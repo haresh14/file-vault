@@ -9,9 +9,13 @@ import SwiftUI
 
 @main
 struct File_VaultApp: App {
+    // Initialize Core Data
+    let coreDataManager = CoreDataManager.shared
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(\.managedObjectContext, coreDataManager.context)
         }
     }
 }
