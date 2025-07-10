@@ -42,6 +42,16 @@ struct PasscodeView: View {
                     .font(.system(size: 60))
                     .foregroundColor(.blue)
                     .padding(.bottom, 20)
+                    #if DEBUG
+                    .onLongPressGesture(minimumDuration: 3.0) {
+                        // Secret reset for testing - long press lock icon for 3 seconds
+                        print("DEBUG: Resetting app via long press")
+                        try? KeychainManager.shared.deletePassword()
+                        KeychainManager.shared.setBiometricEnabled(false)
+                        KeychainManager.shared.clearLastBackgroundTime()
+                        exit(0) // Force quit to restart fresh
+                    }
+                    #endif
                 
                 // Title
                 Text(isSettingPasscode ? "Set Your Passcode" : "Enter Passcode")
@@ -100,7 +110,7 @@ struct PasscodeView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: 300)
                             .padding()
-                            .background(Color.blue)
+                            .background(passcode.isEmpty || (isSettingPasscode && confirmPasscode.isEmpty) ? Color.gray : Color.blue)
                             .cornerRadius(10)
                     }
                     .disabled(passcode.isEmpty || (isSettingPasscode && confirmPasscode.isEmpty))
@@ -156,8 +166,10 @@ struct PasscodeView: View {
         
         do {
             try KeychainManager.shared.savePassword(passcode)
+            print("DEBUG: Passcode saved successfully")
             onAuthenticated()
         } catch {
+            print("ERROR: Failed to save passcode: \(error)")
             showError(message: "Failed to save passcode")
         }
     }

@@ -24,23 +24,36 @@ class BiometricAuthManager {
         var error: NSError?
         
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            print("DEBUG: Cannot evaluate biometric policy. Error: \(error?.localizedDescription ?? "Unknown")")
             return .none
         }
         
+        let type: BiometricType
         switch context.biometryType {
         case .touchID:
-            return .touchID
+            type = .touchID
         case .faceID:
-            return .faceID
+            type = .faceID
         default:
-            return .none
+            type = .none
         }
+        
+        print("DEBUG: Biometric type detected: \(type)")
+        return type
     }
     
     func canUseBiometrics() -> Bool {
         let context = LAContext()
         var error: NSError?
-        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        let can = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        
+        if !can {
+            print("DEBUG: Biometrics not available. Error: \(error?.localizedDescription ?? "Unknown")")
+        } else {
+            print("DEBUG: Biometrics available")
+        }
+        
+        return can
     }
     
     func authenticateWithBiometrics(reason: String, completion: @escaping (Bool, Error?) -> Void) {

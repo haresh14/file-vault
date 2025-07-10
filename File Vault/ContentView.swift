@@ -9,35 +9,73 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var isAuthenticated = false
-    @State private var needsPasscodeSetup = false
+    @State private var isPasswordSet = false
+    @State private var isInBackground = false
     
     var body: some View {
-        Group {
-            if !KeychainManager.shared.isPasswordSet() {
-                // First time setup - need to create passcode
-                PasscodeView(isSettingPasscode: true) {
-                    // After setting passcode, show biometric setup
-                    isAuthenticated = true
+        ZStack {
+            Group {
+                if !isPasswordSet {
+                    // First time setup - need to create passcode
+                    PasscodeView(isSettingPasscode: true) {
+                        // After setting passcode, update both states
+                        print("DEBUG: Passcode set successfully, updating states")
+                        isPasswordSet = true
+                        isAuthenticated = true
+                    }
+                } else if !isAuthenticated {
+                    // Show authentication screen
+                    PasscodeView(isSettingPasscode: false) {
+                        print("DEBUG: Authentication successful, setting isAuthenticated = true")
+                        isAuthenticated = true
+                    }
+                } else {
+                    // Main vault view
+                    VaultMainView()
                 }
-            } else if !isAuthenticated {
-                // Show authentication screen
-                PasscodeView(isSettingPasscode: false) {
-                    isAuthenticated = true
-                }
-            } else {
-                // Main vault view (placeholder for now)
-                VaultMainView()
+            }
+            
+            // Privacy overlay when in background
+            if isInBackground {
+                Color.black
+                    .ignoresSafeArea()
+                    .overlay(
+                        VStack {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white)
+                            Text("File Vault")
+                                .font(.title)
+                                .foregroundColor(.white)
+                        }
+                    )
             }
         }
+        .onAppear {
+            // Check if password is already set
+            isPasswordSet = KeychainManager.shared.isPasswordSet()
+            print("DEBUG: ContentView appeared")
+            print("DEBUG: Is password set: \(isPasswordSet)")
+            print("DEBUG: Is authenticated: \(isAuthenticated)")
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            // App is going to background
+            // App is going to background - show privacy overlay and record time
+            isInBackground = true
             KeychainManager.shared.setLastBackgroundTime()
-            isAuthenticated = false
+            print("DEBUG: App going to background, showing privacy overlay")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // App became active - hide privacy overlay
+            isInBackground = false
+            print("DEBUG: App became active, hiding privacy overlay")
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // App is coming to foreground
+            // App is coming to foreground - check if we need authentication
             if KeychainManager.shared.shouldRequireAuthentication() {
                 isAuthenticated = false
+                print("DEBUG: App coming to foreground, requires authentication")
+            } else {
+                print("DEBUG: App coming to foreground, within timeout period - no auth needed")
             }
         }
     }
@@ -76,52 +114,6 @@ struct VaultMainView: View {
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
-            }
-        }
-    }
-}
-
-// Basic settings view
-struct SettingsView: View {
-    @Environment(\.dismiss) var dismiss
-    @State private var biometricEnabled = KeychainManager.shared.isBiometricEnabled()
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section("Security") {
-                    Toggle("Enable Biometric Authentication", isOn: $biometricEnabled)
-                        .onChange(of: biometricEnabled) { newValue in
-                            KeychainManager.shared.setBiometricEnabled(newValue)
-                        }
-                        .disabled(!BiometricAuthManager.shared.canUseBiometrics())
-                    
-                    if BiometricAuthManager.shared.canUseBiometrics() {
-                        HStack {
-                            Image(systemName: BiometricAuthManager.shared.biometricType() == .faceID ? "faceid" : "touchid")
-                            Text("\(BiometricAuthManager.shared.biometricType() == .faceID ? "Face ID" : "Touch ID") Available")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                
-                Section("About") {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
             }
         }
     }

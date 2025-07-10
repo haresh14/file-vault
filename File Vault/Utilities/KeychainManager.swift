@@ -112,18 +112,59 @@ class KeychainManager {
     // MARK: - App Lock State
     
     private let lastBackgroundTimeKey = "lastBackgroundTime"
-    private let lockTimeoutInterval: TimeInterval = 30 // 30 seconds
+    private let lockTimeoutKey = "lockTimeout"
+    
+    enum LockTimeout: Int, CaseIterable {
+        case immediate = 0
+        case thirtySeconds = 30
+        case oneMinute = 60
+        case fiveMinutes = 300
+        case never = -1
+        
+        var displayName: String {
+            switch self {
+            case .immediate: return "Immediately"
+            case .thirtySeconds: return "30 Seconds"
+            case .oneMinute: return "1 Minute"
+            case .fiveMinutes: return "5 Minutes"
+            case .never: return "Never"
+            }
+        }
+    }
+    
+    func setLockTimeout(_ timeout: LockTimeout) {
+        UserDefaults.standard.set(timeout.rawValue, forKey: lockTimeoutKey)
+    }
+    
+    func getLockTimeout() -> LockTimeout {
+        let rawValue = UserDefaults.standard.integer(forKey: lockTimeoutKey)
+        // Default to 30 seconds if not set
+        return LockTimeout(rawValue: rawValue) ?? .thirtySeconds
+    }
     
     func setLastBackgroundTime() {
         UserDefaults.standard.set(Date(), forKey: lastBackgroundTimeKey)
     }
     
     func shouldRequireAuthentication() -> Bool {
+        let timeout = getLockTimeout()
+        
+        // If set to never, don't require authentication
+        if timeout == .never {
+            return false
+        }
+        
+        // If set to immediate, always require authentication
+        if timeout == .immediate {
+            return true
+        }
+        
         guard let lastBackgroundTime = UserDefaults.standard.object(forKey: lastBackgroundTimeKey) as? Date else {
             return true // First launch
         }
         
-        return Date().timeIntervalSince(lastBackgroundTime) > lockTimeoutInterval
+        let timeInterval = Date().timeIntervalSince(lastBackgroundTime)
+        return timeInterval > Double(timeout.rawValue)
     }
     
     func clearLastBackgroundTime() {
