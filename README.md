@@ -2,6 +2,20 @@
 
 A secure vault iOS application to store and manage photos and videos with biometric and passcode protection.
 
+## 🚀 Quick Start for Beginners
+
+**New to iOS development?** Check out our [Developer Guide](DEVELOPER_GUIDE.md) for detailed step-by-step instructions!
+
+### Prerequisites
+- Mac computer with macOS
+- Xcode installed (free from Mac App Store)
+- iOS device or simulator
+
+### Getting Started
+1. Open `File Vault.xcodeproj` in Xcode
+2. Follow the [Developer Guide](DEVELOPER_GUIDE.md#adding-privacy-permissions) to add privacy permissions
+3. Press the ▶️ Play button to run the app
+
 ## Features Implemented
 
 ### Phase 1 - Foundation & Security (✅ Complete)
@@ -34,12 +48,20 @@ File Vault/
 
 ## Setup Instructions
 
+### For Beginners
+Please refer to our comprehensive [Developer Guide](DEVELOPER_GUIDE.md) which includes:
+- How to open the project in Xcode
+- Step-by-step instructions for adding privacy permissions
+- How to build and run the app
+- Common Xcode tasks and troubleshooting
+
+### Quick Setup (Experienced Developers)
 1. Open `File Vault.xcodeproj` in Xcode
-2. Add the following privacy permissions to the project's Info settings:
-   - `NSFaceIDUsageDescription`: "File Vault uses Face ID to protect your private photos and videos"
-   - `NSPhotoLibraryUsageDescription`: "File Vault needs access to your photo library to import photos and videos"
-   - `NSPhotoLibraryAddUsageDescription`: "File Vault needs permission to save photos and videos to your photo library"
-3. Build and run on a physical device or simulator
+2. Add these privacy keys to Info.plist:
+   - `NSFaceIDUsageDescription`
+   - `NSPhotoLibraryUsageDescription`
+   - `NSPhotoLibraryAddUsageDescription`
+3. Build and run (Cmd+R)
 
 ## Security Features
 
@@ -71,4 +93,10 @@ To test the authentication flow:
 1. Launch the app - you'll be prompted to create a passcode
 2. Enter a passcode (minimum 4 characters)
 3. Enable biometric authentication in Settings
-4. Background the app and return after 30 seconds to test auto-lock 
+4. Background the app and return after 30 seconds to test auto-lock
+
+## Need Help?
+
+- **New to iOS?** Start with our [Developer Guide](DEVELOPER_GUIDE.md)
+- **Xcode Issues?** Check the [Troubleshooting section](DEVELOPER_GUIDE.md#troubleshooting)
+- **Understanding the code?** Each file has comments explaining its purpose 
