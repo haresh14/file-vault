@@ -26,130 +26,177 @@ struct PasscodeView: View {
     
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            backgroundGradient
             
             VStack(spacing: 30) {
                 Spacer()
                 
-                // Lock icon
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                    .padding(.bottom, 20)
-                    #if DEBUG
-                    .onLongPressGesture(minimumDuration: 3.0) {
-                        // Secret reset for testing - long press lock icon for 3 seconds
-                        print("DEBUG: Resetting app via long press")
-                        try? KeychainManager.shared.deletePassword()
-                        KeychainManager.shared.setBiometricEnabled(false)
-                        KeychainManager.shared.clearLastBackgroundTime()
-                        exit(0) // Force quit to restart fresh
-                    }
-                    #endif
-                
-                // Title
-                Text(isSettingPasscode ? "Set Your Passcode" : "Enter Passcode")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                // Subtitle
-                Text(isSettingPasscode ? "Create a secure passcode to protect your vault" : "Access your secure vault")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                lockIcon
+                titleText
+                subtitleText
                 
                 VStack(spacing: 20) {
-                    // Passcode field
-                    SecureField("Passcode", text: $passcode)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(maxWidth: 300)
-                        .focused($isPasscodeFocused)
-                        .onSubmit {
-                            if isSettingPasscode && !confirmPasscode.isEmpty {
-                                handleSetPasscode()
-                            } else if !isSettingPasscode {
-                                handleAuthentication()
-                            }
-                        }
-                    
-                    // Confirm passcode field (only when setting)
-                    if isSettingPasscode {
-                        SecureField("Confirm Passcode", text: $confirmPasscode)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .frame(maxWidth: 300)
-                            .onSubmit {
-                                handleSetPasscode()
-                            }
-                    }
-                    
-                    // Error message
-                    if showError {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .transition(.opacity)
-                    }
-                    
-                    // Action button
-                    Button(action: {
-                        if isSettingPasscode {
-                            handleSetPasscode()
-                        } else {
-                            handleAuthentication()
-                        }
-                    }) {
-                        Text(isSettingPasscode ? "Set Passcode" : "Unlock")
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 300)
-                            .padding()
-                            .background(passcode.isEmpty || (isSettingPasscode && confirmPasscode.isEmpty) ? Color.gray : Color.blue)
-                            .cornerRadius(10)
-                    }
-                    .disabled(passcode.isEmpty || (isSettingPasscode && confirmPasscode.isEmpty))
-                    
-                    // Cancel button (if available)
-                    if let onCancel = onCancel {
-                        Button("Cancel") {
-                            onCancel()
-                        }
-                        .foregroundColor(.blue)
-                    }
+                    passcodeFields
+                    errorView
+                    actionButton
+                    cancelButton
                 }
                 
                 Spacer()
                 
-                // Biometric authentication option
-                if !isSettingPasscode && KeychainManager.shared.isBiometricEnabled() && BiometricAuthManager.shared.canUseBiometrics() {
-                    Button(action: authenticateWithBiometrics) {
-                        HStack {
-                            Image(systemName: BiometricAuthManager.shared.biometricType() == .faceID ? "faceid" : "touchid")
-                                .font(.title2)
-                            Text("Use \(BiometricAuthManager.shared.biometricType() == .faceID ? "Face ID" : "Touch ID")")
-                        }
-                        .foregroundColor(.blue)
-                    }
-                    .padding(.bottom, 30)
-                }
+                biometricButton
             }
             .padding()
         }
-        .onAppear {
-            isPasscodeFocused = true
-            
-            // Auto-trigger biometric authentication if enabled
-            if !isSettingPasscode && KeychainManager.shared.isBiometricEnabled() {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    authenticateWithBiometrics()
+        .onAppear(perform: handleOnAppear)
+    }
+    
+    // MARK: - View Components
+    
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+    
+    private var lockIcon: some View {
+        Image(systemName: "lock.fill")
+            .font(.system(size: 60))
+            .foregroundColor(.blue)
+            .padding(.bottom, 20)
+            #if DEBUG
+            .onLongPressGesture(minimumDuration: 3.0, perform: performDebugReset)
+            #endif
+    }
+    
+    private var titleText: some View {
+        Text(isSettingPasscode ? "Set Your Passcode" : "Enter Passcode")
+            .font(.largeTitle)
+            .fontWeight(.bold)
+    }
+    
+    private var subtitleText: some View {
+        Text(isSettingPasscode ? "Create a secure passcode to protect your vault" : "Access your secure vault")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    private var passcodeFields: some View {
+        SecureField("Passcode", text: $passcode)
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .frame(maxWidth: 300)
+            .focused($isPasscodeFocused)
+            .onSubmit(handlePasscodeSubmit)
+        
+        if isSettingPasscode {
+            SecureField("Confirm Passcode", text: $confirmPasscode)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(maxWidth: 300)
+                .onSubmit(handleSetPasscode)
+        }
+    }
+    
+    @ViewBuilder
+    private var errorView: some View {
+        if showError {
+            Text(errorMessage)
+                .foregroundColor(.red)
+                .font(.caption)
+                .transition(.opacity)
+        }
+    }
+    
+    private var actionButton: some View {
+        Button(action: handleButtonAction) {
+            Text(isSettingPasscode ? "Set Passcode" : "Unlock")
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .frame(maxWidth: 300)
+                .padding()
+                .background(buttonBackgroundColor)
+                .cornerRadius(10)
+        }
+        .disabled(isButtonDisabled)
+    }
+    
+    @ViewBuilder
+    private var cancelButton: some View {
+        if let onCancel = onCancel {
+            Button("Cancel", action: onCancel)
+                .foregroundColor(.blue)
+        }
+    }
+    
+    @ViewBuilder
+    private var biometricButton: some View {
+        if shouldShowBiometric {
+            Button(action: authenticateWithBiometrics) {
+                HStack {
+                    Image(systemName: biometricIconName)
+                        .font(.title2)
+                    Text("Use \(biometricDisplayName)")
                 }
+                .foregroundColor(.blue)
             }
+            .padding(.bottom, 30)
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var buttonBackgroundColor: Color {
+        isButtonDisabled ? Color.gray : Color.blue
+    }
+    
+    private var isButtonDisabled: Bool {
+        passcode.isEmpty || (isSettingPasscode && confirmPasscode.isEmpty)
+    }
+    
+    private var shouldShowBiometric: Bool {
+        !isSettingPasscode && 
+        KeychainManager.shared.isBiometricEnabled() && 
+        BiometricAuthManager.shared.canUseBiometrics()
+    }
+    
+    private var biometricIconName: String {
+        BiometricAuthManager.shared.biometricType() == .faceID ? "faceid" : "touchid"
+    }
+    
+    private var biometricDisplayName: String {
+        BiometricAuthManager.shared.biometricType() == .faceID ? "Face ID" : "Touch ID"
+    }
+    
+    // MARK: - Actions
+    
+    private func handleOnAppear() {
+        isPasscodeFocused = true
+        
+        if shouldShowBiometric {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                authenticateWithBiometrics()
+            }
+        }
+    }
+    
+    private func handlePasscodeSubmit() {
+        if isSettingPasscode && !confirmPasscode.isEmpty {
+            handleSetPasscode()
+        } else if !isSettingPasscode {
+            handleAuthentication()
+        }
+    }
+    
+    private func handleButtonAction() {
+        if isSettingPasscode {
+            handleSetPasscode()
+        } else {
+            handleAuthentication()
         }
     }
     
@@ -209,4 +256,14 @@ struct PasscodeView: View {
             showError = false
         }
     }
+    
+    #if DEBUG
+    private func performDebugReset() {
+        print("DEBUG: Resetting app via long press")
+        try? KeychainManager.shared.deletePassword()
+        KeychainManager.shared.setBiometricEnabled(false)
+        KeychainManager.shared.clearLastBackgroundTime()
+        exit(0)
+    }
+    #endif
 } 
