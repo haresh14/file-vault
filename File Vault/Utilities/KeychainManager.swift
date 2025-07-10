@@ -116,6 +116,9 @@ class KeychainManager {
     
     enum LockTimeout: Int, CaseIterable {
         case immediate = 0
+        case fiveSeconds = 5
+        case tenSeconds = 10
+        case fifteenSeconds = 15
         case thirtySeconds = 30
         case oneMinute = 60
         case fiveMinutes = 300
@@ -124,6 +127,9 @@ class KeychainManager {
         var displayName: String {
             switch self {
             case .immediate: return "Immediately"
+            case .fiveSeconds: return "5 Seconds"
+            case .tenSeconds: return "10 Seconds"
+            case .fifteenSeconds: return "15 Seconds"
             case .thirtySeconds: return "30 Seconds"
             case .oneMinute: return "1 Minute"
             case .fiveMinutes: return "5 Minutes"

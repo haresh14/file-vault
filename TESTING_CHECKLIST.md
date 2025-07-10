@@ -46,15 +46,31 @@ Test each timeout option:
 1. [ ] **Set to "Immediately"**
    - Background app → Return immediately → Should require passcode
    
-2. [ ] **Set to "30 Seconds"** (default)
+2. [ ] **Set to "5 Seconds"**
+   - Background app → Return within 3 seconds → Should NOT require passcode
+   - Background app → Wait 6+ seconds → Return → Should require passcode
+   
+3. [ ] **Set to "10 Seconds"**
+   - Background app → Return within 8 seconds → Should NOT require passcode
+   - Background app → Wait 12+ seconds → Return → Should require passcode
+   
+4. [ ] **Set to "15 Seconds"**
+   - Background app → Return within 12 seconds → Should NOT require passcode
+   - Background app → Wait 17+ seconds → Return → Should require passcode
+   
+5. [ ] **Set to "30 Seconds"** (default)
    - Background app → Return within 20 seconds → Should NOT require passcode
    - Background app → Wait 35+ seconds → Return → Should require passcode
    
-3. [ ] **Set to "1 Minute"**
+6. [ ] **Set to "1 Minute"**
    - Background app → Return within 50 seconds → Should NOT require passcode
    - Background app → Wait 65+ seconds → Return → Should require passcode
    
-4. [ ] **Set to "Never"**
+7. [ ] **Set to "5 Minutes"**
+   - Background app → Return within 4 minutes → Should NOT require passcode
+   - Background app → Wait 5+ minutes → Return → Should require passcode
+   
+8. [ ] **Set to "Never"**
    - Background app → Wait any amount of time → Return → Should NOT require passcode
    - ⚠️ Not recommended for security
 
@@ -67,16 +83,21 @@ Test each timeout option:
 
 ## Biometric Authentication Test 🔍
 
+**⚠️ Important Note:** Biometric authentication has limited functionality on simulator. For full testing, use a physical device with Face ID or Touch ID.
+
 **For Simulator:**
 1. [ ] Enable Face ID in simulator: **Features → Face ID → Enrolled**
 2. [ ] In Settings, biometric toggle should show warning if not available
 3. [ ] If available, toggle ON and test authentication
+4. [ ] You can simulate Face ID match: **Features → Face ID → Matching Face**
+5. [ ] You can simulate Face ID failure: **Features → Face ID → Non-matching Face**
 
 **For Physical Device:**
 1. [ ] If device has Face ID/Touch ID, toggle should work
 2. [ ] Background app → Wait for timeout → Return
 3. [ ] Should prompt for biometric automatically
 4. [ ] Cancel biometric → Should show passcode screen
+5. [ ] Approve biometric → Should unlock immediately
 
 **Console Messages to Check:**
 - Look for: `"DEBUG: Biometrics available"` or `"DEBUG: Biometrics not available"`

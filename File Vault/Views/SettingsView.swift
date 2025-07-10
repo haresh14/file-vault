@@ -161,6 +161,12 @@ struct SettingsView: View {
         switch lockTimeout {
         case .immediate:
             return "App will lock immediately when backgrounded"
+        case .fiveSeconds:
+            return "App will lock after 5 seconds in background"
+        case .tenSeconds:
+            return "App will lock after 10 seconds in background"
+        case .fifteenSeconds:
+            return "App will lock after 15 seconds in background"
         case .thirtySeconds:
             return "App will lock after 30 seconds in background"
         case .oneMinute:
