@@ -177,11 +177,8 @@ struct PasscodeView: View {
     private func handleOnAppear() {
         isPasscodeFocused = true
         
-        if shouldShowBiometric {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                authenticateWithBiometrics()
-            }
-        }
+        // Removed automatic biometric trigger - now handled by ContentView
+        // to prevent UI jerking and duplicate prompts
     }
     
     private func handlePasscodeSubmit() {
