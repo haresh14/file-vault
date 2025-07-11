@@ -202,7 +202,7 @@ struct VaultMainView: View {
             loadVaultItems()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
-            print("DEBUG: Received refresh notification")
+            // Refreshing vault items
             loadVaultItems()
         }
     }
@@ -229,15 +229,10 @@ struct VaultMainView: View {
     // MARK: - Functions
     
     private func loadVaultItems() {
-        print("DEBUG: loadVaultItems called")
         let items = CoreDataManager.shared.fetchAllVaultItems()
-        print("DEBUG: Fetched \(items.count) vault items")
         vaultItems = items
         
-        // Debug print all items
-        for item in items {
-            print("DEBUG: Item - fileName: \(item.fileName ?? "nil"), thumbnail: \(item.thumbnailFileName ?? "nil")")
-        }
+        // Items loaded successfully
     }
     
     private func toggleSelection(for item: VaultItem) {
@@ -270,7 +265,6 @@ struct VaultMainView: View {
     private func importAssets(_ assets: [PHAsset]) {
         guard !assets.isEmpty else { return }
         
-        print("DEBUG: Starting import of \(assets.count) assets")
         showPhotoPicker = false
         isImporting = true
         importProgress = 0
@@ -279,22 +273,20 @@ struct VaultMainView: View {
         var processedItems = 0.0
         
         for asset in assets {
-            print("DEBUG: Processing asset type: \(asset.mediaType.rawValue)")
             FileStorageManager.shared.importFromPhotoLibrary(asset: asset) { result in
                 DispatchQueue.main.async {
                     switch result {
-                    case .success(let vaultItem):
-                        print("DEBUG: Successfully imported asset: \(vaultItem.fileName ?? "")")
-                        print("DEBUG: Thumbnail filename: \(vaultItem.thumbnailFileName ?? "none")")
+                    case .success(_):
+                        // Asset imported successfully
+                        break
                     case .failure(let error):
-                        print("DEBUG: Error importing asset: \(error)")
+                        print("Error importing asset: \(error)")
                     }
                     
                     processedItems += 1
                     importProgress = processedItems / totalItems
                     
                     if processedItems == totalItems {
-                        print("DEBUG: All items imported, reloading vault items")
                         isImporting = false
                         loadVaultItems()
                     }
@@ -403,8 +395,7 @@ struct VaultItemCell: View {
     }
     
     private func loadThumbnail() {
-        print("DEBUG: VaultItemCell loading thumbnail for \(item.fileName ?? "")")
-        print("DEBUG: Thumbnail filename: \(item.thumbnailFileName ?? "none")")
+        // Loading thumbnail for item
         
         DispatchQueue.global(qos: .userInitiated).async {
             let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: item)
@@ -413,16 +404,9 @@ struct VaultItemCell: View {
                 self.thumbnail = loadedThumbnail
                 self.isLoadingThumbnail = false
                 
-                if loadedThumbnail != nil {
-                    print("DEBUG: ✅ Thumbnail loaded successfully for \(item.fileName ?? "")")
-                } else {
-                    print("DEBUG: ❌ Thumbnail failed to load for \(item.fileName ?? "")")
-                    print("DEBUG: File type: \(item.fileType ?? "unknown")")
-                    print("DEBUG: Thumbnail filename: \(item.thumbnailFileName ?? "none")")
-                    
+                if loadedThumbnail == nil {
                     // Try to regenerate thumbnail if it's missing
                     if item.thumbnailFileName == nil || item.thumbnailFileName?.isEmpty == true {
-                        print("DEBUG: Attempting to regenerate thumbnail for \(item.fileName ?? "")")
                         self.regenerateThumbnail()
                     }
                 }
@@ -447,7 +431,6 @@ struct VaultItemCell: View {
                         
                         DispatchQueue.main.async {
                             self.thumbnail = thumbnail
-                            print("DEBUG: ✅ Regenerated image thumbnail for \(item.fileName ?? "")")
                         }
                     }
                 } else if item.isVideo {
@@ -469,12 +452,11 @@ struct VaultItemCell: View {
                         
                         DispatchQueue.main.async {
                             self.thumbnail = thumbnail
-                            print("DEBUG: ✅ Regenerated video thumbnail for \(item.fileName ?? "")")
                         }
                     }
                 }
             } catch {
-                print("DEBUG: ❌ Error regenerating thumbnail: \(error)")
+                print("Error regenerating thumbnail: \(error)")
             }
         }
     }

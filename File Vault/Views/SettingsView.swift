@@ -65,13 +65,11 @@ struct SettingsView: View {
             Toggle("Screenshot Protection", isOn: $securityManager.isScreenshotProtectionEnabled)
                 .onChange(of: securityManager.isScreenshotProtectionEnabled) { newValue in
                     securityManager.enableScreenshotProtection(newValue)
-                    print("DEBUG: Screenshot protection enabled: \(newValue)")
                 }
             
             Toggle("Screen Recording Protection", isOn: $securityManager.isRecordingProtectionEnabled)
                 .onChange(of: securityManager.isRecordingProtectionEnabled) { newValue in
                     securityManager.enableRecordingProtection(newValue)
-                    print("DEBUG: Screen recording protection enabled: \(newValue)")
                 }
             
             VStack(alignment: .leading, spacing: 5) {
@@ -153,7 +151,6 @@ struct SettingsView: View {
         }
         .onChange(of: lockTimeout) { newValue in
             KeychainManager.shared.setLockTimeout(newValue)
-            print("DEBUG: Lock timeout changed to: \(newValue.displayName)")
         }
     }
     
@@ -253,14 +250,14 @@ struct SettingsView: View {
             do {
                 try FileStorageManager.shared.deleteFile(vaultItem: item)
             } catch {
-                print("DEBUG: Error deleting file: \(error)")
+                print("Error deleting file: \(error)")
             }
             
             // Delete from Core Data
             CoreDataManager.shared.deleteVaultItem(item)
         }
         
-        print("DEBUG: All files deleted successfully")
+        // Files deleted successfully
         
         // Send notification to refresh vault items
         NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)

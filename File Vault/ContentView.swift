@@ -72,9 +72,7 @@ struct ContentView: View {
     
     private func handleOnAppear() {
         isPasswordSet = KeychainManager.shared.isPasswordSet()
-        print("DEBUG: ContentView appeared")
-        print("DEBUG: Is password set: \(isPasswordSet)")
-        print("DEBUG: Is authenticated: \(isAuthenticated)")
+        // ContentView appeared - checking authentication state
         
         // Request photo library permission
         requestPhotoLibraryPermission()
@@ -143,7 +141,7 @@ struct ContentView: View {
                             KeychainManager.shared.clearLastBackgroundTime()
                             isAuthenticated = true
                             isCheckingBiometric = false
-                            print("DEBUG: Biometric authentication successful")
+                            // Biometric authentication successful
                             
                             // Setup encryption key for file storage
                             if let password = try? KeychainManager.shared.getPassword() {
@@ -168,7 +166,7 @@ struct ContentView: View {
     }
     
     private func handlePasscodeSet() {
-        print("DEBUG: Passcode set successfully, updating states")
+                    // Passcode set successfully
         isPasswordSet = true
         isAuthenticated = true
         
@@ -179,7 +177,7 @@ struct ContentView: View {
     }
     
     private func handleAuthentication() {
-        print("DEBUG: Authentication successful, setting isAuthenticated = true")
+        // Authentication successful
         isAuthenticated = true
         shouldShowPasscode = false
         

@@ -210,7 +210,7 @@ struct PasscodeView: View {
         
         do {
             try KeychainManager.shared.savePassword(passcode)
-            print("DEBUG: Passcode saved successfully")
+            // Passcode saved successfully
             onAuthenticated()
         } catch {
             print("ERROR: Failed to save passcode: \(error)")
@@ -256,7 +256,7 @@ struct PasscodeView: View {
     
     #if DEBUG
     private func performDebugReset() {
-        print("DEBUG: Resetting app via long press")
+        // Resetting app via long press
         try? KeychainManager.shared.deletePassword()
         KeychainManager.shared.setBiometricEnabled(false)
         KeychainManager.shared.clearLastBackgroundTime()

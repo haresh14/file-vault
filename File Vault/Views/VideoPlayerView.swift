@@ -36,14 +36,13 @@ struct UnifiedMediaViewerView: View {
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .ignoresSafeArea()
                 .onChange(of: currentIndex) { oldValue, newValue in
-                    print("DEBUG: TabView index changed from \(oldValue) to \(newValue)")
+                    // Media index changed
                 }
             }
         }
         .statusBarHidden()
         .onAppear {
             currentIndex = initialIndex
-            print("DEBUG: UnifiedMediaViewer appeared with \(mediaItems.count) items, initial index: \(initialIndex)")
         }
         .gesture(
             // Swipe down to close
@@ -75,14 +74,12 @@ struct AutoPlayVideoView: View {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
                     .onAppear {
-                        print("DEBUG: VideoPlayer appeared for \(vaultItem.fileName ?? "unknown")")
                         if isActive && !hasLoadedOnce {
                             player.play()
                             hasLoadedOnce = true
                         }
                     }
                     .onChange(of: isActive) { oldValue, newValue in
-                        print("DEBUG: Video \(vaultItem.fileName ?? "unknown") isActive changed: \(oldValue) -> \(newValue)")
                         if newValue {
                             // Only play if we haven't played before or if the video ended
                             if !hasLoadedOnce || player.currentTime() >= player.currentItem?.duration ?? CMTime.zero {
@@ -125,19 +122,16 @@ struct AutoPlayVideoView: View {
             }
         }
         .onAppear {
-            print("DEBUG: AutoPlayVideoView appeared for \(vaultItem.fileName ?? "unknown")")
             if player == nil {
                 loadVideo()
             }
         }
         .onDisappear {
-            print("DEBUG: AutoPlayVideoView disappeared for \(vaultItem.fileName ?? "unknown")")
             player?.pause()
         }
     }
     
     private func loadVideo() {
-        print("DEBUG: Loading video for \(vaultItem.fileName ?? "unknown")")
         Task {
             do {
                 let fileData = try FileStorageManager.shared.loadFile(vaultItem: vaultItem)
@@ -168,8 +162,6 @@ struct AutoPlayVideoView: View {
                     self.player = newPlayer
                     self.isLoading = false
                     
-                    print("DEBUG: Video player created for \(vaultItem.fileName ?? "unknown"), isActive: \(isActive)")
-                    
                     // Auto-play if active
                     if isActive {
                         newPlayer.play()
@@ -185,7 +177,7 @@ struct AutoPlayVideoView: View {
                 await MainActor.run {
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
-                    print("DEBUG: Error loading video: \(error)")
+                    print("Error loading video: \(error)")
                 }
             }
         }

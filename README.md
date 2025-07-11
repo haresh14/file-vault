@@ -18,12 +18,17 @@ A secure vault iOS application to store and manage photos and videos with biomet
 
 ## Features Implemented
 
-### Phase 1 - Foundation & Security (✅ Complete)
+### ✅ Complete Features
 - **Core Data Setup**: Created data models for VaultItem and Folder with proper relationships
 - **Keychain Integration**: Secure password storage using iOS Keychain Services
 - **Biometric Authentication**: Face ID/Touch ID support using LocalAuthentication framework
 - **Passcode Protection**: Custom passcode entry UI with secure text fields
 - **Authentication Flow**: Combined biometric and passcode authentication with automatic lock on app backgrounding
+- **File Storage**: Secure encrypted file storage with AES-GCM encryption
+- **Photo/Video Import**: Import from photo library with thumbnail generation
+- **Media Viewer**: Unified photo and video viewer with zoom, pan, and auto-play
+- **Web Upload**: Local web server for browser-based file uploads
+- **Security Features**: Screenshot protection, screen recording detection, app backgrounding protection
 
 ## Project Structure
 
@@ -70,16 +75,15 @@ Please refer to our comprehensive [Developer Guide](DEVELOPER_GUIDE.md) which in
 - **Auto-lock**: App automatically locks after 30 seconds in background
 - **Core Data Encryption**: Data protection enabled with `FileProtectionType.complete`
 
-## Next Steps
+## Current Issues (TODO)
 
-- [ ] File storage implementation with encryption
-- [ ] Main vault UI with grid/list view
-- [ ] Photo import from gallery
-- [ ] File operations (delete, rename, organize)
-- [ ] Photo viewer with zoom/pan
-- [ ] Video player with advanced controls
-- [ ] Web server for browser-based uploads
-- [ ] Unit tests
+- [ ] Fix thumbnail stretching/squeezing in gallery view
+- [ ] Fix swipe navigation on images in photo viewer
+- [ ] Fix video player white screen on first load
+- [ ] Fix video brightness/color rendering issues
+- [ ] Add missing video player controls (seek bar, volume)
+- [ ] Fix video pinch zoom functionality
+- [ ] Fix video double-tap zoom functionality
 
 ## Requirements
 

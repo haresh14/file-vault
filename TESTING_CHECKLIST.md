@@ -1,6 +1,6 @@
-# Testing Checklist - Phase 1 (Updated)
+# Testing Checklist - Core Features
 
-Use this checklist to verify that the authentication features are working correctly before proceeding to the next phase.
+Use this checklist to verify that all core features are working correctly.
 
 ## Pre-Test Setup ✅
 
@@ -157,7 +157,7 @@ Test each timeout option:
 
 ## Known Limitations 📝
 
-These are expected behaviors in Phase 1:
+These are expected behaviors:
 - Main screen only shows placeholder content
 - No actual photo/video storage yet
 - No ability to change passcode after initial setup
@@ -179,13 +179,15 @@ These are expected behaviors in Phase 1:
 - Should appear immediately when backgrounding
 - Check console for: `"DEBUG: App going to background, showing privacy overlay"`
 
-## Ready for Phase 2? ✨
+## All Tests Complete? ✨
 
-If all tests pass, you're ready to proceed to the next phase:
+If all tests pass, the core features are working correctly:
 - [ ] All authentication flows work correctly
 - [ ] Lock timeout works as configured
 - [ ] Privacy overlay protects content in app switcher
+- [ ] File storage and import working
+- [ ] Media viewer functioning
+- [ ] Web upload server operational
 - [ ] No crashes or major bugs
-- [ ] Understand the current code structure
 
-Congratulations! The security foundation is solid and ready for file storage implementation. 🎉 
+Congratulations! The File Vault app is fully functional! 🎉 
