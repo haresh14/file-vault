@@ -22,6 +22,7 @@ struct VaultMainView: View {
     @State private var searchText = ""
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
+    @State private var showWebUpload = false
     
     @Environment(\.managedObjectContext) var context
     
@@ -138,6 +139,10 @@ struct VaultMainView: View {
                         Button("Select All") {
                             selectedVaultItems = Set(vaultItems)
                         }
+                    } else {
+                        Button(action: { showWebUpload = true }) {
+                            Image(systemName: "globe")
+                        }
                     }
                 }
                 
@@ -156,6 +161,9 @@ struct VaultMainView: View {
                 PhotoPickerView { assets in
                     importAssets(assets)
                 }
+            }
+            .sheet(isPresented: $showWebUpload) {
+                WebUploadView()
             }
             .overlay(
                 Group {

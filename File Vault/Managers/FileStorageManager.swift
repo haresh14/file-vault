@@ -11,6 +11,7 @@ import UIKit
 import AVFoundation
 import Photos
 import UniformTypeIdentifiers
+import CoreData
 
 class FileStorageManager {
     static let shared = FileStorageManager()
@@ -396,10 +397,42 @@ class FileStorageManager {
     
     // MARK: - Storage Info
     
-    func getStorageInfo() -> (usedSpace: Int64, fileCount: Int) {
-        let items = CoreDataManager.shared.fetchAllVaultItems()
-        let usedSpace = items.reduce(0) { $0 + $1.fileSize }
-        return (usedSpace, items.count)
+    func getStorageInfo() -> (fileCount: Int, usedSpace: Int64) {
+        let context = CoreDataManager.shared.persistentContainer.viewContext
+        
+        let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        
+        do {
+            let items = try context.fetch(request)
+            let fileCount = items.count
+            
+            // Calculate used space by summing file sizes
+            var usedSpace: Int64 = 0
+            for item in items {
+                if let fileName = item.fileName {
+                    let fileURL = vaultDirectory.appendingPathComponent(fileName)
+                    if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                       let fileSize = attributes[FileAttributeKey.size] as? Int64 {
+                        usedSpace += fileSize
+                    }
+                }
+                
+                // Also count thumbnail size
+                if let thumbnailFileName = item.thumbnailFileName {
+                    let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
+                    if let attributes = try? FileManager.default.attributesOfItem(atPath: thumbnailURL.path),
+                       let thumbnailSize = attributes[FileAttributeKey.size] as? Int64 {
+                        usedSpace += thumbnailSize
+                    }
+                }
+            }
+            
+            return (fileCount: fileCount, usedSpace: usedSpace)
+            
+        } catch {
+            print("DEBUG: Error fetching storage info: \(error)")
+            return (fileCount: 0, usedSpace: 0)
+        }
     }
     
     // MARK: - Import from Photo Library
