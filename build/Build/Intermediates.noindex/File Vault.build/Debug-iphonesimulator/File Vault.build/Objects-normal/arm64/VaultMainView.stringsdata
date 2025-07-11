@@ -1,0 +1,104 @@
+{
+  "source": "/Users/mac/Flexteam/projects/flexteam/File Vault/File Vault/Views/VaultMainView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%lld selected",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 126
+        }
+      },
+      {
+        "comment": "",
+        "key": "File Vault",
+        "location": {
+          "startingColumn": 89,
+          "startingLine": 126
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete Items",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 160
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search files",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select All",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 161
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 162
+        }
+      },
+      {
+        "comment": "",
+        "key": "Are you sure you want to delete %lld item(s)? This action cannot be undone.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 166
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your Vault is Empty",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 186
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap the + button to add photos and videos",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 190
+        }
+      },
+      {
+        "comment": "",
+        "key": "Importing...",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 380
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 384
+        }
+      }
+    ]
+  },
+  "version": 1
+}

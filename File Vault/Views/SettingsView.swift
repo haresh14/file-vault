@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var biometricEnabled = KeychainManager.shared.isBiometricEnabled()
     @State private var showResetAlert = false
     @State private var showResetConfirmation = false
+    @State private var showDeleteFilesAlert = false
     @State private var lockTimeout = KeychainManager.shared.getLockTimeout()
     @State private var showBiometricAlert = false
     
@@ -73,23 +74,32 @@ struct SettingsView: View {
     
     #if DEBUG
     private var developerSection: some View {
-        Section("Developer Options") {
+        Section(header: Text("Developer Options")) {
             Button(action: { showResetAlert = true }) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                    Text("Reset App (Testing Only)")
-                        .foregroundColor(.red)
-                }
+                Label("Reset App (Delete All Data)", systemImage: "exclamationmark.triangle")
+                    .foregroundColor(.red)
             }
-            .alert("Reset App?", isPresented: $showResetAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Reset", role: .destructive) {
-                    resetApp()
-                }
-            } message: {
-                Text("This will delete your passcode and all app data. This option is only available in debug builds.")
+            
+            Button(action: { showDeleteFilesAlert = true }) {
+                Label("Delete All Files Only", systemImage: "trash.fill")
+                    .foregroundColor(.orange)
             }
+        }
+        .alert("Reset App", isPresented: $showResetAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                resetApp()
+            }
+        } message: {
+            Text("This will delete all data including your passcode and files. You'll need to set up the app again.")
+        }
+        .alert("Delete All Files", isPresented: $showDeleteFilesAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete All", role: .destructive) {
+                performDeleteAllFiles()
+            }
+        } message: {
+            Text("This will delete all files in your vault but keep your passcode and settings.")
         }
     }
     #endif
@@ -204,5 +214,29 @@ struct SettingsView: View {
         } catch {
             print("Error resetting app: \(error)")
         }
+    }
+    
+    private func performDeleteAllFiles() {
+        // Delete all vault items from Core Data
+        let vaultItems = CoreDataManager.shared.fetchAllVaultItems()
+        
+        for item in vaultItems {
+            // Delete file from storage
+            do {
+                try FileStorageManager.shared.deleteFile(vaultItem: item)
+            } catch {
+                print("DEBUG: Error deleting file: \(error)")
+            }
+            
+            // Delete from Core Data
+            CoreDataManager.shared.deleteVaultItem(item)
+        }
+        
+        print("DEBUG: All files deleted successfully")
+        
+        // Send notification to refresh vault items
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
+        dismiss()
     }
 } 

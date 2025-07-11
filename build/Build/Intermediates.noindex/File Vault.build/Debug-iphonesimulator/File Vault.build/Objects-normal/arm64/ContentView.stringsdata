@@ -1,0 +1,24 @@
+{
+  "source": "/Users/mac/Flexteam/projects/flexteam/File Vault/File Vault/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Checking Authentication...",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 210
+        }
+      },
+      {
+        "comment": "",
+        "key": "File Vault",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 232
+        }
+      }
+    ]
+  },
+  "version": 1
+}

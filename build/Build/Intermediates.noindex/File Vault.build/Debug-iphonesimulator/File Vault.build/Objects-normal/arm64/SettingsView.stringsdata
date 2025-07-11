@@ -1,0 +1,240 @@
+{
+  "source": "/Users/mac/Flexteam/projects/flexteam/File Vault/File Vault/Views/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Biometric Authentication",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 39
+        }
+      },
+      {
+        "comment": "",
+        "key": "App Reset",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 44
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 31
+        }
+      },
+      {
+        "comment": "",
+        "key": "Security",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 54
+        }
+      },
+      {
+        "comment": "",
+        "key": "Lock Behavior",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 62
+        }
+      },
+      {
+        "comment": "",
+        "key": "Developer Options",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 77
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset App",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 88
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete All Files",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 96
+        }
+      },
+      {
+        "comment": "",
+        "key": "About",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "Biometric authentication is not available on this device. This feature requires Face ID or Touch ID.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "The app has been reset. Please restart the app.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 47
+        }
+      },
+      {
+        "comment": "",
+        "key": "Auto-Lock",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 121
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enable Biometric Authentication",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 133
+        }
+      },
+      {
+        "comment": "",
+        "key": "Current Setting: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset App (Delete All Data)",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete All Files Only",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 84
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 89
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "This will delete all data including your passcode and files. You'll need to set up the app again.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 94
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 97
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete All",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 98
+        }
+      },
+      {
+        "comment": "",
+        "key": "This will delete all files in your vault but keep your passcode and settings.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "Version",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 110
+        }
+      },
+      {
+        "comment": "",
+        "key": "1.0.0",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 112
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ Available",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Biometric authentication not available",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 153
+        }
+      }
+    ]
+  },
+  "version": 1
+}

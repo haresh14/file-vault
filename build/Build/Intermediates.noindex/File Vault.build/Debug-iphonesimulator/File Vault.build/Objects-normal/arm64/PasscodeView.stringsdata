@@ -1,0 +1,88 @@
+{
+  "source": "/Users/mac/Flexteam/projects/flexteam/File Vault/File Vault/Views/PasscodeView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Set Your Passcode",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter Passcode",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create a secure passcode to protect your vault",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 82
+        }
+      },
+      {
+        "comment": "",
+        "key": "Access your secure vault",
+        "location": {
+          "startingColumn": 85,
+          "startingLine": 82
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 91
+        }
+      },
+      {
+        "comment": "",
+        "key": "Confirm Passcode",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 98
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Set Passcode",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 117
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unlock",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 117
+        }
+      },
+      {
+        "comment": "",
+        "key": "Use %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 143
+        }
+      }
+    ]
+  },
+  "version": 1
+}

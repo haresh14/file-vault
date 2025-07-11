@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Photos
 
 struct ContentView: View {
     @State private var isAuthenticated = false
@@ -13,6 +14,12 @@ struct ContentView: View {
     @State private var isInBackground = false
     @State private var isCheckingBiometric = false
     @State private var shouldShowPasscode = false
+    @Environment(\.scenePhase) var scenePhase
+    
+    // Check if password is already set
+    private var hasPassword: Bool {
+        return KeychainManager.shared.isPasswordSet()
+    }
     
     var body: some View {
         ZStack {
@@ -60,6 +67,9 @@ struct ContentView: View {
         print("DEBUG: ContentView appeared")
         print("DEBUG: Is password set: \(isPasswordSet)")
         print("DEBUG: Is authenticated: \(isAuthenticated)")
+        
+        // Request photo library permission
+        requestPhotoLibraryPermission()
         
         // If password is set but not authenticated, check if we should show biometric
         if isPasswordSet && !isAuthenticated {
@@ -109,6 +119,11 @@ struct ContentView: View {
                             isAuthenticated = true
                             isCheckingBiometric = false
                             print("DEBUG: Biometric authentication successful")
+                            
+                            // Setup encryption key for file storage
+                            if let password = try? KeychainManager.shared.getPassword() {
+                                FileStorageManager.shared.setupEncryptionKey(from: password)
+                            }
                         } else {
                             // Show passcode screen on failure or cancel
                             isCheckingBiometric = false
@@ -131,6 +146,11 @@ struct ContentView: View {
         print("DEBUG: Passcode set successfully, updating states")
         isPasswordSet = true
         isAuthenticated = true
+        
+        // Setup encryption key for file storage
+        if let password = try? KeychainManager.shared.getPassword() {
+            FileStorageManager.shared.setupEncryptionKey(from: password)
+        }
     }
     
     private func handleAuthentication() {
@@ -140,6 +160,34 @@ struct ContentView: View {
         
         // Reset biometric failure count after successful passcode entry
         BiometricAuthManager.shared.resetFailureCount()
+        
+        // Setup encryption key for file storage
+        if let password = try? KeychainManager.shared.getPassword() {
+            FileStorageManager.shared.setupEncryptionKey(from: password)
+        }
+    }
+    
+    private func requestPhotoLibraryPermission() {
+        let photoLibraryStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        
+        switch photoLibraryStatus {
+        case .authorized:
+            print("DEBUG: Photo library permission already granted.")
+        case .limited:
+            print("DEBUG: Photo library permission limited. User can select specific photos.")
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+                if status == .authorized || status == .limited {
+                    print("DEBUG: Photo library permission granted (full or limited).")
+                } else {
+                    print("DEBUG: Photo library permission denied or restricted.")
+                }
+            }
+        case .denied, .restricted:
+            print("DEBUG: Photo library permission denied or restricted. Please enable it in Settings.")
+        @unknown default:
+            print("DEBUG: Unknown photo library status.")
+        }
     }
 }
 
@@ -189,43 +237,7 @@ struct PrivacyOverlay: View {
     }
 }
 
-// Main vault view
-struct VaultMainView: View {
-    @State private var showSettings = false
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.green)
-                    .padding()
-                
-                Text("Welcome to Your Vault")
-                    .font(.title)
-                    .fontWeight(.bold)
-                
-                Text("Your photos and videos are secure")
-                    .foregroundColor(.secondary)
-                    .padding()
-                
-                Spacer()
-            }
-            .navigationTitle("File Vault")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showSettings = true }) {
-                        Image(systemName: "gear")
-                    }
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-            }
-        }
-    }
-}
+
 
 #Preview {
     ContentView()
