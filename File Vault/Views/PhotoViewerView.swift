@@ -224,9 +224,6 @@ struct PhotoZoomView: View {
     }
 }
 
-// Array extension for safe indexing
-extension Array {
-    subscript(safe index: Index) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
+#Preview {
+    Text("Photo Viewer Preview")
 } 

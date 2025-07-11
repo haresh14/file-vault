@@ -22,7 +22,7 @@ struct VaultMainView: View {
     @State private var showPhotoViewer = false
     @State private var photoViewerIndex = 0
     @State private var showVideoPlayer = false
-    @State private var selectedVideoItem: VaultItem?
+    @State private var videoViewerIndex = 0
     
     @Environment(\.managedObjectContext) var context
     
@@ -38,6 +38,14 @@ struct VaultMainView: View {
                 item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
+    }
+    
+    var filteredImages: [VaultItem] {
+        return filteredItems.filter { $0.isImage }
+    }
+    
+    var filteredVideos: [VaultItem] {
+        return filteredItems.filter { $0.isVideo }
     }
     
     var body: some View {
@@ -171,14 +179,15 @@ struct VaultMainView: View {
             }
             .fullScreenCover(isPresented: $showPhotoViewer) {
                 PhotoViewerView(
-                    vaultItems: filteredItems.filter { $0.isImage },
+                    vaultItems: filteredImages,
                     initialIndex: photoViewerIndex
                 )
             }
             .fullScreenCover(isPresented: $showVideoPlayer) {
-                if let videoItem = selectedVideoItem {
-                    VideoPlayerView(vaultItem: videoItem)
-                }
+                VideoPlayerView(
+                    vaultItems: filteredVideos,
+                    initialIndex: videoViewerIndex
+                )
             }
         }
         .onAppear {
@@ -234,15 +243,18 @@ struct VaultMainView: View {
     private func viewItem(_ item: VaultItem) {
         if item.isImage {
             // Show photo viewer for images
-            let imageItems = filteredItems.filter { $0.isImage }
+            let imageItems = filteredImages
             if let index = imageItems.firstIndex(where: { $0.objectID == item.objectID }) {
                 photoViewerIndex = index
                 showPhotoViewer = true
             }
         } else if item.isVideo {
             // Show video player for videos
-            selectedVideoItem = item
-            showVideoPlayer = true
+            let videoItems = filteredVideos
+            if let index = videoItems.firstIndex(where: { $0.objectID == item.objectID }) {
+                videoViewerIndex = index
+                showVideoPlayer = true
+            }
         } else {
             print("Unsupported file type: \(item.fileName ?? "")")
         }
