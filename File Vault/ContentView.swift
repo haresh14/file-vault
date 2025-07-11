@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var isInBackground = false
     @State private var isCheckingBiometric = false
     @State private var shouldShowPasscode = false
+    @State private var shouldShowPrivacyOverlay = false
+    @StateObject private var securityManager = SecurityManager.shared
     @Environment(\.scenePhase) var scenePhase
     
     // Check if password is already set
@@ -25,11 +27,14 @@ struct ContentView: View {
         ZStack {
             mainContent
             
-            if isInBackground {
-                PrivacyOverlay()
+            if shouldShowPrivacyOverlay {
+                EnhancedPrivacyOverlay()
             }
         }
         .onAppear(perform: handleOnAppear)
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            handleScenePhaseChange(from: oldPhase, to: newPhase)
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             handleWillResignActive()
         }
@@ -38,6 +43,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             handleWillEnterForeground()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            handleDidEnterBackground()
         }
     }
     
@@ -78,17 +86,21 @@ struct ContentView: View {
     }
     
     private func handleWillResignActive() {
+        shouldShowPrivacyOverlay = true
         isInBackground = true
         KeychainManager.shared.setLastBackgroundTime()
-        print("DEBUG: App going to background, showing privacy overlay")
+        print("DEBUG: App going to background, showing enhanced privacy overlay")
     }
     
     private func handleDidBecomeActive() {
+        shouldShowPrivacyOverlay = false
         isInBackground = false
         print("DEBUG: App became active, hiding privacy overlay")
     }
     
     private func handleWillEnterForeground() {
+        shouldShowPrivacyOverlay = false
+        
         if KeychainManager.shared.shouldRequireAuthentication() {
             isAuthenticated = false
             isCheckingBiometric = false
@@ -101,6 +113,19 @@ struct ContentView: View {
             }
         } else {
             print("DEBUG: App coming to foreground, within timeout period - no auth needed")
+        }
+    }
+    
+    private func handleDidEnterBackground() {
+        shouldShowPrivacyOverlay = true
+        print("DEBUG: App entered background, showing enhanced privacy overlay")
+    }
+    
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        if newPhase == .background {
+            handleWillResignActive()
+        } else if newPhase == .active {
+            handleDidBecomeActive()
         }
     }
     
@@ -218,25 +243,41 @@ struct BiometricCheckView: View {
     }
 }
 
-// Privacy overlay as a separate view
-struct PrivacyOverlay: View {
+// Enhanced privacy overlay with better visual design
+struct EnhancedPrivacyOverlay: View {
     var body: some View {
-        Color.black
-            .ignoresSafeArea()
-            .overlay(
-                VStack(spacing: 10) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.white)
-                    
-                    Text("File Vault")
-                        .font(.title)
-                        .foregroundColor(.white)
-                }
-            )
+        ZStack {
+            Color.black
+                .opacity(0.8)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(.white)
+                
+                Text("File Vault")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                
+                Text("Your vault is protected by advanced security measures.")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                Spacer()
+                
+                Text("App is in background to ensure your privacy.")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.bottom)
+            }
+        }
     }
 }
-
 
 
 #Preview {

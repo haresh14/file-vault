@@ -15,11 +15,13 @@ struct SettingsView: View {
     @State private var showDeleteFilesAlert = false
     @State private var lockTimeout = KeychainManager.shared.getLockTimeout()
     @State private var showBiometricAlert = false
+    @StateObject private var securityManager = SecurityManager.shared
     
     var body: some View {
         NavigationView {
             Form {
                 securitySection
+                advancedSecuritySection
                 lockBehaviorSection
                 
                 #if DEBUG
@@ -55,6 +57,32 @@ struct SettingsView: View {
             lockTimeoutPicker
             biometricToggle
             biometricStatusView
+        }
+    }
+    
+    private var advancedSecuritySection: some View {
+        Section("Advanced Security") {
+            Toggle("Screenshot Protection", isOn: $securityManager.isScreenshotProtectionEnabled)
+                .onChange(of: securityManager.isScreenshotProtectionEnabled) { newValue in
+                    securityManager.enableScreenshotProtection(newValue)
+                    print("DEBUG: Screenshot protection enabled: \(newValue)")
+                }
+            
+            Toggle("Screen Recording Protection", isOn: $securityManager.isRecordingProtectionEnabled)
+                .onChange(of: securityManager.isRecordingProtectionEnabled) { newValue in
+                    securityManager.enableRecordingProtection(newValue)
+                    print("DEBUG: Screen recording protection enabled: \(newValue)")
+                }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Enhanced Protection")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text("Protects your vault contents from screenshots and screen recording attempts.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
     }
     
