@@ -37,13 +37,26 @@ class CoreDataManager {
     func save() {
         let context = persistentContainer.viewContext
         
-        if context.hasChanges {
-            do {
-                try context.save()
-            } catch {
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
+        guard context.hasChanges else { return }
+        
+        do {
+            try context.save()
+        } catch {
+            let nsError = error as NSError
+            print("CoreData save error: \(nsError), \(nsError.userInfo)")
+            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+        }
+    }
+    
+    func saveContext(_ context: NSManagedObjectContext) {
+        guard context.hasChanges else { return }
+        
+        do {
+            try context.save()
+        } catch {
+            let nsError = error as NSError
+            print("CoreData save error: \(nsError), \(nsError.userInfo)")
+            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
         }
     }
     
@@ -62,6 +75,50 @@ class CoreDataManager {
         
         save()
         return item
+    }
+    
+    // Thread-safe version for background imports
+    func createVaultItemInBackground(fileName: String, fileType: String, fileSize: Int64, thumbnailFileName: String? = nil, in folder: Folder? = nil, completion: @escaping (VaultItem?) -> Void) {
+        let backgroundContext = persistentContainer.newBackgroundContext()
+        
+        backgroundContext.perform {
+            let item = VaultItem(context: backgroundContext)
+            item.id = UUID()
+            item.fileName = fileName
+            item.fileType = fileType
+            item.fileSize = fileSize
+            item.thumbnailFileName = thumbnailFileName
+            item.createdAt = Date()
+            item.updatedAt = Date()
+            
+            // Handle folder relationship if needed
+            if let folder = folder {
+                // Get the folder in background context
+                if let folderInBgContext = backgroundContext.object(with: folder.objectID) as? Folder {
+                    item.folder = folderInBgContext
+                }
+            }
+            
+            do {
+                try backgroundContext.save()
+                
+                // Return to main context
+                DispatchQueue.main.async {
+                    do {
+                        let mainContextItem = try self.context.existingObject(with: item.objectID) as? VaultItem
+                        completion(mainContextItem)
+                    } catch {
+                        print("Error getting item in main context: \(error)")
+                        completion(nil)
+                    }
+                }
+            } catch {
+                print("Error saving in background context: \(error)")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
+            }
+        }
     }
     
     func deleteVaultItem(_ item: VaultItem) {

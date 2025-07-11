@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import Photos
+import AVFoundation
 
 struct VaultMainView: View {
     @State private var showSettings = false
@@ -19,10 +20,8 @@ struct VaultMainView: View {
     @State private var isSelectionMode = false
     @State private var showDeleteAlert = false
     @State private var searchText = ""
-    @State private var showPhotoViewer = false
-    @State private var photoViewerIndex = 0
-    @State private var showVideoPlayer = false
-    @State private var videoViewerIndex = 0
+    @State private var showUnifiedMediaViewer = false
+    @State private var mediaViewerIndex = 0
     
     @Environment(\.managedObjectContext) var context
     
@@ -42,10 +41,6 @@ struct VaultMainView: View {
     
     var filteredImages: [VaultItem] {
         return filteredItems.filter { $0.isImage }
-    }
-    
-    var filteredVideos: [VaultItem] {
-        return filteredItems.filter { $0.isVideo }
     }
     
     var body: some View {
@@ -177,16 +172,10 @@ struct VaultMainView: View {
             } message: {
                 Text("Are you sure you want to delete \(selectedVaultItems.count) item(s)? This action cannot be undone.")
             }
-            .fullScreenCover(isPresented: $showPhotoViewer) {
-                PhotoViewerView(
-                    vaultItems: filteredImages,
-                    initialIndex: photoViewerIndex
-                )
-            }
-            .fullScreenCover(isPresented: $showVideoPlayer) {
-                VideoPlayerView(
-                    vaultItems: filteredVideos,
-                    initialIndex: videoViewerIndex
+            .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+                UnifiedMediaViewerView(
+                    mediaItems: filteredItems,
+                    initialIndex: mediaViewerIndex
                 )
             }
         }
@@ -242,21 +231,20 @@ struct VaultMainView: View {
     
     private func viewItem(_ item: VaultItem) {
         if item.isImage {
-            // Show photo viewer for images
-            let imageItems = filteredImages
-            if let index = imageItems.firstIndex(where: { $0.objectID == item.objectID }) {
-                photoViewerIndex = index
-                showPhotoViewer = true
+            // Show photo viewer for images - but now use unified viewer
+            if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
+                mediaViewerIndex = index
+                showUnifiedMediaViewer = true
             }
         } else if item.isVideo {
-            // Show video player for videos
-            let videoItems = filteredVideos
-            if let index = videoItems.firstIndex(where: { $0.objectID == item.objectID }) {
-                videoViewerIndex = index
-                showVideoPlayer = true
+            // Show video player for videos - but now use unified viewer
+            if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
+                mediaViewerIndex = index
+                showUnifiedMediaViewer = true
             }
         } else {
-            print("Unsupported file type: \(item.fileName ?? "")")
+            // Handle other file types if needed
+            print("Unsupported file type: \(item.fileType ?? "unknown")")
         }
     }
     
@@ -396,13 +384,78 @@ struct VaultItemCell: View {
     }
     
     private func loadThumbnail() {
-        print("DEBUG: VaultItemCell onAppear for \(item.fileName ?? "")")
+        print("DEBUG: VaultItemCell loading thumbnail for \(item.fileName ?? "")")
+        print("DEBUG: Thumbnail filename: \(item.thumbnailFileName ?? "none")")
+        
         DispatchQueue.global(qos: .userInitiated).async {
             let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: item)
+            
             DispatchQueue.main.async {
                 self.thumbnail = loadedThumbnail
                 self.isLoadingThumbnail = false
-                print("DEBUG: Thumbnail loaded for \(item.fileName ?? ""): \(loadedThumbnail != nil)")
+                
+                if loadedThumbnail != nil {
+                    print("DEBUG: ✅ Thumbnail loaded successfully for \(item.fileName ?? "")")
+                } else {
+                    print("DEBUG: ❌ Thumbnail failed to load for \(item.fileName ?? "")")
+                    print("DEBUG: File type: \(item.fileType ?? "unknown")")
+                    print("DEBUG: Thumbnail filename: \(item.thumbnailFileName ?? "none")")
+                    
+                    // Try to regenerate thumbnail if it's missing
+                    if item.thumbnailFileName == nil || item.thumbnailFileName?.isEmpty == true {
+                        print("DEBUG: Attempting to regenerate thumbnail for \(item.fileName ?? "")")
+                        self.regenerateThumbnail()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func regenerateThumbnail() {
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                let fileData = try FileStorageManager.shared.loadFile(vaultItem: item)
+                
+                if item.isImage {
+                    // Generate image thumbnail
+                    if let image = UIImage(data: fileData) {
+                        let thumbnailSize = CGSize(width: 200, height: 200)
+                        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+                        
+                        let thumbnail = renderer.image { context in
+                            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                        }
+                        
+                        DispatchQueue.main.async {
+                            self.thumbnail = thumbnail
+                            print("DEBUG: ✅ Regenerated image thumbnail for \(item.fileName ?? "")")
+                        }
+                    }
+                } else if item.isVideo {
+                    // Generate video thumbnail
+                    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+                        .appendingPathComponent(UUID().uuidString + ".mov")
+                    
+                    try fileData.write(to: tempURL)
+                    defer { try? FileManager.default.removeItem(at: tempURL) }
+                    
+                    let asset = AVURLAsset(url: tempURL)
+                    let generator = AVAssetImageGenerator(asset: asset)
+                    generator.appliesPreferredTrackTransform = true
+                    
+                    let time = CMTime(seconds: 1, preferredTimescale: 60)
+                    
+                    if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
+                        let thumbnail = UIImage(cgImage: cgImage)
+                        
+                        DispatchQueue.main.async {
+                            self.thumbnail = thumbnail
+                            print("DEBUG: ✅ Regenerated video thumbnail for \(item.fileName ?? "")")
+                        }
+                    }
+                }
+            } catch {
+                print("DEBUG: ❌ Error regenerating thumbnail: \(error)")
             }
         }
     }

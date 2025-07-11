@@ -164,7 +164,7 @@ class FileStorageManager {
             print("DEBUG: Skipping thumbnail generation for fileType: \(fileType)")
         }
         
-        // Create Core Data entry
+        // Create Core Data entry using synchronous method for direct calls
         let vaultItem = CoreDataManager.shared.createVaultItem(
             fileName: uniqueFileName,
             fileType: fileType,
@@ -175,6 +175,71 @@ class FileStorageManager {
         print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
         
         return vaultItem
+    }
+    
+    // New method for background imports
+    func saveFileInBackground(data: Data, fileName: String, fileType: String, completion: @escaping (Result<VaultItem, Error>) -> Void) {
+        print("DEBUG: saveFileInBackground called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
+        
+        guard let key = encryptionKey else {
+            print("DEBUG: No encryption key available")
+            completion(.failure(FileStorageError.noEncryptionKey))
+            return
+        }
+        
+        // Generate unique filename
+        let uniqueFileName = "\(UUID().uuidString)_\(fileName)"
+        let fileURL = vaultDirectory.appendingPathComponent(uniqueFileName)
+        print("DEBUG: Will save file to: \(fileURL.path)")
+        
+        do {
+            // Encrypt data
+            let encryptedData = try encryptData(data, using: key)
+            print("DEBUG: Data encrypted, size: \(encryptedData.count)")
+            
+            // Save encrypted file
+            try encryptedData.write(to: fileURL)
+            print("DEBUG: Encrypted file saved")
+            
+            // Generate thumbnail if it's an image or video
+            var thumbnailFileName: String? = nil
+            
+            print("DEBUG: Checking fileType for thumbnail generation")
+            print("DEBUG: fileType = '\(fileType)'")
+            print("DEBUG: fileType.hasPrefix(\"image/\") = \(fileType.hasPrefix("image/"))")
+            print("DEBUG: fileType.hasPrefix(\"video/\") = \(fileType.hasPrefix("video/"))")
+            
+            if fileType.hasPrefix("image/") {
+                print("DEBUG: Generating image thumbnail...")
+                thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
+                print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
+            } else if fileType.hasPrefix("video/") {
+                print("DEBUG: Generating video thumbnail...")
+                thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
+                print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
+            } else {
+                print("DEBUG: Skipping thumbnail generation for fileType: \(fileType)")
+            }
+            
+            // Create Core Data entry using background context
+            CoreDataManager.shared.createVaultItemInBackground(
+                fileName: uniqueFileName,
+                fileType: fileType,
+                fileSize: Int64(data.count),
+                thumbnailFileName: thumbnailFileName
+            ) { vaultItem in
+                if let vaultItem = vaultItem {
+                    print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
+                    completion(.success(vaultItem))
+                } else {
+                    print("DEBUG: Failed to create VaultItem")
+                    completion(.failure(FileStorageError.importFailed))
+                }
+            }
+        } catch {
+            print("DEBUG: Error in saveFileInBackground: \(error)")
+            completion(.failure(error))
+        }
     }
     
     func loadFile(vaultItem: VaultItem) throws -> Data {
@@ -409,11 +474,19 @@ class FileStorageManager {
                     let fileName = asset.value(forKey: "filename") as? String ?? "VID_\(Date().timeIntervalSince1970).mov"
                     let fileType = "video/quicktime"
                     
-                    let vaultItem = try self.saveFile(data: data, fileName: fileName, fileType: fileType)
-                    print("DEBUG: Video saved successfully: \(vaultItem.fileName ?? "")")
-                    completion(.success(vaultItem))
+                    // Use background save for videos to prevent Core Data recursive save errors
+                    self.saveFileInBackground(data: data, fileName: fileName, fileType: fileType) { result in
+                        switch result {
+                        case .success(let vaultItem):
+                            print("DEBUG: Video saved successfully: \(vaultItem.fileName ?? "")")
+                            completion(.success(vaultItem))
+                        case .failure(let error):
+                            print("DEBUG: Error saving video: \(error)")
+                            completion(.failure(error))
+                        }
+                    }
                 } catch {
-                    print("DEBUG: Error saving video: \(error)")
+                    print("DEBUG: Error loading video data: \(error)")
                     completion(.failure(error))
                 }
             }
