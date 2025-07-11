@@ -342,6 +342,9 @@ extension WebServerManager {
                     selectedFiles.splice(index, 1);
                     updateFileList();
                     updateUploadButton();
+                    if (selectedFiles.length === 0) {
+                        resetUploadButton();
+                    }
                 }
                 
                 function clearFiles() {
@@ -350,6 +353,13 @@ extension WebServerManager {
                     updateFileList();
                     updateUploadButton();
                     hideStatus();
+                    resetUploadButton();
+                }
+                
+                function resetUploadButton() {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Upload Files';
+                    hideProgress();
                 }
                 
                 function getFileIcon(mimeType) {
@@ -420,8 +430,7 @@ extension WebServerManager {
                         
                         xhr.addEventListener('load', () => {
                             hideProgress();
-                            uploadBtn.disabled = false;
-                            uploadBtn.textContent = 'Upload Files';
+                            resetUploadButton();
                             
                             if (xhr.status === 200) {
                                 showStatus('Successfully uploaded ' + selectedFiles.length + ' file(s)!');
@@ -433,8 +442,7 @@ extension WebServerManager {
                         
                         xhr.addEventListener('error', () => {
                             hideProgress();
-                            uploadBtn.disabled = false;
-                            uploadBtn.textContent = 'Upload Files';
+                            resetUploadButton();
                             showStatus('Upload failed. Please check your connection.', true);
                         });
                         
@@ -443,8 +451,7 @@ extension WebServerManager {
                         
                     } catch (error) {
                         hideProgress();
-                        uploadBtn.disabled = false;
-                        uploadBtn.textContent = 'Upload Files';
+                        resetUploadButton();
                         showStatus('Upload failed: ' + error.message, true);
                     }
                 });

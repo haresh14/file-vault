@@ -7,60 +7,72 @@
 
 import Foundation
 import Network
-import UIKit
+import CoreData
+import SwiftUI
 
 class WebServerManager: ObservableObject {
     static let shared = WebServerManager()
     
-    @Published var isServerRunning = false
+    @Published var isRunning = false
     @Published var serverURL: String = ""
     @Published var connectedDevices: [String] = []
     
     private var listener: NWListener?
     private var connections: [NWConnection] = []
-    private let serverPort: NWEndpoint.Port = 8080
+    private let serverPort = 8080
     
     private init() {}
     
-    // MARK: - Server Control
-    
     func startServer() {
-        guard !isServerRunning else { return }
+        print("DEBUG: startServer called")
+        
+        guard let port = NWEndpoint.Port(rawValue: UInt16(serverPort)) else {
+            print("DEBUG: Invalid port: \(serverPort)")
+            return
+        }
+        
+        let parameters = NWParameters.tcp
+        parameters.allowLocalEndpointReuse = true
+        parameters.includePeerToPeer = true
         
         do {
-            let parameters = NWParameters.tcp
-            parameters.allowLocalEndpointReuse = true
-            parameters.includePeerToPeer = true
+            let listener = try NWListener(using: parameters, on: port)
+            print("DEBUG: Listener created successfully")
             
-            listener = try NWListener(using: parameters, on: serverPort)
-            
-            listener?.newConnectionHandler = { [weak self] connection in
+            listener.newConnectionHandler = { [weak self] (connection: NWConnection) in
+                print("DEBUG: newConnectionHandler called")
                 self?.handleNewConnection(connection)
             }
             
-            listener?.stateUpdateHandler = { [weak self] state in
-                DispatchQueue.main.async {
-                    switch state {
-                    case .ready:
-                        self?.isServerRunning = true
+            listener.stateUpdateHandler = { [weak self] (state: NWListener.State) in
+                print("DEBUG: Listener state changed to: \(state)")
+                switch state {
+                case .ready:
+                    print("DEBUG: Server started successfully on port \(self?.serverPort ?? 0)")
+                    DispatchQueue.main.async {
+                        self?.isRunning = true
                         self?.updateServerURL()
-                        print("DEBUG: Web server started on port \(self?.serverPort.rawValue ?? 0)")
-                    case .failed(let error):
-                        print("DEBUG: Web server failed: \(error)")
-                        self?.isServerRunning = false
-                    case .cancelled:
-                        self?.isServerRunning = false
-                        print("DEBUG: Web server cancelled")
-                    default:
-                        break
                     }
+                case .failed(let error):
+                    print("DEBUG: Server failed to start: \(error)")
+                    DispatchQueue.main.async {
+                        self?.isRunning = false
+                    }
+                case .cancelled:
+                    print("DEBUG: Server cancelled")
+                    DispatchQueue.main.async {
+                        self?.isRunning = false
+                    }
+                default:
+                    print("DEBUG: Server state: \(state)")
                 }
             }
             
-            listener?.start(queue: .global(qos: .userInitiated))
-            
+            self.listener = listener
+            listener.start(queue: DispatchQueue.global(qos: .userInitiated))
+            print("DEBUG: Listener started")
         } catch {
-            print("DEBUG: Failed to start web server: \(error)")
+            print("DEBUG: Failed to create listener: \(error)")
         }
     }
     
@@ -70,7 +82,7 @@ class WebServerManager: ObservableObject {
         connections.removeAll()
         
         DispatchQueue.main.async {
-            self.isServerRunning = false
+            self.isRunning = false
             self.serverURL = ""
             self.connectedDevices.removeAll()
         }
@@ -84,7 +96,7 @@ class WebServerManager: ObservableObject {
         connections.append(connection)
         print("DEBUG: New connection added, total connections: \(connections.count)")
         
-        connection.stateUpdateHandler = { [weak self] state in
+        connection.stateUpdateHandler = { [weak self] (state: NWConnection.State) in
             print("DEBUG: Connection state changed to: \(state)")
             switch state {
             case .ready:
@@ -107,7 +119,7 @@ class WebServerManager: ObservableObject {
             }
         }
         
-        connection.start(queue: .global(qos: .userInitiated))
+        connection.start(queue: DispatchQueue.global(qos: .userInitiated))
         print("DEBUG: Connection started")
     }
     
@@ -145,39 +157,43 @@ class WebServerManager: ObservableObject {
                         return
                     }
                     
-                    // Check if we have complete headers (look for double CRLF)
-                    if !headersComplete, let requestString = String(data: receivedData, encoding: .utf8),
-                       let headerEndRange = requestString.range(of: "\r\n\r\n") {
-                        headersComplete = true
-                        print("DEBUG: Headers complete, parsing Content-Length")
-                        
-                        // Extract Content-Length from headers
-                        let headerSection = String(requestString[..<headerEndRange.lowerBound])
-                        let headerLines = headerSection.components(separatedBy: "\r\n")
-                        
-                        for line in headerLines {
-                            if line.lowercased().hasPrefix("content-length:") {
-                                let lengthString = line.replacingOccurrences(of: "content-length:", with: "", options: .caseInsensitive)
-                                    .trimmingCharacters(in: .whitespaces)
-                                expectedContentLength = Int(lengthString)
-                                print("DEBUG: Expected Content-Length: \(expectedContentLength ?? 0)")
-                                break
+                    // Check if we have complete headers (look for double CRLF in binary data)
+                    if !headersComplete {
+                        let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
+                        if let headerEndRange = receivedData.range(of: headerEndMarker) {
+                            headersComplete = true
+                            print("DEBUG: Headers complete, parsing Content-Length")
+                            
+                            // Extract headers only (safe to convert to UTF-8)
+                            let headerData = receivedData.subdata(in: receivedData.startIndex..<headerEndRange.lowerBound)
+                            if let headerString = String(data: headerData, encoding: .utf8) {
+                                let headerLines = headerString.components(separatedBy: "\r\n")
+                                
+                                for line in headerLines {
+                                    if line.lowercased().hasPrefix("content-length:") {
+                                        let lengthString = line.replacingOccurrences(of: "content-length:", with: "", options: .caseInsensitive)
+                                            .trimmingCharacters(in: .whitespaces)
+                                        expectedContentLength = Int(lengthString)
+                                        print("DEBUG: Expected Content-Length: \(expectedContentLength ?? 0)")
+                                        break
+                                    }
+                                }
+                                
+                                // Calculate how much data we need
+                                let headerEndIndex = receivedData.startIndex.distance(to: headerEndRange.upperBound)
+                                let totalExpected = headerEndIndex + (expectedContentLength ?? 0)
+                                print("DEBUG: Headers end at \(headerEndIndex), total expected: \(totalExpected)")
                             }
                         }
-                        
-                        // Calculate how much data we need
-                        let headerEndIndex = requestString.distance(from: requestString.startIndex, to: headerEndRange.upperBound)
-                        let totalExpected = headerEndIndex + (expectedContentLength ?? 0)
-                        print("DEBUG: Headers end at \(headerEndIndex), total expected: \(totalExpected)")
                     }
                     
                     // Check if we have all the data we need
                     if headersComplete {
                         if let contentLength = expectedContentLength {
-                            // Calculate header size
-                            if let requestString = String(data: receivedData, encoding: .utf8),
-                               let headerEndRange = requestString.range(of: "\r\n\r\n") {
-                                let headerEndIndex = requestString.distance(from: requestString.startIndex, to: headerEndRange.upperBound)
+                            // Calculate header size using binary data
+                            let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
+                            if let headerEndRange = receivedData.range(of: headerEndMarker) {
+                                let headerEndIndex = receivedData.startIndex.distance(to: headerEndRange.upperBound)
                                 let totalExpected = headerEndIndex + contentLength
                                 
                                 if receivedData.count >= totalExpected {
@@ -220,18 +236,29 @@ class WebServerManager: ObservableObject {
     private func processHTTPRequest(data: Data, connection: NWConnection) {
         print("DEBUG: processHTTPRequest called with \(data.count) bytes")
         
-        guard let requestString = String(data: data, encoding: .utf8) else {
-            print("DEBUG: Failed to convert request data to UTF-8 string")
+        // Find the end of HTTP headers (double CRLF)
+        let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
+        guard let headerEndRange = data.range(of: headerEndMarker) else {
+            print("DEBUG: No HTTP header end marker found")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
         
-        print("DEBUG: Request string length: \(requestString.count)")
-        print("DEBUG: Request preview: \(requestString.prefix(500))")
+        // Extract headers (safe to convert to UTF-8)
+        let headerData = data.subdata(in: data.startIndex..<headerEndRange.lowerBound)
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            print("DEBUG: Failed to convert header data to UTF-8 string")
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
+            return
+        }
         
-        let lines = requestString.components(separatedBy: "\r\n")
+        print("DEBUG: Header string length: \(headerString.count)")
+        print("DEBUG: Header preview: \(headerString.prefix(500))")
+        
+        // Parse request line
+        let lines = headerString.components(separatedBy: "\r\n")
         guard let requestLine = lines.first, !requestLine.isEmpty else {
-            print("DEBUG: No valid request line found")
+            print("DEBUG: No request line found")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
@@ -239,17 +266,17 @@ class WebServerManager: ObservableObject {
         print("DEBUG: Request line: \(requestLine)")
         
         let components = requestLine.components(separatedBy: " ")
-        guard components.count >= 2 else {
-            print("DEBUG: Invalid request line format: \(components)")
+        guard components.count >= 3 else {
+            print("DEBUG: Invalid request line format")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
         
         let method = components[0]
         let path = components[1]
-        
         print("DEBUG: Method: \(method), Path: \(path)")
         
+        // Route the request
         switch (method, path) {
         case ("GET", "/"):
             print("DEBUG: Serving upload page for /")
@@ -266,9 +293,6 @@ class WebServerManager: ObservableObject {
         case ("GET", "/status"):
             print("DEBUG: Serving status page")
             serveStatusPage(connection: connection)
-        case ("GET", "/favicon.ico"):
-            print("DEBUG: Serving 404 for favicon")
-            sendHTTPResponse(connection: connection, statusCode: 404, body: "Not Found")
         default:
             print("DEBUG: Unknown request: \(method) \(path)")
             sendHTTPResponse(connection: connection, statusCode: 404, body: "Not Found")
@@ -330,14 +354,26 @@ class WebServerManager: ObservableObject {
     private func handleFileUpload(requestData: Data, connection: NWConnection) {
         print("DEBUG: handleFileUpload called with data size: \(requestData.count)")
         
-        guard let requestString = String(data: requestData, encoding: .utf8) else {
-            print("DEBUG: Failed to convert request data to string")
+        // Find the end of HTTP headers (double CRLF)
+        let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
+        guard let headerEndRange = requestData.range(of: headerEndMarker) else {
+            print("DEBUG: No HTTP header end marker found in upload request")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
         
+        // Extract headers (safe to convert to UTF-8)
+        let headerData = requestData.subdata(in: requestData.startIndex..<headerEndRange.lowerBound)
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            print("DEBUG: Failed to convert header data to UTF-8 string")
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
+            return
+        }
+        
+        print("DEBUG: Upload request header string preview (first 1000 chars): \(headerString.prefix(1000))")
+        
         // Parse multipart form data
-        let boundary = extractBoundary(from: requestString)
+        let boundary = extractBoundary(from: headerString)
         print("DEBUG: Extracted boundary: '\(boundary)'")
         guard !boundary.isEmpty else {
             print("DEBUG: No boundary found in request")
@@ -363,20 +399,23 @@ class WebServerManager: ObservableObject {
                     print("DEBUG: Determined file type: \(fileType) for file: \(fileName)")
                     
                     // Save file using FileStorageManager
-                    let _ = try FileStorageManager.shared.saveFile(
+                    let savedItem = try FileStorageManager.shared.saveFile(
                         data: fileData,
                         fileName: fileName,
                         fileType: fileType
                     )
                     
                     uploadedFiles.append(fileName)
-                    print("DEBUG: Successfully uploaded file: \(fileName)")
+                    print("DEBUG: Successfully uploaded file: \(fileName), saved with ID: \(savedItem.id?.uuidString ?? "unknown")")
                     
                 } catch {
                     print("DEBUG: Error saving uploaded file \(fileName): \(error)")
                 }
             } else {
                 print("DEBUG: Skipping part \(index) - missing filename or data")
+                print("DEBUG: fileName exists: \(part.fileName != nil)")
+                print("DEBUG: fileData exists: \(part.data != nil)")
+                print("DEBUG: fileData not empty: \(!(part.data?.isEmpty ?? true))")
             }
         }
         
@@ -396,7 +435,7 @@ class WebServerManager: ObservableObject {
     
     private func updateServerURL() {
         if let localIP = getLocalIPAddress() {
-            serverURL = "http://\(localIP):\(serverPort.rawValue)"
+            serverURL = "http://\(localIP):\(serverPort)"
         }
     }
     
@@ -512,43 +551,70 @@ extension WebServerManager {
     }
     
     private func parseMultipartData(data: Data, boundary: String) -> [MultipartPart] {
+        print("DEBUG: parseMultipartData called with boundary: '\(boundary)', data size: \(data.count)")
+        
         let boundaryData = "--\(boundary)".data(using: .utf8)!
         let endBoundaryData = "--\(boundary)--".data(using: .utf8)!
+        
+        print("DEBUG: Looking for boundary data: \(boundaryData.count) bytes")
         
         var parts: [MultipartPart] = []
         var searchRange = data.startIndex..<data.endIndex
         
         while let boundaryRange = data.range(of: boundaryData, in: searchRange) {
+            print("DEBUG: Found boundary at range: \(boundaryRange)")
             searchRange = boundaryRange.upperBound..<data.endIndex
             
             // Find next boundary or end boundary
             let nextBoundaryRange = data.range(of: boundaryData, in: searchRange) ?? data.range(of: endBoundaryData, in: searchRange)
             
-            guard let nextRange = nextBoundaryRange else { break }
+            guard let nextRange = nextBoundaryRange else { 
+                print("DEBUG: No next boundary found, breaking")
+                break 
+            }
+            
+            print("DEBUG: Next boundary at range: \(nextRange)")
             
             let partData = data.subdata(in: boundaryRange.upperBound..<nextRange.lowerBound)
+            print("DEBUG: Part data size: \(partData.count)")
             
             if let part = parseMultipartPart(data: partData) {
                 parts.append(part)
+                print("DEBUG: Successfully parsed part \(parts.count)")
+            } else {
+                print("DEBUG: Failed to parse part")
             }
             
             searchRange = nextRange.upperBound..<data.endIndex
         }
         
+        print("DEBUG: parseMultipartData completed, found \(parts.count) parts")
         return parts
     }
     
     private func parseMultipartPart(data: Data) -> MultipartPart? {
+        print("DEBUG: parseMultipartPart called with data size: \(data.count)")
+        
         // Find the double CRLF that separates headers from body
         let headerBodySeparator = "\r\n\r\n".data(using: .utf8)!
         
-        guard let separatorRange = data.range(of: headerBodySeparator) else { return nil }
+        guard let separatorRange = data.range(of: headerBodySeparator) else { 
+            print("DEBUG: No header-body separator found")
+            return nil 
+        }
         
         let headerData = data.subdata(in: data.startIndex..<separatorRange.lowerBound)
         let bodyData = data.subdata(in: separatorRange.upperBound..<data.endIndex)
         
+        print("DEBUG: Header data size: \(headerData.count), Body data size: \(bodyData.count)")
+        
         // Parse headers as string
-        guard let headerString = String(data: headerData, encoding: .utf8) else { return nil }
+        guard let headerString = String(data: headerData, encoding: .utf8) else { 
+            print("DEBUG: Failed to convert header data to string")
+            return nil 
+        }
+        
+        print("DEBUG: Header string: \(headerString)")
         
         var headers: [String: String] = [:]
         let headerLines = headerString.components(separatedBy: "\r\n")
@@ -564,7 +630,11 @@ extension WebServerManager {
             }
         }
         
+        print("DEBUG: Parsed headers: \(headers)")
+        
         // Keep body as binary data
-        return MultipartPart(headers: headers, data: bodyData)
+        let part = MultipartPart(headers: headers, data: bodyData)
+        print("DEBUG: Created part with filename: \(part.fileName ?? "none")")
+        return part
     }
 } 

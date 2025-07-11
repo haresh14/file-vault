@@ -38,17 +38,17 @@ struct WebUploadView: View {
                     VStack(spacing: 16) {
                         HStack {
                             Circle()
-                                .fill(webServer.isServerRunning ? Color.green : Color.red)
+                                .fill(webServer.isRunning ? Color.green : Color.red)
                                 .frame(width: 12, height: 12)
                             
-                            Text(webServer.isServerRunning ? "Server Running" : "Server Stopped")
+                            Text(webServer.isRunning ? "Server Running" : "Server Stopped")
                                 .font(.headline)
-                                .foregroundColor(webServer.isServerRunning ? .green : .red)
+                                .foregroundColor(webServer.isRunning ? .green : .red)
                             
                             Spacer()
                         }
                         
-                        if webServer.isServerRunning {
+                        if webServer.isRunning {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Text("Server URL:")
@@ -86,18 +86,18 @@ struct WebUploadView: View {
                     VStack(spacing: 12) {
                         Button(action: toggleServer) {
                             HStack {
-                                Image(systemName: webServer.isServerRunning ? "stop.circle" : "play.circle")
-                                Text(webServer.isServerRunning ? "Stop Server" : "Start Server")
+                                Image(systemName: webServer.isRunning ? "stop.circle" : "play.circle")
+                                Text(webServer.isRunning ? "Stop Server" : "Start Server")
                             }
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(webServer.isServerRunning ? Color.red : Color.green)
+                            .background(webServer.isRunning ? Color.red : Color.green)
                             .cornerRadius(12)
                         }
                         
-                        if webServer.isServerRunning {
+                        if webServer.isRunning {
                             HStack(spacing: 12) {
                                 Button(action: { showQRCode = true }) {
                                     HStack {
@@ -129,7 +129,7 @@ struct WebUploadView: View {
                     }
                     
                     // Instructions
-                    if webServer.isServerRunning {
+                    if webServer.isRunning {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("How to Upload Files:")
                                 .font(.headline)
@@ -182,7 +182,7 @@ struct WebUploadView: View {
     }
     
     private func toggleServer() {
-        if webServer.isServerRunning {
+        if webServer.isRunning {
             webServer.stopServer()
         } else {
             webServer.startServer()
