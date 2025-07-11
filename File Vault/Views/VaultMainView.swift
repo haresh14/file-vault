@@ -21,6 +21,8 @@ struct VaultMainView: View {
     @State private var searchText = ""
     @State private var showPhotoViewer = false
     @State private var photoViewerIndex = 0
+    @State private var showVideoPlayer = false
+    @State private var selectedVideoItem: VaultItem?
     
     @Environment(\.managedObjectContext) var context
     
@@ -173,6 +175,11 @@ struct VaultMainView: View {
                     initialIndex: photoViewerIndex
                 )
             }
+            .fullScreenCover(isPresented: $showVideoPlayer) {
+                if let videoItem = selectedVideoItem {
+                    VideoPlayerView(vaultItem: videoItem)
+                }
+            }
         }
         .onAppear {
             loadVaultItems()
@@ -225,16 +232,19 @@ struct VaultMainView: View {
     }
     
     private func viewItem(_ item: VaultItem) {
-        // Only show photo viewer for images (not videos for now)
         if item.isImage {
+            // Show photo viewer for images
             let imageItems = filteredItems.filter { $0.isImage }
             if let index = imageItems.firstIndex(where: { $0.objectID == item.objectID }) {
                 photoViewerIndex = index
                 showPhotoViewer = true
             }
+        } else if item.isVideo {
+            // Show video player for videos
+            selectedVideoItem = item
+            showVideoPlayer = true
         } else {
-            // For videos, we'll implement video player later
-            print("Video viewing not implemented yet: \(item.fileName ?? "")")
+            print("Unsupported file type: \(item.fileName ?? "")")
         }
     }
     
