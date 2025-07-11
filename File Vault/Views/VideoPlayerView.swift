@@ -87,9 +87,7 @@ struct VideoPlayerView: View {
         .statusBarHidden()
         .onAppear {
             addDebugInfo("VideoPlayerView appeared")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                setupPlayer()
-            }
+            setupPlayer()
         }
         .onDisappear {
             addDebugInfo("VideoPlayerView disappeared")
@@ -122,7 +120,7 @@ struct VideoPlayerView: View {
                 let videoData = try FileStorageManager.shared.loadFile(vaultItem: vaultItem)
                 addDebugInfo("Video data loaded successfully: \(videoData.count) bytes")
                 
-                // Determine file extension
+                // Determine file extension based on MIME type
                 let fileExtension: String
                 if let fileType = vaultItem.fileType?.lowercased() {
                     switch fileType {
@@ -132,6 +130,8 @@ struct VideoPlayerView: View {
                         fileExtension = "mov"
                     case "video/x-m4v":
                         fileExtension = "m4v"
+                    case "video/avi":
+                        fileExtension = "avi"
                     default:
                         fileExtension = "mp4"
                     }
@@ -141,9 +141,9 @@ struct VideoPlayerView: View {
                 
                 addDebugInfo("Using file extension: .\(fileExtension)")
                 
-                // Create temporary file
+                // Create temporary file with proper naming
                 let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("video_\(UUID().uuidString)")
+                    .appendingPathComponent("vault_video_\(UUID().uuidString)")
                     .appendingPathExtension(fileExtension)
                 
                 addDebugInfo("Temp file path: \(tempURL.path)")
@@ -169,26 +169,47 @@ struct VideoPlayerView: View {
                 }
                 
                 await MainActor.run {
-                    addDebugInfo("Creating AVPlayer...")
+                    addDebugInfo("Creating AVPlayer with Apple best practices...")
                     
-                    // Create AVPlayer with proper configuration
+                    // Create AVURLAsset with proper configuration
                     let asset = AVURLAsset(url: tempURL)
+                    
+                    // Create AVPlayerItem with proper configuration
                     let playerItem = AVPlayerItem(asset: asset)
                     
-                    // Configure player item for better video quality
-                    playerItem.preferredForwardBufferDuration = 1.0
+                    // Configure player item according to Apple best practices
+                    playerItem.preferredForwardBufferDuration = 2.0
                     
+                    // Set up metadata for better player experience (from WWDC 2022)
+                    if let fileName = vaultItem.fileName {
+                        let titleItem = AVMutableMetadataItem()
+                        titleItem.identifier = .commonIdentifierTitle
+                        titleItem.value = fileName as NSString
+                        titleItem.extendedLanguageTag = "und"
+                        playerItem.externalMetadata = [titleItem]
+                    }
+                    
+                    // Create AVPlayer with proper configuration
                     let newPlayer = AVPlayer(playerItem: playerItem)
                     
-                    // Configure player for better performance and quality
+                    // Configure player according to Apple best practices
                     newPlayer.automaticallyWaitsToMinimizeStalling = false
                     newPlayer.actionAtItemEnd = .pause
+                    
+                    // Set volume to ensure audio works properly
+                    newPlayer.volume = 1.0
                     
                     self.player = newPlayer
                     self.isLoading = false
                     
-                    addDebugInfo("AVPlayer created successfully")
+                    addDebugInfo("AVPlayer created successfully with Apple best practices")
                     addDebugInfo("Player setup complete - should show video now")
+                    
+                    // Clean up temp file after a delay to ensure player has loaded it
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        try? FileManager.default.removeItem(at: tempURL)
+                        addDebugInfo("Temp file cleaned up")
+                    }
                 }
                 
             } catch {
@@ -208,19 +229,29 @@ struct VideoPlayerView: View {
     }
 }
 
-// AVPlayerViewController wrapper for better video rendering
+// AVPlayerViewController wrapper optimized according to Apple best practices
 struct AVPlayerViewControllerRepresentable: UIViewControllerRepresentable {
     let player: AVPlayer
     let onDismiss: () -> Void
     
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
+        
+        // Configure according to Apple best practices from WWDC 2022
         controller.player = player
         controller.showsPlaybackControls = true
         controller.videoGravity = .resizeAspect
         
-        // Configure for better video quality
+        // Disable features that might cause issues
         controller.allowsPictureInPicturePlayback = false
+        
+        // Configure for better video quality and performance
+        controller.updatesNowPlayingInfoCenter = true
+        
+        // Enable visual analysis (Live Text) - new iOS 16 feature from WWDC 2022
+        if #available(iOS 16.0, *) {
+            controller.allowsVideoFrameAnalysis = true
+        }
         
         // Set up the coordinator to handle dismissal
         context.coordinator.onDismiss = onDismiss
