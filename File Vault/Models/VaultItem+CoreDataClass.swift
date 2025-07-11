@@ -10,5 +10,5 @@ import CoreData
 
 @objc(VaultItem)
 public class VaultItem: NSManagedObject {
-
+    
 } 

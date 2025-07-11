@@ -19,6 +19,8 @@ struct VaultMainView: View {
     @State private var isSelectionMode = false
     @State private var showDeleteAlert = false
     @State private var searchText = ""
+    @State private var showPhotoViewer = false
+    @State private var photoViewerIndex = 0
     
     @Environment(\.managedObjectContext) var context
     
@@ -165,6 +167,12 @@ struct VaultMainView: View {
             } message: {
                 Text("Are you sure you want to delete \(selectedVaultItems.count) item(s)? This action cannot be undone.")
             }
+            .fullScreenCover(isPresented: $showPhotoViewer) {
+                PhotoViewerView(
+                    vaultItems: filteredItems.filter { $0.isImage },
+                    initialIndex: photoViewerIndex
+                )
+            }
         }
         .onAppear {
             loadVaultItems()
@@ -217,8 +225,17 @@ struct VaultMainView: View {
     }
     
     private func viewItem(_ item: VaultItem) {
-        // TODO: Navigate to detail view
-        print("View item: \(item.fileName ?? "")")
+        // Only show photo viewer for images (not videos for now)
+        if item.isImage {
+            let imageItems = filteredItems.filter { $0.isImage }
+            if let index = imageItems.firstIndex(where: { $0.objectID == item.objectID }) {
+                photoViewerIndex = index
+                showPhotoViewer = true
+            }
+        } else {
+            // For videos, we'll implement video player later
+            print("Video viewing not implemented yet: \(item.fileName ?? "")")
+        }
     }
     
     private func importAssets(_ assets: [PHAsset]) {
@@ -285,16 +302,19 @@ struct VaultItemCell: View {
     @State private var isLoadingThumbnail = true
     
     var body: some View {
-        ZStack {
+        GeometryReader { geometry in
+            let size = min(geometry.size.width, geometry.size.height)
+            
+            ZStack {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
-                    .aspectRatio(1, contentMode: .fit)
+                    .frame(width: size, height: size)
                 
                 if let thumbnail = thumbnail {
                     Image(uiImage: thumbnail)
                         .resizable()
                         .scaledToFill()
-                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .frame(width: size, height: size)
                         .clipped()
                 } else if isLoadingThumbnail {
                     ProgressView()
@@ -339,6 +359,8 @@ struct VaultItemCell: View {
                 }
             }
             .cornerRadius(4)
+        }
+        .aspectRatio(1, contentMode: .fit)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()

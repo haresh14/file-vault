@@ -314,6 +314,21 @@ class FileStorageManager {
         return image
     }
     
+    func loadImage(for vaultItem: VaultItem) async throws -> UIImage {
+        return try await withCheckedThrowingContinuation { continuation in
+            do {
+                let fileData = try loadFile(vaultItem: vaultItem)
+                guard let image = UIImage(data: fileData) else {
+                    continuation.resume(throwing: FileStorageError.decryptionFailed)
+                    return
+                }
+                continuation.resume(returning: image)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+    
     // MARK: - Storage Info
     
     func getStorageInfo() -> (usedSpace: Int64, fileCount: Int) {

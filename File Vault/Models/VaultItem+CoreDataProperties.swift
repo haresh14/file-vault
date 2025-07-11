@@ -22,6 +22,10 @@ extension VaultItem {
     @NSManaged public var thumbnailFileName: String?
     @NSManaged public var updatedAt: Date?
     @NSManaged public var folder: Folder?
+    
+    var dateAdded: Date? {
+        return createdAt
+    }
 
 }
 
@@ -30,6 +34,10 @@ extension VaultItem : Identifiable {
         guard let fileType = fileType else { return false }
         let photoTypes = ["image/jpeg", "image/png", "image/heic", "image/heif", "image/gif", "image/webp"]
         return photoTypes.contains(fileType.lowercased())
+    }
+    
+    var isImage: Bool {
+        return fileType?.hasPrefix("image/") ?? false
     }
     
     var isVideo: Bool {
