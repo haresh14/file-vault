@@ -23,6 +23,7 @@ struct VaultMainView: View {
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
     @State private var showWebUpload = false
+    @StateObject private var webServer = WebServerManager.shared
     
     @Environment(\.managedObjectContext) var context
     
@@ -141,7 +142,17 @@ struct VaultMainView: View {
                         }
                     } else {
                         Button(action: { showWebUpload = true }) {
-                            Image(systemName: "globe")
+                            ZStack {
+                                Image(systemName: "globe")
+                                
+                                if webServer.isRunning {
+                                    // Running indicator - small green dot
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
                         }
                     }
                 }
