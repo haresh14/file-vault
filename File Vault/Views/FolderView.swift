@@ -8,6 +8,26 @@
 import SwiftUI
 import Photos
 
+enum FolderSortOption: String, CaseIterable {
+    case name = "Name"
+    case date = "Date"
+    case size = "Size"
+    case kind = "Kind"
+    
+    var systemImage: String {
+        switch self {
+        case .name:
+            return "textformat.abc"
+        case .date:
+            return "calendar"
+        case .size:
+            return "arrow.up.arrow.down"
+        case .kind:
+            return "folder"
+        }
+    }
+}
+
 struct FolderView: View {
     @State private var folders: [Folder] = []
     @State private var files: [VaultItem] = []
@@ -22,8 +42,46 @@ struct FolderView: View {
     @State private var showPhotoPicker = false
     @State private var isImporting = false
     @State private var importProgress: Double = 0
+    @State private var showSortActionSheet = false
+    @State private var sortOption: FolderSortOption = .name
+    @State private var sortAscending: Bool = true
     
     @Environment(\.managedObjectContext) var context
+    
+    var sortedFolders: [Folder] {
+        let sorted: [Folder]
+        
+        switch sortOption {
+        case .name:
+            sorted = folders.sorted { ($0.name ?? "") < ($1.name ?? "") }
+        case .date:
+            sorted = folders.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
+        case .size:
+            sorted = folders.sorted { $0.totalItemCount < $1.totalItemCount }
+        case .kind:
+            // For folders, kind sorting is same as name since they're all folders
+            sorted = folders.sorted { ($0.name ?? "") < ($1.name ?? "") }
+        }
+        
+        return sortAscending ? sorted : sorted.reversed()
+    }
+    
+    var sortedFiles: [VaultItem] {
+        let sorted: [VaultItem]
+        
+        switch sortOption {
+        case .name:
+            sorted = files.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
+        case .date:
+            sorted = files.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
+        case .size:
+            sorted = files.sorted { $0.fileSize < $1.fileSize }
+        case .kind:
+            sorted = files.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
+        }
+        
+        return sortAscending ? sorted : sorted.reversed()
+    }
     
     var body: some View {
         NavigationView {
@@ -51,6 +109,10 @@ struct FolderView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button(action: { showSortActionSheet = true }) {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    
                     Button(action: { showPhotoPicker = true }) {
                         Image(systemName: "photo.badge.plus")
                     }
@@ -99,9 +161,28 @@ struct FolderView: View {
                     importAssets(assets)
                 }
             }
+            .sheet(isPresented: $showSortActionSheet) {
+                FolderSortPopupView(
+                    currentSortOption: sortOption,
+                    sortAscending: sortAscending,
+                    onSortSelected: { option in
+                        if option == sortOption {
+                            // Toggle sort direction if same option is selected
+                            sortAscending.toggle()
+                        } else {
+                            // Set new sort option and default to ascending
+                            sortOption = option
+                            sortAscending = true
+                        }
+                        showSortActionSheet = false
+                    }
+                )
+                .presentationDetents([.fraction(0.5)])
+                .presentationDragIndicator(.visible)
+            }
             .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
                 UnifiedMediaViewerView(
-                    mediaItems: files,
+                    mediaItems: sortedFiles,
                     initialIndex: mediaViewerIndex
                 )
             }
@@ -192,7 +273,7 @@ struct FolderView: View {
             // Folders section
             if !folders.isEmpty {
                 Section("Folders") {
-                    ForEach(folders) { folder in
+                    ForEach(sortedFolders) { folder in
                         FolderRowView(folder: folder) {
                             navigateToFolder(folder)
                         } onRename: {
@@ -206,7 +287,7 @@ struct FolderView: View {
             // Files section
             if !files.isEmpty {
                 Section("Files") {
-                    ForEach(files) { file in
+                    ForEach(sortedFiles) { file in
                         FileRowView(file: file) {
                             viewFile(file)
                         }
@@ -289,7 +370,7 @@ struct FolderView: View {
     }
     
     private func viewFile(_ file: VaultItem) {
-        if let index = files.firstIndex(where: { $0.objectID == file.objectID }) {
+        if let index = sortedFiles.firstIndex(where: { $0.objectID == file.objectID }) {
             mediaViewerIndex = index
             showUnifiedMediaViewer = true
         }
@@ -451,6 +532,69 @@ struct FileRowView: View {
         formatter.allowedUnits = [.useKB, .useMB, .useGB]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
+    }
+}
+
+// MARK: - Folder Sort Popup View
+
+struct FolderSortPopupView: View {
+    let currentSortOption: FolderSortOption
+    let sortAscending: Bool
+    let onSortSelected: (FolderSortOption) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Sort options
+                VStack(spacing: 0) {
+                    ForEach(FolderSortOption.allCases, id: \.self) { option in
+                        HStack(spacing: 16) {
+                            Image(systemName: option.systemImage)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text(option.rawValue)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            if option == currentSortOption {
+                                Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
+                                    .font(.body)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onSortSelected(option)
+                        }
+                        
+                        if option != FolderSortOption.allCases.last {
+                            Divider()
+                                .padding(.leading, 60)
+                        }
+                    }
+                }
+                .padding(.top, 20)
+                
+                Spacer()
+            }
+            .navigationTitle("Sort by")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
