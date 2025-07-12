@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Photos
 
 struct FolderView: View {
     @State private var folders: [Folder] = []
@@ -18,6 +19,9 @@ struct FolderView: View {
     @State private var renameText = ""
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
+    @State private var showPhotoPicker = false
+    @State private var isImporting = false
+    @State private var importProgress: Double = 0
     
     @Environment(\.managedObjectContext) var context
     
@@ -46,9 +50,13 @@ struct FolderView: View {
             .navigationTitle(currentFolder?.displayName ?? "Folders")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button(action: { showPhotoPicker = true }) {
+                        Image(systemName: "photo.badge.plus")
+                    }
+                    
                     Button(action: { showCreateFolder = true }) {
-                        Image(systemName: "plus")
+                        Image(systemName: "folder.badge.plus")
                     }
                 }
                 
@@ -86,12 +94,24 @@ struct FolderView: View {
             } message: {
                 Text("Enter a new name for the folder")
             }
+            .sheet(isPresented: $showPhotoPicker) {
+                PhotoPickerView { assets in
+                    importAssets(assets)
+                }
+            }
             .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
                 UnifiedMediaViewerView(
                     mediaItems: files,
                     initialIndex: mediaViewerIndex
                 )
             }
+            .overlay(
+                Group {
+                    if isImporting {
+                        ImportProgressView(progress: importProgress)
+                    }
+                }
+            )
         }
     }
     
@@ -272,6 +292,39 @@ struct FolderView: View {
         if let index = files.firstIndex(where: { $0.objectID == file.objectID }) {
             mediaViewerIndex = index
             showUnifiedMediaViewer = true
+        }
+    }
+    
+    private func importAssets(_ assets: [PHAsset]) {
+        guard !assets.isEmpty else { return }
+        
+        showPhotoPicker = false
+        isImporting = true
+        importProgress = 0
+        
+        let totalItems = Double(assets.count)
+        var processedItems = 0.0
+        
+        for asset in assets {
+            FileStorageManager.shared.importFromPhotoLibrary(asset: asset, targetFolder: currentFolder) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(_):
+                        // Asset imported successfully
+                        break
+                    case .failure(let error):
+                        print("Error importing asset: \(error)")
+                    }
+                    
+                    processedItems += 1
+                    importProgress = processedItems / totalItems
+                    
+                    if processedItems == totalItems {
+                        isImporting = false
+                        loadFolders()
+                    }
+                }
+            }
         }
     }
 }

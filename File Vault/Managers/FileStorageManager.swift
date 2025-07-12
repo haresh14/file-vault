@@ -124,7 +124,7 @@ class FileStorageManager {
     
     // MARK: - File Operations
     
-    func saveFile(data: Data, fileName: String, fileType: String) throws -> VaultItem {
+    func saveFile(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil) throws -> VaultItem {
         print("DEBUG: saveFile called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
         
         guard let key = encryptionKey else {
@@ -170,7 +170,8 @@ class FileStorageManager {
             fileName: uniqueFileName,
             fileType: fileType,
             fileSize: Int64(data.count),
-            thumbnailFileName: thumbnailFileName
+            thumbnailFileName: thumbnailFileName,
+            in: targetFolder
         )
         
         print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
@@ -179,7 +180,7 @@ class FileStorageManager {
     }
     
     // New method for background imports
-    func saveFileInBackground(data: Data, fileName: String, fileType: String, completion: @escaping (Result<VaultItem, Error>) -> Void) {
+    func saveFileInBackground(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil, completion: @escaping (Result<VaultItem, Error>) -> Void) {
         print("DEBUG: saveFileInBackground called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
         
         guard let key = encryptionKey else {
@@ -227,7 +228,8 @@ class FileStorageManager {
                 fileName: uniqueFileName,
                 fileType: fileType,
                 fileSize: Int64(data.count),
-                thumbnailFileName: thumbnailFileName
+                thumbnailFileName: thumbnailFileName,
+                in: targetFolder
             ) { vaultItem in
                 if let vaultItem = vaultItem {
                     print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
@@ -437,7 +439,7 @@ class FileStorageManager {
     
     // MARK: - Import from Photo Library
     
-    func importFromPhotoLibrary(asset: PHAsset, completion: @escaping (Result<VaultItem, Error>) -> Void) {
+    func importFromPhotoLibrary(asset: PHAsset, targetFolder: Folder? = nil, completion: @escaping (Result<VaultItem, Error>) -> Void) {
         print("DEBUG: Starting import for asset: \(asset.localIdentifier)")
         
         if asset.mediaType == .image {
@@ -472,7 +474,7 @@ class FileStorageManager {
                 print("DEBUG: fileType being used: \(fileType)")
                 
                 do {
-                    let vaultItem = try self.saveFile(data: data, fileName: fileName, fileType: fileType)
+                    let vaultItem = try self.saveFile(data: data, fileName: fileName, fileType: fileType, targetFolder: targetFolder)
                     print("DEBUG: Image saved successfully: \(vaultItem.fileName ?? "")")
                     completion(.success(vaultItem))
                 } catch {
@@ -508,7 +510,7 @@ class FileStorageManager {
                     let fileType = "video/quicktime"
                     
                     // Use background save for videos to prevent Core Data recursive save errors
-                    self.saveFileInBackground(data: data, fileName: fileName, fileType: fileType) { result in
+                    self.saveFileInBackground(data: data, fileName: fileName, fileType: fileType, targetFolder: targetFolder) { result in
                         switch result {
                         case .success(let vaultItem):
                             print("DEBUG: Video saved successfully: \(vaultItem.fileName ?? "")")
