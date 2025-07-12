@@ -43,6 +43,8 @@ struct FolderView: View {
     @State private var isImporting = false
     @State private var importProgress: Double = 0
     @State private var showSortActionSheet = false
+    @State private var showAddActionSheet = false
+    @State private var showSettings = false
     @State private var sortOption: FolderSortOption = .name
     @State private var sortAscending: Bool = true
     @State private var isSelectionMode = false
@@ -113,68 +115,51 @@ struct FolderView: View {
                     }
                 }
                 
-                // Floating Action Button
-                if isSelectionMode && (!selectedFolders.isEmpty || !selectedFiles.isEmpty) {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            
-                            Button(action: {
-                                showDeleteAlert = true
-                            }) {
-                                Image(systemName: "trash")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                                    .frame(width: 56, height: 56)
-                                    .background(Color.red)
-                                    .clipShape(Circle())
-                                    .shadow(radius: 4)
-                            }
-                        }
-                        .padding()
-                    }
-                }
+
             }
             .navigationTitle(currentFolder?.displayName ?? "Folders")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if isSelectionMode {
+                        Button("Select All") {
+                            selectAllItems()
+                        }
+                    } else if currentFolder != nil {
+                        Button("Back") {
+                            navigateBack()
+                        }
+                    } else {
+                        Button(action: { showSettings = true }) {
+                            Image(systemName: "gear")
+                        }
+                    }
+                }
+                
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isSelectionMode {
+                        Button(action: { showDeleteAlert = true }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                        .disabled(selectedFolders.isEmpty && selectedFiles.isEmpty)
+                        
                         Button("Cancel") {
                             exitSelectionMode()
                         }
                     } else {
+                        Button(action: { showAddActionSheet = true }) {
+                            Image(systemName: "plus")
+                        }
+                        
                         Button(action: { showSortActionSheet = true }) {
                             Image(systemName: "arrow.up.arrow.down")
                         }
                         
-                        Button(action: { showPhotoPicker = true }) {
-                            Image(systemName: "photo.badge.plus")
-                        }
-                        
-                        Button(action: { showCreateFolder = true }) {
-                            Image(systemName: "folder.badge.plus")
-                        }
-                        
-                        Button("Select") {
-                            enterSelectionMode()
-                        }
-                    }
-                }
-                
-                if currentFolder != nil {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Back") {
-                            navigateBack()
-                        }
-                    }
-                }
-                
-                if isSelectionMode {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Select All") {
-                            selectAllItems()
+                        if !folders.isEmpty || !files.isEmpty {
+                            Button("Select") {
+                                enterSelectionMode()
+                            }
                         }
                     }
                 }
@@ -247,6 +232,23 @@ struct FolderView: View {
                 )
                 .presentationDetents([.fraction(0.5)])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showAddActionSheet) {
+                FolderAddActionSheet(
+                    onAddPhotos: {
+                        showAddActionSheet = false
+                        showPhotoPicker = true
+                    },
+                    onCreateFolder: {
+                        showAddActionSheet = false
+                        showCreateFolder = true
+                    }
+                )
+                .presentationDetents([.fraction(0.3)])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
                 UnifiedMediaViewerView(
@@ -835,6 +837,75 @@ struct SelectableFileRowView: View {
         formatter.allowedUnits = [.useKB, .useMB, .useGB]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
+    }
+}
+
+// MARK: - Folder Add Action Sheet
+
+struct FolderAddActionSheet: View {
+    let onAddPhotos: () -> Void
+    let onCreateFolder: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    Button(action: onAddPhotos) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text("Add from Photos")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                    
+                    Divider()
+                        .padding(.leading, 60)
+                    
+                    Button(action: onCreateFolder) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text("Create Folder")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                }
+                .padding(.top, 20)
+                
+                Spacer()
+            }
+            .navigationTitle("Add Content")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

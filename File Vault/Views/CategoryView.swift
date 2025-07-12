@@ -154,6 +154,7 @@ struct CategoryFilesView: View {
     @State private var isSelectionMode = false
     @State private var selectedItems: Set<VaultItem> = []
     @State private var showDeleteAlert = false
+    @State private var showSettings = false
     
     // Remove the items parameter and make it reactive
     init(categoryType: CategoryType) {
@@ -230,34 +231,31 @@ struct CategoryFilesView: View {
                 }
             }
             
-            // Floating Action Button
-            if isSelectionMode && !selectedItems.isEmpty {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        
-                        Button(action: {
-                            showDeleteAlert = true
-                        }) {
-                            Image(systemName: "trash")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(Color.red)
-                                .clipShape(Circle())
-                                .shadow(radius: 4)
-                        }
-                    }
-                    .padding()
-                }
-            }
+
         }
         .navigationTitle(categoryType.rawValue)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                if isSelectionMode {
+                    Button("Select All") {
+                        selectAllItems()
+                    }
+                } else {
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gear")
+                    }
+                }
+            }
+            
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if isSelectionMode {
+                    Button(action: { showDeleteAlert = true }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                    .disabled(selectedItems.isEmpty)
+                    
                     Button("Cancel") {
                         exitSelectionMode()
                     }
@@ -270,14 +268,6 @@ struct CategoryFilesView: View {
                         Button("Select") {
                             enterSelectionMode()
                         }
-                    }
-                }
-            }
-            
-            if isSelectionMode {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Select All") {
-                        selectAllItems()
                     }
                 }
             }
@@ -304,6 +294,9 @@ struct CategoryFilesView: View {
                 mediaItems: sortedItems,
                 initialIndex: mediaViewerIndex
             )
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
         .alert("Delete Items", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) { }

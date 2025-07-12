@@ -48,6 +48,7 @@ struct VaultMainView: View {
     @State private var mediaViewerIndex = 0
     @State private var showWebUpload = false
     @State private var showSortActionSheet = false
+    @State private var showAddActionSheet = false
     @State private var sortOption: SortOption = .userDefault
     @State private var sortAscending: Bool = true
     @StateObject private var webServer = WebServerManager.shared
@@ -129,59 +130,7 @@ struct VaultMainView: View {
                     }
                 }
                 
-                // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        
-                        if isSelectionMode {
-                            HStack(spacing: 16) {
-                                // Delete button
-                                Button(action: {
-                                    showDeleteAlert = true
-                                }) {
-                                    Image(systemName: "trash")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                        .frame(width: 56, height: 56)
-                                        .background(Color.red)
-                                        .clipShape(Circle())
-                                        .shadow(radius: 4)
-                                }
-                                .disabled(selectedVaultItems.isEmpty)
-                                
-                                // Cancel selection
-                                Button(action: {
-                                    isSelectionMode = false
-                                    selectedVaultItems.removeAll()
-                                    hasTriggeredSelectionHaptic = false
-                                }) {
-                                    Image(systemName: "xmark")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                        .frame(width: 56, height: 56)
-                                        .background(Color.gray)
-                                        .clipShape(Circle())
-                                        .shadow(radius: 4)
-                                }
-                            }
-                        } else {
-                            Button(action: {
-                                showPhotoPicker = true
-                            }) {
-                                Image(systemName: "plus")
-                                    .font(.title)
-                                    .foregroundColor(.white)
-                                    .frame(width: 60, height: 60)
-                                    .background(Color.blue)
-                                    .clipShape(Circle())
-                                    .shadow(radius: 4)
-                            }
-                        }
-                    }
-                    .padding()
-                }
+
             }
             .navigationTitle(isSelectionMode ? "\(selectedVaultItems.count) selected" : "Gallery")
             .navigationBarTitleDisplayMode(.large)
@@ -192,30 +141,30 @@ struct VaultMainView: View {
                             selectedVaultItems = Set(vaultItems)
                         }
                     } else {
-                        Button(action: { showWebUpload = true }) {
-                            ZStack {
-                                Image(systemName: "globe")
-                                
-                                if webServer.isRunning {
-                                    // Running indicator - small green dot
-                                    Circle()
-                                        .fill(Color.green)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 8, y: -8)
-                                }
-                            }
+                        Button(action: { showSettings = true }) {
+                            Image(systemName: "gear")
                         }
                     }
                 }
                 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isSelectionMode {
+                        Button(action: { showDeleteAlert = true }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                        .disabled(selectedVaultItems.isEmpty)
+                        
                         Button("Cancel") {
                             isSelectionMode = false
                             selectedVaultItems.removeAll()
                             hasTriggeredSelectionHaptic = false
                         }
                     } else {
+                        Button(action: { showAddActionSheet = true }) {
+                            Image(systemName: "plus")
+                        }
+                        
                         Button(action: { showSortActionSheet = true }) {
                             Image(systemName: "arrow.up.arrow.down")
                         }
@@ -225,10 +174,6 @@ struct VaultMainView: View {
                                 isSelectionMode = true
                                 selectedVaultItems.removeAll()
                             }
-                        }
-                        
-                        Button(action: { showSettings = true }) {
-                            Image(systemName: "gear")
                         }
                     }
                 }
@@ -261,6 +206,20 @@ struct VaultMainView: View {
                     }
                 )
                 .presentationDetents([.fraction(0.5)])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showAddActionSheet) {
+                AddActionSheet(
+                    onAddPhotos: {
+                        showAddActionSheet = false
+                        showPhotoPicker = true
+                    },
+                    onWebUpload: {
+                        showAddActionSheet = false
+                        showWebUpload = true
+                    }
+                )
+                .presentationDetents([.fraction(0.3)])
                 .presentationDragIndicator(.visible)
             }
             .overlay(
@@ -647,6 +606,85 @@ struct PhotoPickerView: UIViewControllerRepresentable {
             }
             
             parent.completion(assets)
+        }
+    }
+}
+
+// MARK: - Add Action Sheet
+
+struct AddActionSheet: View {
+    let onAddPhotos: () -> Void
+    let onWebUpload: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var webServer = WebServerManager.shared
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    Button(action: onAddPhotos) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text("Add from Photos")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                    
+                    Divider()
+                        .padding(.leading, 60)
+                    
+                    Button(action: onWebUpload) {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Image(systemName: "globe")
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                
+                                if webServer.isRunning {
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
+                            .frame(width: 20)
+                            
+                            Text("Web Upload")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                }
+                .padding(.top, 20)
+                
+                Spacer()
+            }
+            .navigationTitle("Add Content")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
