@@ -188,8 +188,15 @@ struct VaultMainView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if isSelectionMode {
-                        Button("Select All") {
-                            selectedVaultItems = Set(vaultItems)
+                        if selectedVaultItems.isEmpty {
+                            Button("Select All") {
+                                selectedVaultItems = Set(vaultItems)
+                            }
+                        } else {
+                            Button(action: { showDeleteAlert = true }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
                         }
                     } else {
                         Button(action: { showWebUpload = true }) {
@@ -209,9 +216,22 @@ struct VaultMainView: View {
                 }
                 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if !isSelectionMode {
+                    if isSelectionMode {
+                        Button("Cancel") {
+                            isSelectionMode = false
+                            selectedVaultItems.removeAll()
+                            hasTriggeredSelectionHaptic = false
+                        }
+                    } else {
                         Button(action: { showSortActionSheet = true }) {
                             Image(systemName: "arrow.up.arrow.down")
+                        }
+                        
+                        if !vaultItems.isEmpty {
+                            Button("Select") {
+                                isSelectionMode = true
+                                selectedVaultItems.removeAll()
+                            }
                         }
                         
                         Button(action: { showSettings = true }) {
