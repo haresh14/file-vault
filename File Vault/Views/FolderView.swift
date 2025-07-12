@@ -52,6 +52,7 @@ struct FolderView: View {
     @State private var selectedFiles: Set<VaultItem> = []
     @State private var showDeleteAlert = false
     @State private var showSwipeDeleteAlert = false
+    @State private var showMoveSheet = false
     @State private var itemsToDelete: [Any] = []
     
     @Environment(\.managedObjectContext) var context
@@ -142,6 +143,11 @@ struct FolderView: View {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isSelectionMode {
                         if !selectedFolders.isEmpty || !selectedFiles.isEmpty {
+                            Button(action: { showMoveSheet = true }) {
+                                Image(systemName: "folder")
+                                    .foregroundColor(.blue)
+                            }
+                            
                             Button(action: { showDeleteAlert = true }) {
                                 Image(systemName: "trash")
                                     .foregroundColor(.red)
@@ -253,6 +259,17 @@ struct FolderView: View {
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showMoveSheet) {
+                FolderPickerView(
+                    selectedFolders: selectedFolders,
+                    selectedFiles: selectedFiles,
+                    currentFolder: currentFolder,
+                    onMove: { destinationFolder in
+                        moveSelectedItems(to: destinationFolder)
+                        showMoveSheet = false
+                    }
+                )
             }
             .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
                 UnifiedMediaViewerView(
@@ -518,6 +535,25 @@ struct FolderView: View {
     private func selectAllItems() {
         selectedFolders = Set(folders)
         selectedFiles = Set(files)
+    }
+    
+    private func moveSelectedItems(to destinationFolder: Folder?) {
+        // Move selected folders
+        for folder in selectedFolders {
+            CoreDataManager.shared.moveFolder(folder, to: destinationFolder)
+        }
+        
+        // Move selected files
+        for file in selectedFiles {
+            CoreDataManager.shared.moveVaultItem(file, to: destinationFolder)
+        }
+        
+        exitSelectionMode()
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
+        loadFolders()
     }
     
     private func deleteSelectedItems() {
@@ -973,6 +1009,102 @@ struct FolderSortPopupView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Folder Picker View
+
+struct FolderPickerView: View {
+    let selectedFolders: Set<Folder>
+    let selectedFiles: Set<VaultItem>
+    let currentFolder: Folder?
+    let onMove: (Folder?) -> Void
+    
+    @State private var allFolders: [Folder] = []
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Root folder option
+                Button(action: {
+                    onMove(nil)
+                    dismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "house.fill")
+                            .foregroundColor(.blue)
+                        Text("Root Folder")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if currentFolder == nil {
+                            Text("Current")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .disabled(currentFolder == nil)
+                
+                // All other folders
+                ForEach(allFolders, id: \.objectID) { folder in
+                    Button(action: {
+                        onMove(folder)
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(.blue)
+                            Text(folder.displayName)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if folder == currentFolder {
+                                Text("Current")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .disabled(folder == currentFolder || selectedFolders.contains(folder) || isDescendantOfSelectedFolder(folder))
+                }
+            }
+            .navigationTitle("Move to Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                loadFolders()
+            }
+        }
+    }
+    
+    private func loadFolders() {
+        allFolders = CoreDataManager.shared.fetchAllFolders()
+    }
+    
+    private func isDescendantOfSelectedFolder(_ folder: Folder) -> Bool {
+        for selectedFolder in selectedFolders {
+            if isFolder(selectedFolder, ancestorOf: folder) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    private func isFolder(_ potentialAncestor: Folder, ancestorOf folder: Folder) -> Bool {
+        var current: Folder? = folder.parent
+        while let currentFolder = current {
+            if currentFolder == potentialAncestor {
+                return true
+            }
+            current = currentFolder.parent
+        }
+        return false
     }
 }
 

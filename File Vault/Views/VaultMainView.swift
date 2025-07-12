@@ -42,6 +42,7 @@ struct VaultMainView: View {
     @State private var selectedVaultItems: Set<VaultItem> = []
     @State private var isSelectionMode = false
     @State private var showDeleteAlert = false
+    @State private var showMoveSheet = false
     @State private var hasTriggeredSelectionHaptic = false
     @State private var searchText = ""
     @State private var showUnifiedMediaViewer = false
@@ -150,6 +151,11 @@ struct VaultMainView: View {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isSelectionMode {
                         if !selectedVaultItems.isEmpty {
+                            Button(action: { showMoveSheet = true }) {
+                                Image(systemName: "folder")
+                                    .foregroundColor(.blue)
+                            }
+                            
                             Button(action: { showDeleteAlert = true }) {
                                 Image(systemName: "trash")
                                     .foregroundColor(.red)
@@ -242,6 +248,15 @@ struct VaultMainView: View {
                 UnifiedMediaViewerView(
                     mediaItems: filteredItems,
                     initialIndex: mediaViewerIndex
+                )
+            }
+            .sheet(isPresented: $showMoveSheet) {
+                GalleryFolderPickerView(
+                    selectedFiles: selectedVaultItems,
+                    onMove: { destinationFolder in
+                        moveSelectedItems(to: destinationFolder)
+                        showMoveSheet = false
+                    }
                 )
             }
         }
@@ -340,6 +355,21 @@ struct VaultMainView: View {
                 }
             }
         }
+    }
+    
+    private func moveSelectedItems(to destinationFolder: Folder?) {
+        for item in selectedVaultItems {
+            CoreDataManager.shared.moveVaultItem(item, to: destinationFolder)
+        }
+        
+        selectedVaultItems.removeAll()
+        isSelectionMode = false
+        hasTriggeredSelectionHaptic = false
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
+        loadVaultItems()
     }
     
     private func deleteSelectedItems() {
@@ -555,6 +585,68 @@ struct ImportProgressView: View {
             .background(Color.black.opacity(0.8))
             .cornerRadius(20)
         }
+    }
+}
+
+// MARK: - Gallery Folder Picker View
+
+struct GalleryFolderPickerView: View {
+    let selectedFiles: Set<VaultItem>
+    let onMove: (Folder?) -> Void
+    
+    @State private var allFolders: [Folder] = []
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Root folder option
+                Button(action: {
+                    onMove(nil)
+                    dismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "house.fill")
+                            .foregroundColor(.blue)
+                        Text("Root Folder")
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+                
+                // All other folders
+                ForEach(allFolders, id: \.objectID) { folder in
+                    Button(action: {
+                        onMove(folder)
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(.blue)
+                            Text(folder.displayName)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Move to Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                loadFolders()
+            }
+        }
+    }
+    
+    private func loadFolders() {
+        allFolders = CoreDataManager.shared.fetchAllFolders()
     }
 }
 

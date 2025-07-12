@@ -165,6 +165,7 @@ struct CategoryFilesView: View {
     @State private var isSelectionMode = false
     @State private var selectedItems: Set<VaultItem> = []
     @State private var showDeleteAlert = false
+    @State private var showMoveSheet = false
     
     // Remove the items parameter and make it reactive
     init(categoryType: CategoryType) {
@@ -261,6 +262,11 @@ struct CategoryFilesView: View {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if isSelectionMode {
                     if !selectedItems.isEmpty {
+                        Button(action: { showMoveSheet = true }) {
+                            Image(systemName: "folder")
+                                .foregroundColor(.blue)
+                        }
+                        
                         Button(action: { showDeleteAlert = true }) {
                             Image(systemName: "trash")
                                 .foregroundColor(.red)
@@ -304,6 +310,15 @@ struct CategoryFilesView: View {
             UnifiedMediaViewerView(
                 mediaItems: sortedItems,
                 initialIndex: mediaViewerIndex
+            )
+        }
+        .sheet(isPresented: $showMoveSheet) {
+            CategoryFolderPickerView(
+                selectedFiles: selectedItems,
+                onMove: { destinationFolder in
+                    moveSelectedItems(to: destinationFolder)
+                    showMoveSheet = false
+                }
             )
         }
         .alert("Delete Items", isPresented: $showDeleteAlert) {
@@ -365,6 +380,17 @@ struct CategoryFilesView: View {
         selectedItems = Set(items)
     }
     
+    private func moveSelectedItems(to destinationFolder: Folder?) {
+        for item in selectedItems {
+            CoreDataManager.shared.moveVaultItem(item, to: destinationFolder)
+        }
+        
+        exitSelectionMode()
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+    }
+    
     private func deleteSelectedItems() {
         for item in selectedItems {
             do {
@@ -378,6 +404,68 @@ struct CategoryFilesView: View {
         
         // Post notification to refresh other views
         NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+    }
+}
+
+// MARK: - Category Folder Picker View
+
+struct CategoryFolderPickerView: View {
+    let selectedFiles: Set<VaultItem>
+    let onMove: (Folder?) -> Void
+    
+    @State private var allFolders: [Folder] = []
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Root folder option
+                Button(action: {
+                    onMove(nil)
+                    dismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "house.fill")
+                            .foregroundColor(.blue)
+                        Text("Root Folder")
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+                
+                // All other folders
+                ForEach(allFolders, id: \.objectID) { folder in
+                    Button(action: {
+                        onMove(folder)
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(.blue)
+                            Text(folder.displayName)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Move to Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                loadFolders()
+            }
+        }
+    }
+    
+    private func loadFolders() {
+        allFolders = CoreDataManager.shared.fetchAllFolders()
     }
 }
 
