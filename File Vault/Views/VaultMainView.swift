@@ -183,7 +183,7 @@ struct VaultMainView: View {
                     .padding()
                 }
             }
-            .navigationTitle(isSelectionMode ? "\(selectedVaultItems.count) selected" : "")
+            .navigationTitle(isSelectionMode ? "\(selectedVaultItems.count) selected" : "Gallery")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -289,11 +289,11 @@ struct VaultMainView: View {
                 .font(.system(size: 80))
                 .foregroundColor(.gray)
             
-            Text("Your Vault is Empty")
+            Text("No Media Files")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Tap the + button to add photos and videos")
+            Text("Add photos and videos to see them here from all your folders")
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -303,10 +303,10 @@ struct VaultMainView: View {
     // MARK: - Functions
     
     private func loadVaultItems() {
-        let items = CoreDataManager.shared.fetchAllVaultItems()
+        let items = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
         vaultItems = items
         
-        // Items loaded successfully
+        // Items loaded successfully from all folders
     }
     
     private func toggleSelection(for item: VaultItem) {
