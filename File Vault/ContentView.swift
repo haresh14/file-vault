@@ -66,7 +66,7 @@ struct ContentView: View {
                 }
             }
         } else {
-            VaultMainView()
+            MainTabView()
         }
     }
     
