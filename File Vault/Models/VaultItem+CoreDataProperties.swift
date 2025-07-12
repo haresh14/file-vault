@@ -56,4 +56,39 @@ extension VaultItem : Identifiable {
         ]
         return videoTypes.contains(fileType.lowercased())
     }
+    
+    var isDocument: Bool {
+        guard let fileType = fileType else { return false }
+        let documentTypes = [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "text/plain",
+            "text/rtf",
+            "application/rtf",
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed"
+        ]
+        return documentTypes.contains(fileType.lowercased()) || 
+               (!isImage && !isVideo && !isAudio)
+    }
+    
+    var isAudio: Bool {
+        guard let fileType = fileType else { return false }
+        let audioTypes = [
+            "audio/mpeg",        // MP3
+            "audio/wav",         // WAV
+            "audio/x-m4a",       // M4A
+            "audio/aac",         // AAC
+            "audio/ogg",         // OGG
+            "audio/flac"         // FLAC
+        ]
+        return audioTypes.contains(fileType.lowercased())
+    }
 } 

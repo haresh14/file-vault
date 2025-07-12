@@ -7,13 +7,80 @@
 
 import SwiftUI
 
+enum CategoryType: String, CaseIterable {
+    case photos = "Photos"
+    case videos = "Videos"
+    case documents = "Documents"
+    case allFiles = "All Files"
+    
+    var systemImage: String {
+        switch self {
+        case .photos:
+            return "photo"
+        case .videos:
+            return "video"
+        case .documents:
+            return "doc"
+        case .allFiles:
+            return "folder"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .photos:
+            return .blue
+        case .videos:
+            return .purple
+        case .documents:
+            return .orange
+        case .allFiles:
+            return .gray
+        }
+    }
+}
+
 struct CategoryView: View {
-    let categories = [
-        Category(name: "Photos", systemImage: "photo", color: .blue),
-        Category(name: "Videos", systemImage: "video", color: .purple),
-        Category(name: "Documents", systemImage: "doc", color: .orange),
-        Category(name: "All Files", systemImage: "folder", color: .gray)
-    ]
+    @State private var allVaultItems: [VaultItem] = []
+    @Environment(\.managedObjectContext) var context
+    
+    var photoItems: [VaultItem] {
+        allVaultItems.filter { $0.isImage }
+    }
+    
+    var videoItems: [VaultItem] {
+        allVaultItems.filter { $0.isVideo }
+    }
+    
+    var documentItems: [VaultItem] {
+        allVaultItems.filter { $0.isDocument }
+    }
+    
+    private func getItemCount(for categoryType: CategoryType) -> Int {
+        switch categoryType {
+        case .photos:
+            return photoItems.count
+        case .videos:
+            return videoItems.count
+        case .documents:
+            return documentItems.count
+        case .allFiles:
+            return allVaultItems.count
+        }
+    }
+    
+    private func getItems(for categoryType: CategoryType) -> [VaultItem] {
+        switch categoryType {
+        case .photos:
+            return photoItems
+        case .videos:
+            return videoItems
+        case .documents:
+            return documentItems
+        case .allFiles:
+            return allVaultItems
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -21,55 +88,166 @@ struct CategoryView: View {
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 150), spacing: 16)
                 ], spacing: 16) {
-                    ForEach(categories) { category in
-                        CategoryCard(category: category) {
-                            // TODO: Navigate to category files
+                    ForEach(CategoryType.allCases, id: \.self) { categoryType in
+                        NavigationLink(destination: CategoryFilesView(
+                            categoryType: categoryType,
+                            items: getItems(for: categoryType)
+                        )) {
+                            CategoryCard(
+                                categoryType: categoryType,
+                                itemCount: getItemCount(for: categoryType)
+                            )
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding()
             }
             .navigationTitle("Categories")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                loadVaultItems()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
+                loadVaultItems()
+            }
         }
+    }
+    
+    private func loadVaultItems() {
+        allVaultItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
     }
 }
 
-struct Category: Identifiable {
-    let id = UUID()
-    let name: String
-    let systemImage: String
-    let color: Color
-}
-
 struct CategoryCard: View {
-    let category: Category
-    let onTap: () -> Void
+    let categoryType: CategoryType
+    let itemCount: Int
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 12) {
-                Image(systemName: category.systemImage)
-                    .font(.system(size: 40))
-                    .foregroundColor(category.color)
-                
-                Text(category.name)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Text("0 items") // TODO: Show actual count
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+        VStack(spacing: 12) {
+            Image(systemName: categoryType.systemImage)
+                .font(.system(size: 40))
+                .foregroundColor(categoryType.color)
+            
+            Text(categoryType.rawValue)
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text("\(itemCount) items")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
-        .buttonStyle(PlainButtonStyle())
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+struct CategoryFilesView: View {
+    let categoryType: CategoryType
+    let items: [VaultItem]
+    @State private var showUnifiedMediaViewer = false
+    @State private var mediaViewerIndex = 0
+    @State private var sortOption: SortOption = .date
+    @State private var sortAscending: Bool = false
+    @State private var showSortActionSheet = false
+    
+    var sortedItems: [VaultItem] {
+        let sorted: [VaultItem]
+        
+        switch sortOption {
+        case .userDefault, .date:
+            sorted = items.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
+        case .name:
+            sorted = items.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
+        case .size:
+            sorted = items.sorted { $0.fileSize < $1.fileSize }
+        case .kind:
+            sorted = items.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
+        }
+        
+        return sortAscending ? sorted : sorted.reversed()
+    }
+    
+    let columns = [
+        GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
+    ]
+    
+    var body: some View {
+        Group {
+            if items.isEmpty {
+                VStack(spacing: 20) {
+                    Image(systemName: categoryType.systemImage)
+                        .font(.system(size: 80))
+                        .foregroundColor(.gray)
+                    
+                    Text("No \(categoryType.rawValue)")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text("Files of this type will appear here when you add them to your vault")
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 2) {
+                        ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
+                            VaultItemCell(
+                                item: item,
+                                isSelected: false,
+                                isSelectionMode: false,
+                                onTap: {
+                                    mediaViewerIndex = index
+                                    showUnifiedMediaViewer = true
+                                },
+                                onLongPress: {}
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+        }
+        .navigationTitle(categoryType.rawValue)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showSortActionSheet = true }) {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+            }
+        }
+        .sheet(isPresented: $showSortActionSheet) {
+            SortPopupView(
+                currentSortOption: sortOption,
+                sortAscending: sortAscending,
+                onSortSelected: { option in
+                    if option == sortOption {
+                        sortAscending.toggle()
+                    } else {
+                        sortOption = option
+                        sortAscending = true
+                    }
+                    showSortActionSheet = false
+                }
+            )
+            .presentationDetents([.fraction(0.5)])
+            .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+            UnifiedMediaViewerView(
+                mediaItems: sortedItems,
+                initialIndex: mediaViewerIndex
+            )
+        }
     }
 }
 
 #Preview {
     CategoryView()
+        .environment(\.managedObjectContext, CoreDataManager.shared.context)
 } 
