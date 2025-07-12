@@ -544,9 +544,17 @@ class WebServerManager: ObservableObject {
         """
         sendHTTPResponse(connection: connection, statusCode: statusCode, contentType: "application/json", body: response)
         
-        // Notify UI to refresh
+        // Notify UI to refresh with more comprehensive notifications
         DispatchQueue.main.async {
+            // Save Core Data context to ensure changes are persisted
+            CoreDataManager.shared.save()
+            
+            // Post multiple notifications to ensure all UI components refresh
             NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: CoreDataManager.shared.context)
+            
+            // Also trigger a general refresh notification
+            NotificationCenter.default.post(name: Notification.Name("VaultDataChanged"), object: nil)
         }
     }
     

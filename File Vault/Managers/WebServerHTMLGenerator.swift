@@ -79,7 +79,7 @@ extension WebServerManager {
             let itemCount = folder.totalItemCount
             let folderIdString = folder.id?.uuidString ?? ""
             folderItems += """
-                <div class="file-item" ondblclick="navigateToFolder('\(folderIdString)')">
+                <div class="file-item" onclick="navigateToFolder('\(folderIdString)')" style="cursor: pointer;">
                     <div class="file-icon">📁</div>
                     <div class="file-info">
                         <div class="file-name">\(folder.displayName)</div>
@@ -234,6 +234,12 @@ extension WebServerManager {
                 
                 .file-item:hover {
                     background: #f0f2f5;
+                }
+                
+                .file-item[onclick]:hover {
+                    background: #e3f2fd;
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                 }
                 
                 .file-item:last-child {
@@ -492,6 +498,69 @@ extension WebServerManager {
                     border: 1px solid #f5c6cb;
                 }
                 
+                .upload-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 2000;
+                }
+                
+                .upload-progress-card {
+                    background: white;
+                    border-radius: 16px;
+                    padding: 30px;
+                    text-align: center;
+                    min-width: 300px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                }
+                
+                .spinner {
+                    width: 50px;
+                    height: 50px;
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #667eea;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                }
+                
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                
+                .success-icon-large {
+                    font-size: 60px;
+                    color: #28a745;
+                    margin-bottom: 20px;
+                }
+                
+                .upload-progress-text {
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #333;
+                    margin-bottom: 10px;
+                }
+                
+                .upload-progress-detail {
+                    font-size: 14px;
+                    color: #666;
+                    margin-bottom: 20px;
+                }
+                
+                .progress-percentage {
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #667eea;
+                    margin-bottom: 15px;
+                }
+                
                 @media (max-width: 768px) {
                     .container {
                         padding: 20px;
@@ -571,6 +640,17 @@ extension WebServerManager {
                 </div>
             </div>
             
+            <!-- Upload Progress Overlay -->
+            <div id="uploadOverlay" class="upload-overlay" style="display: none;">
+                <div class="upload-progress-card">
+                    <div id="uploadSpinner" class="spinner"></div>
+                    <div id="uploadSuccessIcon" class="success-icon-large" style="display: none;">✅</div>
+                    <div id="uploadProgressText" class="upload-progress-text">Uploading files...</div>
+                    <div id="uploadProgressDetail" class="upload-progress-detail">Preparing upload...</div>
+                    <div id="uploadProgressPercentage" class="progress-percentage" style="display: none;">0%</div>
+                </div>
+            </div>
+            
             <script>
                 const uploadArea = document.getElementById('uploadArea');
                 const fileInput = document.getElementById('fileInput');
@@ -581,6 +661,12 @@ extension WebServerManager {
                 const progressFill = document.getElementById('progressFill');
                 const statusMessage = document.getElementById('statusMessage');
                 const uploadDialog = document.getElementById('uploadDialog');
+                const uploadOverlay = document.getElementById('uploadOverlay');
+                const uploadSpinner = document.getElementById('uploadSpinner');
+                const uploadSuccessIcon = document.getElementById('uploadSuccessIcon');
+                const uploadProgressText = document.getElementById('uploadProgressText');
+                const uploadProgressDetail = document.getElementById('uploadProgressDetail');
+                const uploadProgressPercentage = document.getElementById('uploadProgressPercentage');
                 
                 let files = [];
                 let currentFolderId = '\(currentFolderId?.replacingOccurrences(of: "'", with: "\\'") ?? "")';
@@ -748,6 +834,33 @@ extension WebServerManager {
                     progressFill.style.width = '0%';
                 }
                 
+                function showUploadOverlay() {
+                    uploadOverlay.style.display = 'flex';
+                    uploadSpinner.style.display = 'block';
+                    uploadSuccessIcon.style.display = 'none';
+                    uploadProgressText.textContent = 'Uploading files...';
+                    uploadProgressDetail.textContent = 'Preparing upload...';
+                    uploadProgressPercentage.style.display = 'none';
+                }
+                
+                function updateUploadProgress(percent, uploadedCount, totalCount) {
+                    uploadProgressPercentage.style.display = 'block';
+                    uploadProgressPercentage.textContent = Math.round(percent) + '%';
+                    uploadProgressDetail.textContent = `Uploading ${uploadedCount} of ${totalCount} files...`;
+                }
+                
+                function showUploadSuccess(count) {
+                    uploadSpinner.style.display = 'none';
+                    uploadSuccessIcon.style.display = 'block';
+                    uploadProgressText.textContent = 'Upload Complete!';
+                    uploadProgressDetail.textContent = `Successfully uploaded ${count} file(s)`;
+                    uploadProgressPercentage.style.display = 'none';
+                }
+                
+                function hideUploadOverlay() {
+                    uploadOverlay.style.display = 'none';
+                }
+                
                 // Form submission
                 uploadForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
@@ -791,6 +904,7 @@ extension WebServerManager {
                         uploadBtn.textContent = 'Uploading...';
                         showProgress(0);
                         hideStatus();
+                        showUploadOverlay();
                         
                         const xhr = new XMLHttpRequest();
                         
@@ -798,6 +912,7 @@ extension WebServerManager {
                             if (e.lengthComputable) {
                                 const percent = (e.loaded / e.total) * 100;
                                 showProgress(percent);
+                                updateUploadProgress(percent, 0, files.length);
                             }
                         });
                         
@@ -808,27 +923,31 @@ extension WebServerManager {
                             try {
                                 const response = JSON.parse(xhr.responseText);
                                 if (response.success) {
-                                    showStatus(response.message || 'Files uploaded successfully!');
+                                    showUploadSuccess(files.length);
                                     clearFiles();
                                     
-                                    // Refresh the page after a short delay
+                                    // Hide overlay and refresh after showing success
                                     setTimeout(() => {
+                                        hideUploadOverlay();
                                         hideUploadDialog();
                                         window.location.reload();
-                                    }, 1500);
+                                    }, 2000);
                                 } else {
+                                    hideUploadOverlay();
                                     showStatus(response.message || 'Upload failed', true);
                                 }
                             } catch (e) {
                                 console.error('Error parsing response:', e);
                                 if (xhr.status === 200) {
-                                    showStatus('Files uploaded successfully!');
+                                    showUploadSuccess(files.length);
                                     clearFiles();
                                     setTimeout(() => {
+                                        hideUploadOverlay();
                                         hideUploadDialog();
                                         window.location.reload();
-                                    }, 1500);
+                                    }, 2000);
                                 } else {
+                                    hideUploadOverlay();
                                     showStatus('Upload failed: ' + xhr.status, true);
                                 }
                             }
@@ -837,6 +956,7 @@ extension WebServerManager {
                         xhr.addEventListener('error', () => {
                             hideProgress();
                             resetUploadButton();
+                            hideUploadOverlay();
                             showStatus('Upload failed: Network error', true);
                         });
                         
@@ -853,6 +973,7 @@ extension WebServerManager {
                     } catch (error) {
                         hideProgress();
                         resetUploadButton();
+                        hideUploadOverlay();
                         showStatus('Upload failed: ' + error.message, true);
                     }
                 });
