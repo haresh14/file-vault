@@ -10,6 +10,29 @@ import PhotosUI
 import Photos
 import AVFoundation
 
+enum SortOption: String, CaseIterable {
+    case userDefault = "User Default"
+    case name = "Name"
+    case size = "Size"
+    case date = "Date"
+    case kind = "Kind"
+    
+    var systemImage: String {
+        switch self {
+        case .userDefault:
+            return "person"
+        case .name:
+            return "textformat.abc"
+        case .size:
+            return "arrow.up.arrow.down"
+        case .date:
+            return "calendar"
+        case .kind:
+            return "folder"
+        }
+    }
+}
+
 struct VaultMainView: View {
     @State private var showSettings = false
     @State private var showPhotoPicker = false
@@ -24,6 +47,9 @@ struct VaultMainView: View {
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
     @State private var showWebUpload = false
+    @State private var showSortActionSheet = false
+    @State private var sortOption: SortOption = .userDefault
+    @State private var sortAscending: Bool = true
     @StateObject private var webServer = WebServerManager.shared
     
     @Environment(\.managedObjectContext) var context
@@ -33,13 +59,30 @@ struct VaultMainView: View {
     ]
     
     var filteredItems: [VaultItem] {
-        if searchText.isEmpty {
-            return vaultItems
-        } else {
-            return vaultItems.filter { item in
-                item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
-            }
+        let items = searchText.isEmpty ? vaultItems : vaultItems.filter { item in
+            item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
         }
+        
+        return sortItems(items)
+    }
+    
+    private func sortItems(_ items: [VaultItem]) -> [VaultItem] {
+        let sorted: [VaultItem]
+        
+        switch sortOption {
+        case .userDefault:
+            sorted = items.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
+        case .name:
+            sorted = items.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
+        case .size:
+            sorted = items.sorted { $0.fileSize < $1.fileSize }
+        case .date:
+            sorted = items.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
+        case .kind:
+            sorted = items.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
+        }
+        
+        return sortAscending ? sorted : sorted.reversed()
     }
     
     var filteredImages: [VaultItem] {
@@ -165,8 +208,12 @@ struct VaultMainView: View {
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if !isSelectionMode {
+                        Button(action: { showSortActionSheet = true }) {
+                            Image(systemName: "arrow.up.arrow.down")
+                        }
+                        
                         Button(action: { showSettings = true }) {
                             Image(systemName: "gear")
                         }
@@ -183,6 +230,25 @@ struct VaultMainView: View {
             }
             .sheet(isPresented: $showWebUpload) {
                 WebUploadView()
+            }
+            .sheet(isPresented: $showSortActionSheet) {
+                SortPopupView(
+                    currentSortOption: sortOption,
+                    sortAscending: sortAscending,
+                    onSortSelected: { option in
+                        if option == sortOption {
+                            // Toggle sort direction if same option is selected
+                            sortAscending.toggle()
+                        } else {
+                            // Set new sort option and default to ascending
+                            sortOption = option
+                            sortAscending = true
+                        }
+                        showSortActionSheet = false
+                    }
+                )
+                .presentationDetents([.fraction(0.5)])
+                .presentationDragIndicator(.visible)
             }
             .overlay(
                 Group {
@@ -566,4 +632,68 @@ struct PhotoPickerView: UIViewControllerRepresentable {
             parent.completion(assets)
         }
     }
-} 
+}
+
+// MARK: - Sort Popup View
+
+struct SortPopupView: View {
+    let currentSortOption: SortOption
+    let sortAscending: Bool
+    let onSortSelected: (SortOption) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Sort options
+                VStack(spacing: 0) {
+                    ForEach(SortOption.allCases, id: \.self) { option in
+                        HStack(spacing: 16) {
+                            Image(systemName: option.systemImage)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text(option.rawValue)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            if option == currentSortOption {
+                                Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
+                                    .font(.body)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onSortSelected(option)
+                        }
+                        
+                        if option != SortOption.allCases.last {
+                            Divider()
+                                .padding(.leading, 60)
+                        }
+                    }
+                }
+                .padding(.top, 20)
+                
+                Spacer()
+            }
+            .navigationTitle("Sort by")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
