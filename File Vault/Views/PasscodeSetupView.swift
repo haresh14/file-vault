@@ -41,15 +41,33 @@ struct PasscodeSetupView: View {
             bottomSection
         }
         .padding()
-        .navigationBarBackButtonHidden(false)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 if isConfirming {
-                    Button("Back") {
+                    Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isConfirming = false
                             confirmPasscode = ""
                             showError = false
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                    }
+                } else {
+                    Button(action: {
+                        if let onCancel = onCancel {
+                            onCancel()
+                        } else {
+                            dismiss()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Security Setup")
                         }
                     }
                 }

@@ -37,7 +37,23 @@ struct PasswordSetupView: View {
             Spacer()
         }
         .padding()
-        .navigationBarBackButtonHidden(false)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    if let onCancel = onCancel {
+                        onCancel()
+                    } else {
+                        dismiss()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Security Setup")
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - View Components
