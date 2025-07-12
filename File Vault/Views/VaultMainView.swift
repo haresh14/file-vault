@@ -132,7 +132,7 @@ struct VaultMainView: View {
                     .padding()
                 }
             }
-            .navigationTitle(isSelectionMode ? "\(selectedVaultItems.count) selected" : "File Vault")
+            .navigationTitle(isSelectionMode ? "\(selectedVaultItems.count) selected" : "")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
