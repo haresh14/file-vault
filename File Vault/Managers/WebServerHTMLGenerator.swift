@@ -758,26 +758,32 @@ extension WebServerManager {
                     }
                     
                     const formData = new FormData();
-                    files.forEach((file, index) => {
-                        formData.append('files', file);
-                    });
                     
-                    // Add current folder ID
+                    // Add current folder ID FIRST
                     console.log('DEBUG: About to check folder ID for form submission');
                     console.log('DEBUG: currentFolderId value:', currentFolderId);
                     console.log('DEBUG: currentFolderId !== "":', currentFolderId !== '');
                     console.log('DEBUG: Boolean check result:', currentFolderId && currentFolderId !== '');
                     
                     if (currentFolderId && currentFolderId !== '') {
-                        console.log('Adding folder ID to form data:', currentFolderId);
+                        console.log('DEBUG: Adding folder ID to form data:', currentFolderId);
                         formData.append('folderId', currentFolderId);
-                        console.log('DEBUG: Form data after adding folderId');
-                        for (let pair of formData.entries()) {
-                            console.log('DEBUG: Form field:', pair[0], '=', pair[1]);
-                        }
+                        console.log('DEBUG: Folder ID added to form data');
                     } else {
-                        console.log('No folder ID specified, uploading to root');
+                        console.log('DEBUG: No folder ID specified, uploading to root');
                         console.log('DEBUG: currentFolderId was empty or falsy:', currentFolderId);
+                    }
+                    
+                    // Add files AFTER folder ID
+                    files.forEach((file, index) => {
+                        formData.append('files', file);
+                        console.log('DEBUG: Added file to form data:', file.name);
+                    });
+                    
+                    // Debug: Show all form data entries
+                    console.log('DEBUG: Final form data contents:');
+                    for (let pair of formData.entries()) {
+                        console.log('DEBUG: Form field:', pair[0], '=', typeof pair[1] === 'object' ? pair[1].name : pair[1]);
                     }
                     
                     try {
@@ -835,6 +841,13 @@ extension WebServerManager {
                         });
                         
                         xhr.open('POST', '/upload', true);
+                        
+                        // Also send folder ID in header as backup
+                        if (currentFolderId && currentFolderId !== '') {
+                            xhr.setRequestHeader('X-Folder-ID', currentFolderId);
+                            console.log('DEBUG: Added folder ID to header:', currentFolderId);
+                        }
+                        
                         xhr.send(formData);
                         
                     } catch (error) {

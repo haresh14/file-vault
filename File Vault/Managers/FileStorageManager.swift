@@ -126,6 +126,11 @@ class FileStorageManager {
     
     func saveFile(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil) throws -> VaultItem {
         print("DEBUG: saveFile called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
+        if let folder = targetFolder {
+            print("DEBUG: ✅ Target folder provided: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+        } else {
+            print("DEBUG: ❌ No target folder provided, will save to root level")
+        }
         
         guard let key = encryptionKey else {
             print("DEBUG: No encryption key available")

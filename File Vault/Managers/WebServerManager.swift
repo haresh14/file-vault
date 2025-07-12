@@ -294,7 +294,8 @@ class WebServerManager: ObservableObject {
             print("DEBUG: Serving test page")
             sendHTTPResponse(connection: connection, statusCode: 200, body: "<html><body><h1>Test Page</h1><p>Server is working!</p></body></html>")
         case ("POST", "/upload"):
-            print("DEBUG: Handling file upload")
+            print("DEBUG: ⬆️ POST /upload request received - Handling file upload")
+            print("DEBUG: ⬆️ Request data size: \(data.count) bytes")
             handleFileUpload(requestData: data, connection: connection)
         case ("GET", "/status"):
             print("DEBUG: Serving status page")
@@ -357,10 +358,26 @@ class WebServerManager: ObservableObject {
             print("DEBUG: Query items: \(queryItems)")
             currentFolderId = queryItems.first(where: { $0.name == "folder" })?.value
             print("DEBUG: Extracted folder ID from URL: '\(currentFolderId ?? "nil")'")
+            
+            // Validate the folder ID if it exists
+            if let folderIdString = currentFolderId, !folderIdString.isEmpty {
+                if let folderId = UUID(uuidString: folderIdString) {
+                    if let folder = CoreDataManager.shared.fetchFolder(by: folderId) {
+                        print("DEBUG: Folder validation successful: \(folder.displayName)")
+                    } else {
+                        print("DEBUG: WARNING: Folder ID exists but folder not found in database")
+                        currentFolderId = nil
+                    }
+                } else {
+                    print("DEBUG: WARNING: Invalid folder ID format, resetting to nil")
+                    currentFolderId = nil
+                }
+            }
         } else {
             print("DEBUG: Failed to parse URL or no query items found")
         }
         
+        print("DEBUG: Final currentFolderId being passed to HTML: '\(currentFolderId ?? "nil")'")
         let html = generateUploadHTML(currentFolderId: currentFolderId)
         sendHTTPResponse(connection: connection, statusCode: 200, body: html)
     }
@@ -373,7 +390,8 @@ class WebServerManager: ObservableObject {
     // MARK: - File Upload Handling
     
     private func handleFileUpload(requestData: Data, connection: NWConnection) {
-        print("DEBUG: handleFileUpload called with data size: \(requestData.count)")
+        print("DEBUG: 🔄 handleFileUpload called with data size: \(requestData.count)")
+        print("DEBUG: 🔄 Starting file upload processing...")
         
         // Find the end of HTTP headers (double CRLF)
         let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
@@ -405,8 +423,31 @@ class WebServerManager: ObservableObject {
         let parts = parseMultipartData(data: requestData, boundary: boundary)
         print("DEBUG: Parsed \(parts.count) multipart parts")
         
-        // Extract folder ID from form data
+        // Extract folder ID from form data OR headers
         var targetFolder: Folder? = nil
+        print("DEBUG: Starting folder ID extraction from \(parts.count) parts")
+        
+        // First, try to get folder ID from headers
+        let headerLines = headerString.components(separatedBy: "\r\n")
+        for line in headerLines {
+            if line.lowercased().hasPrefix("x-folder-id:") {
+                let folderIdFromHeader = line.replacingOccurrences(of: "x-folder-id:", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespaces)
+                print("DEBUG: 🎯 Found folder ID in header: '\(folderIdFromHeader)'")
+                if let folderId = UUID(uuidString: folderIdFromHeader) {
+                    targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
+                    if let folder = targetFolder {
+                        print("DEBUG: ✅ Target folder found from header: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+                        break
+                    }
+                }
+            }
+        }
+        
+        // If not found in headers, try form data
+        if targetFolder == nil {
+            print("DEBUG: No folder ID in headers, checking form data...")
+        
         for part in parts {
             print("DEBUG: Examining part - fieldName: '\(part.fieldName ?? "nil")', hasData: \(part.data != nil), dataSize: \(part.data?.count ?? 0)")
             if let data = part.data, let stringValue = String(data: data, encoding: .utf8) {
@@ -416,19 +457,31 @@ class WebServerManager: ObservableObject {
             if let fieldName = part.fieldName, fieldName == "folderId",
                let data = part.data, let folderIdString = String(data: data, encoding: .utf8),
                !folderIdString.isEmpty {
-                print("DEBUG: Found folder ID in form data: '\(folderIdString)'")
+                print("DEBUG: ✅ Found folder ID in form data: '\(folderIdString)'")
                 if let folderId = UUID(uuidString: folderIdString) {
                     targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
-                    print("DEBUG: Target folder found: \(targetFolder?.displayName ?? "unknown")")
+                    if let folder = targetFolder {
+                        print("DEBUG: ✅ Target folder found: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+                    } else {
+                        print("DEBUG: ❌ Folder ID is valid UUID but folder not found in database")
+                    }
                 } else {
-                    print("DEBUG: Invalid folder ID format: \(folderIdString)")
+                    print("DEBUG: ❌ Invalid folder ID format: \(folderIdString)")
                 }
                 break
+            } else if let fieldName = part.fieldName, fieldName == "folderId" {
+                print("DEBUG: ❌ Found folderId field but data is empty or invalid")
+                if let data = part.data {
+                    print("DEBUG: Raw folderId data: \(data)")
+                }
             }
         }
+        } // End of form data checking
         
         if targetFolder == nil {
-            print("DEBUG: No target folder specified, uploading to root level")
+            print("DEBUG: ❌ No target folder specified, uploading to root level")
+        } else {
+            print("DEBUG: ✅ Will upload to folder: \(targetFolder!.displayName)")
         }
         
         var uploadedFiles: [String] = []
@@ -667,31 +720,63 @@ extension WebServerManager {
         var searchRange = data.startIndex..<data.endIndex
         var partIndex = 0
         
-        while let boundaryRange = data.range(of: boundaryData, in: searchRange) {
-            print("DEBUG: Found boundary \(partIndex) at range: \(boundaryRange)")
-            searchRange = boundaryRange.upperBound..<data.endIndex
-            
-            // Find next boundary or end boundary
-            let nextBoundaryRange = data.range(of: boundaryData, in: searchRange) ?? data.range(of: endBoundaryData, in: searchRange)
-            
-            if let nextRange = nextBoundaryRange {
-                print("DEBUG: Next boundary at range: \(nextRange)")
-                
-                let partData = data.subdata(in: boundaryRange.upperBound..<nextRange.lowerBound)
-                print("DEBUG: Part \(partIndex) data size: \(partData.count)")
-                
-                if let part = parseMultipartPart(data: partData) {
-                    parts.append(part)
-                    print("DEBUG: Successfully parsed part \(partIndex + 1), fieldName: '\(part.fieldName ?? "nil")', filename: '\(part.fileName ?? "nil")'")
+        // Find all boundary positions first
+        var boundaryPositions: [Range<Data.Index>] = []
+        var tempSearchRange = data.startIndex..<data.endIndex
+        
+        // First, find all regular boundaries
+        while let boundaryRange = data.range(of: boundaryData, in: tempSearchRange) {
+            boundaryPositions.append(boundaryRange)
+            tempSearchRange = boundaryRange.upperBound..<data.endIndex
+        }
+        
+        // Then, find the end boundary (but don't add it if it's too close to the last regular boundary)
+        if let endBoundaryRange = data.range(of: endBoundaryData, in: data.startIndex..<data.endIndex) {
+            // Check if this end boundary is different from the last regular boundary
+            if let lastBoundary = boundaryPositions.last {
+                if endBoundaryRange.lowerBound > lastBoundary.upperBound {
+                    boundaryPositions.append(endBoundaryRange)
                 } else {
-                    print("DEBUG: Failed to parse part \(partIndex)")
+                    print("DEBUG: End boundary overlaps with last regular boundary, using end boundary instead")
+                    boundaryPositions[boundaryPositions.count - 1] = endBoundaryRange
                 }
-                
-                searchRange = nextRange.upperBound..<data.endIndex
-                partIndex += 1
             } else {
-                print("DEBUG: No next boundary found after part \(partIndex), breaking")
-                break
+                boundaryPositions.append(endBoundaryRange)
+            }
+        }
+        
+        // Sort boundaries by position to ensure proper order
+        boundaryPositions.sort { $0.lowerBound < $1.lowerBound }
+        
+        print("DEBUG: Found \(boundaryPositions.count) total boundaries")
+        
+        // Debug: Print all boundary positions
+        for (index, boundary) in boundaryPositions.enumerated() {
+            print("DEBUG: Boundary \(index): \(boundary)")
+        }
+        
+        // Process each part between boundaries
+        for i in 0..<boundaryPositions.count - 1 {
+            let currentBoundary = boundaryPositions[i]
+            let nextBoundary = boundaryPositions[i + 1]
+            
+            print("DEBUG: Processing part \(i) between boundaries at \(currentBoundary) and \(nextBoundary)")
+            
+            // Validate that we have a valid range
+            if currentBoundary.upperBound >= nextBoundary.lowerBound {
+                print("DEBUG: ❌ Invalid range detected: currentBoundary.upperBound (\(currentBoundary.upperBound)) >= nextBoundary.lowerBound (\(nextBoundary.lowerBound))")
+                print("DEBUG: Skipping part \(i) due to invalid range")
+                continue
+            }
+            
+            let partData = data.subdata(in: currentBoundary.upperBound..<nextBoundary.lowerBound)
+            print("DEBUG: Part \(i) raw data size: \(partData.count)")
+            
+            if let part = parseMultipartPart(data: partData) {
+                parts.append(part)
+                print("DEBUG: ✅ Successfully parsed part \(i + 1), fieldName: '\(part.fieldName ?? "nil")', filename: '\(part.fileName ?? "nil")', dataSize: \(part.data?.count ?? 0)")
+            } else {
+                print("DEBUG: ❌ Failed to parse part \(i)")
             }
         }
         
@@ -702,11 +787,29 @@ extension WebServerManager {
     private func parseMultipartPart(data: Data) -> MultipartPart? {
         print("DEBUG: parseMultipartPart called with data size: \(data.count)")
         
+        // Show first 200 bytes of raw data for debugging
+        let previewData = data.prefix(200)
+        if let previewString = String(data: previewData, encoding: .utf8) {
+            print("DEBUG: Part data preview: \(previewString.replacingOccurrences(of: "\r\n", with: "\\r\\n"))")
+        }
+        
         // Find the double CRLF that separates headers from body
         let headerBodySeparator = "\r\n\r\n".data(using: .utf8)!
         
         guard let separatorRange = data.range(of: headerBodySeparator) else { 
             print("DEBUG: No header-body separator found")
+            // Try single CRLF as fallback
+            let singleCRLF = "\r\n".data(using: .utf8)!
+            if let singleSeparatorRange = data.range(of: singleCRLF) {
+                print("DEBUG: Found single CRLF at position \(singleSeparatorRange)")
+                let headerData = data.subdata(in: data.startIndex..<singleSeparatorRange.lowerBound)
+                let bodyData = data.subdata(in: singleSeparatorRange.upperBound..<data.endIndex)
+                
+                if let headerString = String(data: headerData, encoding: .utf8) {
+                    print("DEBUG: Single CRLF header: \(headerString)")
+                    print("DEBUG: Body data size after single CRLF: \(bodyData.count)")
+                }
+            }
             return nil 
         }
         
@@ -741,7 +844,7 @@ extension WebServerManager {
         
         // Keep body as binary data
         let part = MultipartPart(headers: headers, data: bodyData)
-        print("DEBUG: Created part with filename: \(part.fileName ?? "none")")
+        print("DEBUG: Created part with filename: \(part.fileName ?? "none"), fieldName: \(part.fieldName ?? "none")")
         return part
     }
 } 

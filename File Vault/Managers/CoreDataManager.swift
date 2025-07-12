@@ -73,6 +73,12 @@ class CoreDataManager {
         item.updatedAt = Date()
         item.folder = folder
         
+        if let folder = folder {
+            print("DEBUG: ✅ VaultItem created and assigned to folder: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+        } else {
+            print("DEBUG: ❌ VaultItem created without folder assignment (root level)")
+        }
+        
         save()
         return item
     }
