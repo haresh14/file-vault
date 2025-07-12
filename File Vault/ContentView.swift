@@ -272,8 +272,8 @@ struct EnhancedPrivacyOverlay: View {
                     .font(.caption)
                     .foregroundColor(.white)
                     .padding(.bottom)
-            }
-        }
+    }
+}
     }
 }
 

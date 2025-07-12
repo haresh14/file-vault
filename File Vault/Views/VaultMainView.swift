@@ -19,6 +19,7 @@ struct VaultMainView: View {
     @State private var selectedVaultItems: Set<VaultItem> = []
     @State private var isSelectionMode = false
     @State private var showDeleteAlert = false
+    @State private var hasTriggeredSelectionHaptic = false
     @State private var searchText = ""
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
@@ -67,6 +68,12 @@ struct VaultMainView: View {
                                     },
                                     onLongPress: {
                                         if !isSelectionMode {
+                                            // Trigger haptic feedback only when entering selection mode
+                                            if !hasTriggeredSelectionHaptic {
+                                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                                impactFeedback.impactOccurred()
+                                                hasTriggeredSelectionHaptic = true
+                                            }
                                             isSelectionMode = true
                                             selectedVaultItems.insert(item)
                                         }
@@ -105,6 +112,7 @@ struct VaultMainView: View {
                                 Button(action: {
                                     isSelectionMode = false
                                     selectedVaultItems.removeAll()
+                                    hasTriggeredSelectionHaptic = false
                                 }) {
                                     Image(systemName: "xmark")
                                         .font(.title2)
@@ -306,6 +314,7 @@ struct VaultMainView: View {
         
         selectedVaultItems.removeAll()
         isSelectionMode = false
+        hasTriggeredSelectionHaptic = false
         loadVaultItems()
     }
 }
@@ -321,6 +330,7 @@ struct VaultItemCell: View {
     
     @State private var thumbnail: UIImage?
     @State private var isLoadingThumbnail = true
+    @State private var isPressed = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -366,29 +376,44 @@ struct VaultItemCell: View {
                 // Selection indicator
                 if isSelectionMode {
                     VStack {
+                        Spacer()
                         HStack {
                             Spacer()
-                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                .font(.title2)
-                                .foregroundColor(isSelected ? .blue : .white)
-                                .background(Color.black.opacity(0.4))
-                                .clipShape(Circle())
-                                .padding(6)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.9))
+                                    .frame(width: 24, height: 24)
+                                
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                    .font(.body)
+                                    .foregroundColor(isSelected ? .blue : .gray)
+                            }
+                            .padding(2)
                         }
-                        Spacer()
                     }
                 }
             }
             .cornerRadius(4)
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isPressed)
         }
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
         }
-        .onLongPressGesture {
-            onLongPress()
-        }
+        .onLongPressGesture(minimumDuration: 0.5, perform: onLongPress)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        isPressed = true
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                }
+        )
         .onAppear {
             loadThumbnail()
         }
