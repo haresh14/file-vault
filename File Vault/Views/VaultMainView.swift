@@ -381,6 +381,10 @@ struct VaultMainView: View {
         selectedVaultItems.removeAll()
         isSelectionMode = false
         hasTriggeredSelectionHaptic = false
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
         loadVaultItems()
     }
 }

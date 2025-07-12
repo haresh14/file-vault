@@ -90,8 +90,7 @@ struct CategoryView: View {
                 ], spacing: 16) {
                     ForEach(CategoryType.allCases, id: \.self) { categoryType in
                         NavigationLink(destination: CategoryFilesView(
-                            categoryType: categoryType,
-                            items: getItems(for: categoryType)
+                            categoryType: categoryType
                         )) {
                             CategoryCard(
                                 categoryType: categoryType,
@@ -146,12 +145,20 @@ struct CategoryCard: View {
 
 struct CategoryFilesView: View {
     let categoryType: CategoryType
-    let items: [VaultItem]
+    @State private var items: [VaultItem] = []
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
     @State private var sortOption: SortOption = .date
     @State private var sortAscending: Bool = false
     @State private var showSortActionSheet = false
+    @State private var isSelectionMode = false
+    @State private var selectedItems: Set<VaultItem> = []
+    @State private var showDeleteAlert = false
+    
+    // Remove the items parameter and make it reactive
+    init(categoryType: CategoryType) {
+        self.categoryType = categoryType
+    }
     
     var sortedItems: [VaultItem] {
         let sorted: [VaultItem]
@@ -198,13 +205,22 @@ struct CategoryFilesView: View {
                         ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
                             VaultItemCell(
                                 item: item,
-                                isSelected: false,
-                                isSelectionMode: false,
+                                isSelected: selectedItems.contains(item),
+                                isSelectionMode: isSelectionMode,
                                 onTap: {
-                                    mediaViewerIndex = index
-                                    showUnifiedMediaViewer = true
+                                    if isSelectionMode {
+                                        toggleSelection(item)
+                                    } else {
+                                        mediaViewerIndex = index
+                                        showUnifiedMediaViewer = true
+                                    }
                                 },
-                                onLongPress: {}
+                                onLongPress: {
+                                    if !isSelectionMode {
+                                        enterSelectionMode()
+                                        selectedItems.insert(item)
+                                    }
+                                }
                             )
                         }
                     }
@@ -215,9 +231,30 @@ struct CategoryFilesView: View {
         .navigationTitle(categoryType.rawValue)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showSortActionSheet = true }) {
-                    Image(systemName: "arrow.up.arrow.down")
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if isSelectionMode {
+                    Button("Cancel") {
+                        exitSelectionMode()
+                    }
+                } else {
+                    Button(action: { showSortActionSheet = true }) {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    
+                    if !items.isEmpty {
+                        Button("Select") {
+                            enterSelectionMode()
+                        }
+                    }
+                }
+            }
+            
+            if isSelectionMode && !selectedItems.isEmpty {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showDeleteAlert = true }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
                 }
             }
         }
@@ -244,6 +281,74 @@ struct CategoryFilesView: View {
                 initialIndex: mediaViewerIndex
             )
         }
+        .alert("Delete Items", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteSelectedItems()
+            }
+        } message: {
+            Text("Are you sure you want to delete \(selectedItems.count) item(s)? This action cannot be undone.")
+        }
+        .onAppear {
+            loadItems()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
+            loadItems()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+            loadItems()
+        }
+    }
+    
+    private func loadItems() {
+        // Small delay to ensure Core Data changes are propagated
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
+            
+            switch categoryType {
+            case .photos:
+                items = allItems.filter { $0.isImage }
+            case .videos:
+                items = allItems.filter { $0.isVideo }
+            case .documents:
+                items = allItems.filter { $0.isDocument }
+            case .allFiles:
+                items = allItems
+            }
+        }
+    }
+    
+    private func enterSelectionMode() {
+        isSelectionMode = true
+        selectedItems.removeAll()
+    }
+    
+    private func exitSelectionMode() {
+        isSelectionMode = false
+        selectedItems.removeAll()
+    }
+    
+    private func toggleSelection(_ item: VaultItem) {
+        if selectedItems.contains(item) {
+            selectedItems.remove(item)
+        } else {
+            selectedItems.insert(item)
+        }
+    }
+    
+    private func deleteSelectedItems() {
+        for item in selectedItems {
+            do {
+                try FileStorageManager.shared.deleteFile(vaultItem: item)
+            } catch {
+                print("Error deleting item: \(error)")
+            }
+        }
+        
+        exitSelectionMode()
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
     }
 }
 

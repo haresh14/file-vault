@@ -45,6 +45,12 @@ struct FolderView: View {
     @State private var showSortActionSheet = false
     @State private var sortOption: FolderSortOption = .name
     @State private var sortAscending: Bool = true
+    @State private var isSelectionMode = false
+    @State private var selectedFolders: Set<Folder> = []
+    @State private var selectedFiles: Set<VaultItem> = []
+    @State private var showDeleteAlert = false
+    @State private var showSwipeDeleteAlert = false
+    @State private var itemsToDelete: [Any] = []
     
     @Environment(\.managedObjectContext) var context
     
@@ -109,16 +115,26 @@ struct FolderView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button(action: { showSortActionSheet = true }) {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    
-                    Button(action: { showPhotoPicker = true }) {
-                        Image(systemName: "photo.badge.plus")
-                    }
-                    
-                    Button(action: { showCreateFolder = true }) {
-                        Image(systemName: "folder.badge.plus")
+                    if isSelectionMode {
+                        Button("Cancel") {
+                            exitSelectionMode()
+                        }
+                    } else {
+                        Button(action: { showSortActionSheet = true }) {
+                            Image(systemName: "arrow.up.arrow.down")
+                        }
+                        
+                        Button(action: { showPhotoPicker = true }) {
+                            Image(systemName: "photo.badge.plus")
+                        }
+                        
+                        Button(action: { showCreateFolder = true }) {
+                            Image(systemName: "folder.badge.plus")
+                        }
+                        
+                        Button("Select") {
+                            enterSelectionMode()
+                        }
                     }
                 }
                 
@@ -126,6 +142,15 @@ struct FolderView: View {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Back") {
                             navigateBack()
+                        }
+                    }
+                }
+                
+                if isSelectionMode && (!selectedFolders.isEmpty || !selectedFiles.isEmpty) {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { showDeleteAlert = true }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
                         }
                     }
                 }
@@ -155,6 +180,25 @@ struct FolderView: View {
                 }
             } message: {
                 Text("Enter a new name for the folder")
+            }
+            .alert("Delete Items", isPresented: $showDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    deleteSelectedItems()
+                }
+            } message: {
+                let totalItems = selectedFolders.count + selectedFiles.count
+                return Text("Are you sure you want to delete \(totalItems) item(s)? This action cannot be undone.")
+            }
+            .alert("Delete Items", isPresented: $showSwipeDeleteAlert) {
+                Button("Cancel", role: .cancel) {
+                    itemsToDelete.removeAll()
+                }
+                Button("Delete", role: .destructive) {
+                    performSwipeDelete()
+                }
+            } message: {
+                Text("Are you sure you want to delete \(itemsToDelete.count) item(s)? This action cannot be undone.")
             }
             .sheet(isPresented: $showPhotoPicker) {
                 PhotoPickerView { assets in
@@ -274,13 +318,23 @@ struct FolderView: View {
             if !folders.isEmpty {
                 Section("Folders") {
                     ForEach(sortedFolders) { folder in
-                        FolderRowView(folder: folder) {
-                            navigateToFolder(folder)
-                        } onRename: {
-                            startRenaming(folder)
-                        }
+                        SelectableFolderRowView(
+                            folder: folder,
+                            isSelected: selectedFolders.contains(folder),
+                            isSelectionMode: isSelectionMode,
+                            onTap: {
+                                if isSelectionMode {
+                                    toggleFolderSelection(folder)
+                                } else {
+                                    navigateToFolder(folder)
+                                }
+                            },
+                            onRename: {
+                                startRenaming(folder)
+                            }
+                        )
                     }
-                    .onDelete(perform: deleteFolders)
+                    .onDelete(perform: isSelectionMode ? nil : deleteFolders)
                 }
             }
             
@@ -288,10 +342,20 @@ struct FolderView: View {
             if !files.isEmpty {
                 Section("Files") {
                     ForEach(sortedFiles) { file in
-                        FileRowView(file: file) {
-                            viewFile(file)
-                        }
+                        SelectableFileRowView(
+                            file: file,
+                            isSelected: selectedFiles.contains(file),
+                            isSelectionMode: isSelectionMode,
+                            onTap: {
+                                if isSelectionMode {
+                                    toggleFileSelection(file)
+                                } else {
+                                    viewFile(file)
+                                }
+                            }
+                        )
                     }
+                    .onDelete(perform: isSelectionMode ? nil : deleteFiles)
                 }
             }
         }
@@ -356,10 +420,91 @@ struct FolderView: View {
     }
     
     private func deleteFolders(offsets: IndexSet) {
+        itemsToDelete.removeAll()
         for index in offsets {
-            let folder = folders[index]
+            let folder = sortedFolders[index]
+            itemsToDelete.append(folder)
+        }
+        showSwipeDeleteAlert = true
+    }
+    
+    private func deleteFiles(offsets: IndexSet) {
+        itemsToDelete.removeAll()
+        for index in offsets {
+            let file = sortedFiles[index]
+            itemsToDelete.append(file)
+        }
+        showSwipeDeleteAlert = true
+    }
+    
+    private func performSwipeDelete() {
+        for item in itemsToDelete {
+            if let folder = item as? Folder {
+                CoreDataManager.shared.deleteFolder(folder)
+            } else if let file = item as? VaultItem {
+                do {
+                    try FileStorageManager.shared.deleteFile(vaultItem: file)
+                } catch {
+                    print("Error deleting file: \(error)")
+                }
+            }
+        }
+        itemsToDelete.removeAll()
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
+        loadFolders()
+    }
+    
+    private func enterSelectionMode() {
+        isSelectionMode = true
+        selectedFolders.removeAll()
+        selectedFiles.removeAll()
+    }
+    
+    private func exitSelectionMode() {
+        isSelectionMode = false
+        selectedFolders.removeAll()
+        selectedFiles.removeAll()
+    }
+    
+    private func toggleFolderSelection(_ folder: Folder) {
+        if selectedFolders.contains(folder) {
+            selectedFolders.remove(folder)
+        } else {
+            selectedFolders.insert(folder)
+        }
+    }
+    
+    private func toggleFileSelection(_ file: VaultItem) {
+        if selectedFiles.contains(file) {
+            selectedFiles.remove(file)
+        } else {
+            selectedFiles.insert(file)
+        }
+    }
+    
+    private func deleteSelectedItems() {
+        // Delete selected folders
+        for folder in selectedFolders {
             CoreDataManager.shared.deleteFolder(folder)
         }
+        
+        // Delete selected files
+        for file in selectedFiles {
+            do {
+                try FileStorageManager.shared.deleteFile(vaultItem: file)
+            } catch {
+                print("Error deleting file: \(error)")
+            }
+        }
+        
+        exitSelectionMode()
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
         loadFolders()
     }
     
@@ -444,6 +589,56 @@ struct FolderRowView: View {
     }
 }
 
+struct SelectableFolderRowView: View {
+    let folder: Folder
+    let isSelected: Bool
+    let isSelectionMode: Bool
+    let onTap: () -> Void
+    let onRename: () -> Void
+    
+    var body: some View {
+        HStack {
+            if isSelectionMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .blue : .gray)
+                    .font(.title2)
+            }
+            
+            Image(systemName: "folder.fill")
+                .foregroundColor(.blue)
+                .font(.title2)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(folder.displayName)
+                    .font(.headline)
+                
+                Text("\(folder.totalItemCount) items")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            if !isSelectionMode {
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+        .contextMenu {
+            if !isSelectionMode {
+                Button(action: onRename) {
+                    Label("Rename", systemImage: "pencil")
+                }
+            }
+        }
+    }
+}
+
 struct FileRowView: View {
     let file: VaultItem
     let onTap: () -> Void
@@ -491,6 +686,91 @@ struct FileRowView: View {
                     Text(formatFileSize(file.fileSize))
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            if file.isVideo {
+                Image(systemName: "play.circle")
+                    .foregroundColor(.secondary)
+                    .font(.title3)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+        .onAppear {
+            loadThumbnail()
+        }
+    }
+    
+    private func loadThumbnail() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: file)
+            
+            DispatchQueue.main.async {
+                self.thumbnail = loadedThumbnail
+            }
+        }
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+}
+
+struct SelectableFileRowView: View {
+    let file: VaultItem
+    let isSelected: Bool
+    let isSelectionMode: Bool
+    let onTap: () -> Void
+    @State private var thumbnail: UIImage?
+    
+    var body: some View {
+        HStack {
+            if isSelectionMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .blue : .gray)
+                    .font(.title2)
+            }
+            
+            // Thumbnail or icon
+            Group {
+                if let thumbnail = thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 40, height: 40)
+                        .clipped()
+                        .cornerRadius(6)
+                } else {
+                    Image(systemName: file.isImage ? "photo" : file.isVideo ? "video" : "doc")
+                        .foregroundColor(file.isImage ? .blue : file.isVideo ? .purple : .orange)
+                        .font(.title2)
+                        .frame(width: 40, height: 40)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(file.fileName ?? "Unknown")
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                HStack {
+                    Text(formatFileSize(file.fileSize))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if let createdAt = file.createdAt {
+                        Text("• \(createdAt, style: .date)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             
