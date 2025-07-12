@@ -133,7 +133,7 @@ class WebServerManager: ObservableObject {
     
     private func receiveHTTPRequest(on connection: NWConnection) {
         var receivedData = Data()
-        let maxRequestSize = 50 * 1024 * 1024 // 50MB max
+        let maxRequestSize = 2 * 1024 * 1024 * 1024 // 2GB max
         var expectedContentLength: Int?
         var headersComplete = false
         
@@ -153,7 +153,13 @@ class WebServerManager: ObservableObject {
                     // Check for max size limit
                     if receivedData.count > maxRequestSize {
                         print("DEBUG: Request too large: \(receivedData.count) bytes")
-                        self.sendHTTPResponse(connection: connection, statusCode: 413, body: "Request Entity Too Large")
+                        let errorResponse = """
+                        {
+                            "success": false,
+                            "message": "File too large. Maximum size is 2GB."
+                        }
+                        """
+                        self.sendHTTPResponse(connection: connection, statusCode: 413, contentType: "application/json", body: errorResponse)
                         return
                     }
                     
@@ -280,10 +286,10 @@ class WebServerManager: ObservableObject {
         switch (method, path) {
         case ("GET", "/"):
             print("DEBUG: Serving upload page for /")
-            serveUploadPage(connection: connection)
-        case ("GET", "/upload"):
-            print("DEBUG: Serving upload page for /upload")
-            serveUploadPage(connection: connection)
+            serveUploadPage(connection: connection, path: path)
+        case ("GET", let p) where p.hasPrefix("/upload"):
+            print("DEBUG: Serving upload page for \(p)")
+            serveUploadPage(connection: connection, path: p)
         case ("GET", "/test"):
             print("DEBUG: Serving test page")
             sendHTTPResponse(connection: connection, statusCode: 200, body: "<html><body><h1>Test Page</h1><p>Server is working!</p></body></html>")
@@ -339,8 +345,23 @@ class WebServerManager: ObservableObject {
     
     // MARK: - Page Serving
     
-    private func serveUploadPage(connection: NWConnection) {
-        let html = generateUploadHTML()
+    private func serveUploadPage(connection: NWConnection, path: String) {
+        print("DEBUG: serveUploadPage called with path: \(path)")
+        
+        // Extract folder parameter from URL
+        var currentFolderId: String? = nil
+        if let url = URL(string: "http://localhost:8080\(path)"),
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let queryItems = components.queryItems {
+            print("DEBUG: URL components parsed successfully")
+            print("DEBUG: Query items: \(queryItems)")
+            currentFolderId = queryItems.first(where: { $0.name == "folder" })?.value
+            print("DEBUG: Extracted folder ID from URL: '\(currentFolderId ?? "nil")'")
+        } else {
+            print("DEBUG: Failed to parse URL or no query items found")
+        }
+        
+        let html = generateUploadHTML(currentFolderId: currentFolderId)
         sendHTTPResponse(connection: connection, statusCode: 200, body: html)
     }
     
@@ -384,7 +405,34 @@ class WebServerManager: ObservableObject {
         let parts = parseMultipartData(data: requestData, boundary: boundary)
         print("DEBUG: Parsed \(parts.count) multipart parts")
         
+        // Extract folder ID from form data
+        var targetFolder: Folder? = nil
+        for part in parts {
+            print("DEBUG: Examining part - fieldName: '\(part.fieldName ?? "nil")', hasData: \(part.data != nil), dataSize: \(part.data?.count ?? 0)")
+            if let data = part.data, let stringValue = String(data: data, encoding: .utf8) {
+                print("DEBUG: Part data as string: '\(stringValue)'")
+            }
+            
+            if let fieldName = part.fieldName, fieldName == "folderId",
+               let data = part.data, let folderIdString = String(data: data, encoding: .utf8),
+               !folderIdString.isEmpty {
+                print("DEBUG: Found folder ID in form data: '\(folderIdString)'")
+                if let folderId = UUID(uuidString: folderIdString) {
+                    targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
+                    print("DEBUG: Target folder found: \(targetFolder?.displayName ?? "unknown")")
+                } else {
+                    print("DEBUG: Invalid folder ID format: \(folderIdString)")
+                }
+                break
+            }
+        }
+        
+        if targetFolder == nil {
+            print("DEBUG: No target folder specified, uploading to root level")
+        }
+        
         var uploadedFiles: [String] = []
+        var failedFiles: [String] = []
         
         for (index, part) in parts.enumerated() {
             print("DEBUG: Processing part \(index)")
@@ -402,7 +450,8 @@ class WebServerManager: ObservableObject {
                     let savedItem = try FileStorageManager.shared.saveFile(
                         data: fileData,
                         fileName: fileName,
-                        fileType: fileType
+                        fileType: fileType,
+                        targetFolder: targetFolder
                     )
                     
                     uploadedFiles.append(fileName)
@@ -410,6 +459,7 @@ class WebServerManager: ObservableObject {
                     
                 } catch {
                     print("DEBUG: Error saving uploaded file \(fileName): \(error)")
+                    failedFiles.append(fileName)
                 }
             } else {
                 print("DEBUG: Skipping part \(index) - missing filename or data")
@@ -420,10 +470,26 @@ class WebServerManager: ObservableObject {
         }
         
         print("DEBUG: Total uploaded files: \(uploadedFiles.count)")
+        print("DEBUG: Total failed files: \(failedFiles.count)")
         
-        // Send success response
-        let successHTML = generateSuccessHTML(uploadedFiles: uploadedFiles)
-        sendHTTPResponse(connection: connection, statusCode: 200, body: successHTML)
+        // Send JSON response
+        let isSuccess = uploadedFiles.count > 0
+        let statusCode = isSuccess ? 200 : 500
+        let message = if failedFiles.count > 0 {
+            "Uploaded \(uploadedFiles.count) file(s), failed \(failedFiles.count) file(s)"
+        } else {
+            "Successfully uploaded \(uploadedFiles.count) file(s)"
+        }
+        
+        let response = """
+        {
+            "success": \(isSuccess),
+            "message": "\(message)",
+            "uploaded": [\(uploadedFiles.map { "\"\($0)\"" }.joined(separator: ", "))],
+            "failed": [\(failedFiles.map { "\"\($0)\"" }.joined(separator: ", "))]
+        }
+        """
+        sendHTTPResponse(connection: connection, statusCode: statusCode, contentType: "application/json", body: response)
         
         // Notify UI to refresh
         DispatchQueue.main.async {
@@ -481,18 +547,40 @@ class WebServerManager: ObservableObject {
             return "image/heic"
         case "gif":
             return "image/gif"
+        case "webp":
+            return "image/webp"
         case "mp4":
             return "video/mp4"
         case "mov":
             return "video/quicktime"
         case "m4v":
             return "video/x-m4v"
+        case "mkv":
+            return "video/x-matroska"
+        case "avi":
+            return "video/x-msvideo"
+        case "webm":
+            return "video/webm"
+        case "flv":
+            return "video/x-flv"
+        case "wmv":
+            return "video/x-ms-wmv"
+        case "3gp":
+            return "video/3gpp"
         case "pdf":
             return "application/pdf"
         case "txt":
             return "text/plain"
         case "doc", "docx":
             return "application/msword"
+        case "mp3":
+            return "audio/mpeg"
+        case "wav":
+            return "audio/wav"
+        case "m4a":
+            return "audio/mp4"
+        case "aac":
+            return "audio/aac"
         default:
             return "application/octet-stream"
         }
@@ -518,6 +606,21 @@ struct HTTPStatusText {
 struct MultipartPart {
     let headers: [String: String]
     let data: Data?
+    
+    var fieldName: String? {
+        guard let contentDisposition = headers["content-disposition"] else { return nil }
+        
+        // Extract field name from Content-Disposition header
+        let components = contentDisposition.components(separatedBy: ";")
+        for component in components {
+            let trimmed = component.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("name=") {
+                let fieldName = trimmed.replacingOccurrences(of: "name=", with: "")
+                return fieldName.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+        }
+        return nil
+    }
     
     var fileName: String? {
         guard let contentDisposition = headers["content-disposition"] else { return nil }
@@ -557,35 +660,39 @@ extension WebServerManager {
         let endBoundaryData = "--\(boundary)--".data(using: .utf8)!
         
         print("DEBUG: Looking for boundary data: \(boundaryData.count) bytes")
+        print("DEBUG: Boundary string: '--\(boundary)'")
+        print("DEBUG: End boundary string: '--\(boundary)--'")
         
         var parts: [MultipartPart] = []
         var searchRange = data.startIndex..<data.endIndex
+        var partIndex = 0
         
         while let boundaryRange = data.range(of: boundaryData, in: searchRange) {
-            print("DEBUG: Found boundary at range: \(boundaryRange)")
+            print("DEBUG: Found boundary \(partIndex) at range: \(boundaryRange)")
             searchRange = boundaryRange.upperBound..<data.endIndex
             
             // Find next boundary or end boundary
             let nextBoundaryRange = data.range(of: boundaryData, in: searchRange) ?? data.range(of: endBoundaryData, in: searchRange)
             
-            guard let nextRange = nextBoundaryRange else { 
-                print("DEBUG: No next boundary found, breaking")
-                break 
-            }
-            
-            print("DEBUG: Next boundary at range: \(nextRange)")
-            
-            let partData = data.subdata(in: boundaryRange.upperBound..<nextRange.lowerBound)
-            print("DEBUG: Part data size: \(partData.count)")
-            
-            if let part = parseMultipartPart(data: partData) {
-                parts.append(part)
-                print("DEBUG: Successfully parsed part \(parts.count)")
+            if let nextRange = nextBoundaryRange {
+                print("DEBUG: Next boundary at range: \(nextRange)")
+                
+                let partData = data.subdata(in: boundaryRange.upperBound..<nextRange.lowerBound)
+                print("DEBUG: Part \(partIndex) data size: \(partData.count)")
+                
+                if let part = parseMultipartPart(data: partData) {
+                    parts.append(part)
+                    print("DEBUG: Successfully parsed part \(partIndex + 1), fieldName: '\(part.fieldName ?? "nil")', filename: '\(part.fileName ?? "nil")'")
+                } else {
+                    print("DEBUG: Failed to parse part \(partIndex)")
+                }
+                
+                searchRange = nextRange.upperBound..<data.endIndex
+                partIndex += 1
             } else {
-                print("DEBUG: Failed to parse part")
+                print("DEBUG: No next boundary found after part \(partIndex), breaking")
+                break
             }
-            
-            searchRange = nextRange.upperBound..<data.endIndex
         }
         
         print("DEBUG: parseMultipartData completed, found \(parts.count) parts")

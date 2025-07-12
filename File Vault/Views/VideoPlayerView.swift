@@ -193,8 +193,18 @@ struct AutoPlayVideoView: View {
             return "mov"
         case "video/x-m4v":
             return "m4v"
-        case "video/avi":
+        case "video/x-matroska":
+            return "mkv"
+        case "video/x-msvideo":
             return "avi"
+        case "video/webm":
+            return "webm"
+        case "video/x-flv":
+            return "flv"
+        case "video/x-ms-wmv":
+            return "wmv"
+        case "video/3gpp":
+            return "3gp"
         default:
             return "mp4"
         }

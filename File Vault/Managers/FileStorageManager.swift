@@ -330,34 +330,141 @@ class FileStorageManager {
     
     private func generateVideoThumbnail(from videoData: Data, originalFileName: String) throws -> String? {
         print("DEBUG: Generating video thumbnail for \(originalFileName)")
-        // Save video temporarily to generate thumbnail
-        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+        
+        // Save video temporarily to generate thumbnail - use original extension
+        let originalExtension = (originalFileName as NSString).pathExtension
+        let tempFileName = UUID().uuidString + (originalExtension.isEmpty ? ".mov" : ".\(originalExtension)")
+        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(tempFileName)
         try videoData.write(to: tempURL)
         defer { try? fileManager.removeItem(at: tempURL) }
         
         let asset = AVURLAsset(url: tempURL)
+        
+        // First check if the asset is readable by AVFoundation
+        let tracks = asset.tracks(withMediaType: .video)
+        if tracks.isEmpty {
+            print("DEBUG: No video tracks found in asset, format may not be supported by AVFoundation")
+            return generateGenericVideoThumbnail(originalFileName: originalFileName)
+        }
+        
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 200, height: 200)
         
-        let time = CMTime(seconds: 1, preferredTimescale: 60)
+        // Try multiple time positions to find a good frame
+        let times = [
+            CMTime(seconds: 1, preferredTimescale: 60),
+            CMTime(seconds: 0.5, preferredTimescale: 60),
+            CMTime(seconds: 2, preferredTimescale: 60),
+            CMTime.zero
+        ]
+        
+        for time in times {
+            do {
+                let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
+                let thumbnail = UIImage(cgImage: cgImage)
+                
+                guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else {
+                    print("DEBUG: Failed to create JPEG data from video thumbnail")
+                    continue
+                }
+                
+                let thumbnailFileName = "thumb_\(originalFileName).jpg"
+                let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
+                
+                try thumbnailData.write(to: thumbnailURL)
+                print("DEBUG: Video thumbnail saved successfully at \(thumbnailURL.path)")
+                return thumbnailFileName
+            } catch {
+                print("DEBUG: Error generating video thumbnail at time \(time.seconds): \(error)")
+                continue
+            }
+        }
+        
+        print("DEBUG: Failed to generate video thumbnail for all attempted times, creating generic video thumbnail")
+        return generateGenericVideoThumbnail(originalFileName: originalFileName)
+    }
+    
+    private func generateGenericVideoThumbnail(originalFileName: String) -> String? {
+        print("DEBUG: Generating generic video thumbnail for \(originalFileName)")
+        
+        // Create a generic video icon thumbnail
+        let thumbnailSize = CGSize(width: 200, height: 200)
+        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+        
+        let thumbnail = renderer.image { context in
+            let cgContext = context.cgContext
+            
+            // Set background color (dark gray)
+            cgContext.setFillColor(UIColor.systemGray2.cgColor)
+            cgContext.fill(CGRect(origin: .zero, size: thumbnailSize))
+            
+            // Draw play button in center
+            let playButtonSize: CGFloat = 60
+            let playButtonRect = CGRect(
+                x: (thumbnailSize.width - playButtonSize) / 2,
+                y: (thumbnailSize.height - playButtonSize) / 2,
+                width: playButtonSize,
+                height: playButtonSize
+            )
+            
+            // Draw play button background circle
+            cgContext.setFillColor(UIColor.white.withAlphaComponent(0.9).cgColor)
+            cgContext.fillEllipse(in: playButtonRect)
+            
+            // Draw play triangle
+            let triangleSize: CGFloat = 20
+            let triangleRect = CGRect(
+                x: playButtonRect.midX - triangleSize / 2 + 2, // Offset slightly to center visually
+                y: playButtonRect.midY - triangleSize / 2,
+                width: triangleSize,
+                height: triangleSize
+            )
+            
+            cgContext.setFillColor(UIColor.systemBlue.cgColor)
+            cgContext.beginPath()
+            cgContext.move(to: CGPoint(x: triangleRect.minX, y: triangleRect.minY))
+            cgContext.addLine(to: CGPoint(x: triangleRect.maxX, y: triangleRect.midY))
+            cgContext.addLine(to: CGPoint(x: triangleRect.minX, y: triangleRect.maxY))
+            cgContext.closePath()
+            cgContext.fillPath()
+            
+            // Add file extension text if available
+            let fileExtension = (originalFileName as NSString).pathExtension.uppercased()
+            if !fileExtension.isEmpty {
+                let font = UIFont.systemFont(ofSize: 14, weight: .medium)
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: UIColor.white
+                ]
+                
+                let text = fileExtension
+                let textSize = text.size(withAttributes: attributes)
+                let textRect = CGRect(
+                    x: (thumbnailSize.width - textSize.width) / 2,
+                    y: thumbnailSize.height - textSize.height - 10,
+                    width: textSize.width,
+                    height: textSize.height
+                )
+                
+                text.draw(in: textRect, withAttributes: attributes)
+            }
+        }
+        
+        guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else {
+            print("DEBUG: Failed to create JPEG data from generic video thumbnail")
+            return nil
+        }
+        
+        let thumbnailFileName = "thumb_\(originalFileName).jpg"
+        let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
         
         do {
-            let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
-            let thumbnail = UIImage(cgImage: cgImage)
-            
-            guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else {
-                print("DEBUG: Failed to create JPEG data from video thumbnail")
-                return nil
-            }
-            
-            let thumbnailFileName = "thumb_\(originalFileName).jpg"
-            let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-            
             try thumbnailData.write(to: thumbnailURL)
-            print("DEBUG: Video thumbnail saved successfully at \(thumbnailURL.path)")
+            print("DEBUG: Generic video thumbnail saved successfully at \(thumbnailURL.path)")
             return thumbnailFileName
         } catch {
-            print("DEBUG: Error generating video thumbnail: \(error)")
+            print("DEBUG: Error saving generic video thumbnail: \(error)")
             return nil
         }
     }

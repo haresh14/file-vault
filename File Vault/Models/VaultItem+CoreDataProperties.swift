@@ -42,7 +42,18 @@ extension VaultItem : Identifiable {
     
     var isVideo: Bool {
         guard let fileType = fileType else { return false }
-        let videoTypes = ["video/mp4", "video/quicktime", "video/x-m4v", "video/mpeg"]
+        let videoTypes = [
+            "video/mp4", 
+            "video/quicktime", 
+            "video/x-m4v", 
+            "video/mpeg",
+            "video/x-matroska",  // MKV
+            "video/x-msvideo",   // AVI
+            "video/webm",        // WebM
+            "video/x-flv",       // FLV
+            "video/x-ms-wmv",    // WMV
+            "video/3gpp"         // 3GP
+        ]
         return videoTypes.contains(fileType.lowercased())
     }
 } 

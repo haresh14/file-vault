@@ -248,4 +248,17 @@ class CoreDataManager {
         folder.updatedAt = Date()
         save()
     }
+    
+    func fetchFolder(by id: UUID) -> Folder? {
+        let request: NSFetchRequest<Folder> = Folder.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        do {
+            return try context.fetch(request).first
+        } catch {
+            print("Error fetching folder by ID: \(error)")
+            return nil
+        }
+    }
 } 
