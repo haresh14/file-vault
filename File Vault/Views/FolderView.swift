@@ -322,14 +322,8 @@ struct FolderView: View {
     
     private func navigateToFolder(_ folder: Folder, fromBreadcrumb: Bool = false) {
         if fromBreadcrumb {
-            // For breadcrumb navigation, check if we're going to root
-            if let breadcrumbs = currentFolder?.breadcrumbPath, 
-               let firstFolder = breadcrumbs.first,
-               folder == firstFolder {
-                currentFolder = nil // Go to root
-            } else {
-                currentFolder = folder
-            }
+            // For breadcrumb navigation, always navigate to the clicked folder
+            currentFolder = folder
         } else {
             currentFolder = folder
         }
