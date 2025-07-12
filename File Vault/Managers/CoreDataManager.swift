@@ -169,4 +169,83 @@ class CoreDataManager {
             return []
         }
     }
+    
+    func fetchAllFolders() -> [Folder] {
+        let request: NSFetchRequest<Folder> = Folder.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching all folders: \(error)")
+            return []
+        }
+    }
+    
+    func fetchVaultItems(in folder: Folder?) -> [VaultItem] {
+        let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        
+        if let folder = folder {
+            request.predicate = NSPredicate(format: "folder == %@", folder)
+        } else {
+            // Fetch items not in any folder (root level)
+            request.predicate = NSPredicate(format: "folder == nil")
+        }
+        
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching vault items in folder: \(error)")
+            return []
+        }
+    }
+    
+    func fetchVaultItemsFromAllFolders() -> [VaultItem] {
+        let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching all vault items: \(error)")
+            return []
+        }
+    }
+    
+    func moveVaultItem(_ item: VaultItem, to folder: Folder?) {
+        item.folder = folder
+        item.updatedAt = Date()
+        save()
+    }
+    
+    func moveFolder(_ folder: Folder, to parent: Folder?) {
+        // Prevent moving a folder into itself or its descendants
+        if let parent = parent, isFolder(folder, ancestorOf: parent) {
+            print("Cannot move folder into itself or its descendants")
+            return
+        }
+        
+        folder.parent = parent
+        folder.updatedAt = Date()
+        save()
+    }
+    
+    private func isFolder(_ folder: Folder, ancestorOf potentialDescendant: Folder) -> Bool {
+        var current: Folder? = potentialDescendant
+        while let currentFolder = current {
+            if currentFolder == folder {
+                return true
+            }
+            current = currentFolder.parent
+        }
+        return false
+    }
+    
+    func updateFolder(_ folder: Folder, name: String) {
+        folder.name = name
+        folder.updatedAt = Date()
+        save()
+    }
 } 
