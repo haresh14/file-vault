@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var showChangeAuthSheet = false
     @State private var showChangeAuthConfirmation = false
     @StateObject private var securityManager = SecurityManager.shared
+    @State private var storageInfo: (fileCount: Int, usedSpace: Int64) = (0, 0)
     
     private var currentAuthType: AuthenticationType {
         KeychainManager.shared.getAuthenticationType()
@@ -29,6 +30,7 @@ struct SettingsView: View {
                 securitySection
                 advancedSecuritySection
                 lockBehaviorSection
+                infoSection
                 
                 #if DEBUG
                 developerSection
@@ -67,6 +69,12 @@ struct SettingsView: View {
             Button("OK") { }
         } message: {
             Text("Your authentication method has been updated successfully.")
+        }
+        .onAppear {
+            loadStorageInfo()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
+            loadStorageInfo()
         }
     }
     
@@ -115,6 +123,24 @@ struct SettingsView: View {
                 
                 Text(lockBehaviorDescription)
                     .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    private var infoSection: some View {
+        Section("Disk") {
+            HStack {
+                Text("Total Files")
+                Spacer()
+                Text("\(storageInfo.fileCount)")
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack {
+                Text("Total Size")
+                Spacer()
+                Text(formatFileSize(storageInfo.usedSpace))
                     .foregroundColor(.secondary)
             }
         }
@@ -316,5 +342,21 @@ struct SettingsView: View {
         }
         
         dismiss()
+    }
+    
+    private func loadStorageInfo() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let info = FileStorageManager.shared.getStorageInfo()
+            DispatchQueue.main.async {
+                self.storageInfo = info
+            }
+        }
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 } 
