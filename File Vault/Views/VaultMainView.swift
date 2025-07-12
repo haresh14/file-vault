@@ -265,7 +265,15 @@ struct VaultMainView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
             // Refreshing vault items
-            loadVaultItems()
+            DispatchQueue.main.async {
+                loadVaultItems()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+            // Core Data context saved, refresh items
+            DispatchQueue.main.async {
+                loadVaultItems()
+            }
         }
     }
     
@@ -844,9 +852,7 @@ struct AddActionSheet: View {
                         .contentShape(Rectangle())
                     }
                 }
-                .padding(.top, 20)
-                
-                Spacer()
+                .padding(.top, 4)
             }
             .navigationTitle("Add Content")
             .navigationBarTitleDisplayMode(.inline)
@@ -907,9 +913,7 @@ struct SortPopupView: View {
                         }
                     }
                 }
-                .padding(.top, 20)
-                
-                Spacer()
+                .padding(.top, 4)
             }
             .navigationTitle("Sort by")
             .navigationBarTitleDisplayMode(.inline)

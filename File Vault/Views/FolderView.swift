@@ -177,6 +177,11 @@ struct FolderView: View {
             .onAppear {
                 loadFolders()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+                DispatchQueue.main.async {
+                    loadFolders()
+                }
+            }
             .alert("Create Folder", isPresented: $showCreateFolder) {
                 TextField("Folder Name", text: $newFolderName)
                 Button("Cancel", role: .cancel) {
@@ -932,9 +937,7 @@ struct FolderAddActionSheet: View {
                         .contentShape(Rectangle())
                     }
                 }
-                .padding(.top, 20)
-                
-                Spacer()
+                .padding(.top, 4)
             }
             .navigationTitle("Add Content")
             .navigationBarTitleDisplayMode(.inline)
@@ -995,9 +998,7 @@ struct FolderSortPopupView: View {
                         }
                     }
                 }
-                .padding(.top, 20)
-                
-                Spacer()
+                .padding(.top, 4)
             }
             .navigationTitle("Sort by")
             .navigationBarTitleDisplayMode(.inline)

@@ -257,10 +257,19 @@ struct SettingsView: View {
             CoreDataManager.shared.deleteVaultItem(item)
         }
         
-        // Files deleted successfully
+        // Save context to ensure changes are persisted
+        CoreDataManager.shared.save()
         
-        // Send notification to refresh vault items
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        // Send multiple notifications to ensure all views refresh
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: CoreDataManager.shared.context)
+        }
+        
+        // Additional delayed notification for stubborn views
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        }
         
         dismiss()
     }

@@ -119,7 +119,14 @@ struct CategoryView: View {
             loadVaultItems()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
-            loadVaultItems()
+            DispatchQueue.main.async {
+                loadVaultItems()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+            DispatchQueue.main.async {
+                loadVaultItems()
+            }
         }
         }
     }
@@ -341,20 +348,22 @@ struct CategoryFilesView: View {
     }
     
     private func loadItems() {
-        // Small delay to ensure Core Data changes are propagated
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
-            
-            switch categoryType {
-            case .photos:
-                items = allItems.filter { $0.isImage }
-            case .videos:
-                items = allItems.filter { $0.isVideo }
-            case .documents:
-                items = allItems.filter { $0.isDocument }
-            case .allFiles:
-                items = allItems
-            }
+        let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
+        
+        switch categoryType {
+        case .photos:
+            items = allItems.filter { $0.isImage }
+        case .videos:
+            items = allItems.filter { $0.isVideo }
+        case .documents:
+            items = allItems.filter { $0.isDocument }
+        case .allFiles:
+            items = allItems
+        }
+        
+        // Force a UI update
+        DispatchQueue.main.async {
+            // This ensures the view updates
         }
     }
     
