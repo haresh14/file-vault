@@ -21,17 +21,17 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            VaultMainView()
-                .tabItem {
-                    Image(systemName: "photo.on.rectangle")
-                    Text("Gallery")
-                }
-                .tag(1)
-            
             CategoryView()
                 .tabItem {
                     Image(systemName: "square.grid.2x2")
                     Text("Category")
+                }
+                .tag(1)
+            
+            VaultMainView()
+                .tabItem {
+                    Image(systemName: "photo.on.rectangle")
+                    Text("Gallery")
                 }
                 .tag(2)
             
