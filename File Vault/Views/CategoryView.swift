@@ -42,6 +42,7 @@ enum CategoryType: String, CaseIterable {
 
 struct CategoryView: View {
     @State private var allVaultItems: [VaultItem] = []
+    @State private var showSettings = false
     @Environment(\.managedObjectContext) var context
     
     var photoItems: [VaultItem] {
@@ -102,14 +103,24 @@ struct CategoryView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Categories")
-            .navigationBarTitleDisplayMode(.large)
-            .onAppear {
-                loadVaultItems()
+                    .navigationTitle("Categories")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { showSettings = true }) {
+                    Image(systemName: "gear")
+                }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
-                loadVaultItems()
-            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
+        .onAppear {
+            loadVaultItems()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
+            loadVaultItems()
+        }
         }
     }
     
@@ -154,7 +165,6 @@ struct CategoryFilesView: View {
     @State private var isSelectionMode = false
     @State private var selectedItems: Set<VaultItem> = []
     @State private var showDeleteAlert = false
-    @State private var showSettings = false
     
     // Remove the items parameter and make it reactive
     init(categoryType: CategoryType) {
@@ -235,6 +245,7 @@ struct CategoryFilesView: View {
         }
         .navigationTitle(categoryType.rawValue)
         .navigationBarTitleDisplayMode(.large)
+        .navigationBarBackButtonHidden(isSelectionMode)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 if isSelectionMode {
@@ -242,19 +253,19 @@ struct CategoryFilesView: View {
                         selectAllItems()
                     }
                 } else {
-                    Button(action: { showSettings = true }) {
-                        Image(systemName: "gear")
-                    }
+                    // Don't show settings button when inside a category view
+                    EmptyView()
                 }
             }
             
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if isSelectionMode {
-                    Button(action: { showDeleteAlert = true }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
+                    if !selectedItems.isEmpty {
+                        Button(action: { showDeleteAlert = true }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
                     }
-                    .disabled(selectedItems.isEmpty)
                     
                     Button("Cancel") {
                         exitSelectionMode()
@@ -294,9 +305,6 @@ struct CategoryFilesView: View {
                 mediaItems: sortedItems,
                 initialIndex: mediaViewerIndex
             )
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
         }
         .alert("Delete Items", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) { }

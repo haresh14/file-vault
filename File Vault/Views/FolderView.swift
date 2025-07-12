@@ -126,8 +126,11 @@ struct FolderView: View {
                             selectAllItems()
                         }
                     } else if currentFolder != nil {
-                        Button("Back") {
-                            navigateBack()
+                        Button(action: { navigateBack() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                Text("Back")
+                            }
                         }
                     } else {
                         Button(action: { showSettings = true }) {
@@ -138,11 +141,12 @@ struct FolderView: View {
                 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isSelectionMode {
-                        Button(action: { showDeleteAlert = true }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
+                        if !selectedFolders.isEmpty || !selectedFiles.isEmpty {
+                            Button(action: { showDeleteAlert = true }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
                         }
-                        .disabled(selectedFolders.isEmpty && selectedFiles.isEmpty)
                         
                         Button("Cancel") {
                             exitSelectionMode()

@@ -149,11 +149,12 @@ struct VaultMainView: View {
                 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isSelectionMode {
-                        Button(action: { showDeleteAlert = true }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
+                        if !selectedVaultItems.isEmpty {
+                            Button(action: { showDeleteAlert = true }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
                         }
-                        .disabled(selectedVaultItems.isEmpty)
                         
                         Button("Cancel") {
                             isSelectionMode = false
