@@ -15,7 +15,13 @@ struct SettingsView: View {
     @State private var showDeleteFilesAlert = false
     @State private var lockTimeout = KeychainManager.shared.getLockTimeout()
     @State private var showBiometricAlert = false
+    @State private var showChangeAuthSheet = false
+    @State private var showChangeAuthConfirmation = false
     @StateObject private var securityManager = SecurityManager.shared
+    
+    private var currentAuthType: AuthenticationType {
+        KeychainManager.shared.getAuthenticationType()
+    }
     
     var body: some View {
         NavigationView {
@@ -48,12 +54,28 @@ struct SettingsView: View {
         } message: {
             Text("The app has been reset. Please restart the app.")
         }
+        .sheet(isPresented: $showChangeAuthSheet) {
+            ChangeAuthenticationView(
+                currentAuthType: currentAuthType,
+                onAuthChanged: {
+                    showChangeAuthConfirmation = true
+                    showChangeAuthSheet = false
+                }
+            )
+        }
+        .alert("Authentication Changed", isPresented: $showChangeAuthConfirmation) {
+            Button("OK") { }
+        } message: {
+            Text("Your authentication method has been updated successfully.")
+        }
     }
     
     // MARK: - Section Views
     
     private var securitySection: some View {
         Section("Security") {
+            authenticationInfoView
+            changeAuthButton
             lockTimeoutPicker
             biometricToggle
             biometricStatusView
@@ -142,6 +164,28 @@ struct SettingsView: View {
     }
     
     // MARK: - Component Views
+    
+    private var authenticationInfoView: some View {
+        HStack {
+            Text("Current Method")
+            Spacer()
+            Text(currentAuthType.displayName)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var changeAuthButton: some View {
+        Button(action: { showChangeAuthSheet = true }) {
+            HStack {
+                Text("Change Authentication")
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+        }
+        .foregroundColor(.primary)
+    }
     
     private var lockTimeoutPicker: some View {
         Picker("Auto-Lock", selection: $lockTimeout) {

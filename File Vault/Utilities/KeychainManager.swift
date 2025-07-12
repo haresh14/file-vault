@@ -15,12 +15,39 @@ enum KeychainError: Error {
     case invalidData
 }
 
+enum AuthenticationType: String, CaseIterable {
+    case passcode4 = "passcode4"
+    case passcode6 = "passcode6"
+    case password = "password"
+    
+    var displayName: String {
+        switch self {
+        case .passcode4: return "4-Digit Passcode"
+        case .passcode6: return "6-Digit Passcode"
+        case .password: return "Password"
+        }
+    }
+    
+    var isPasscode: Bool {
+        return self == .passcode4 || self == .passcode6
+    }
+    
+    var digitCount: Int? {
+        switch self {
+        case .passcode4: return 4
+        case .passcode6: return 6
+        case .password: return nil
+        }
+    }
+}
+
 class KeychainManager {
     static let shared = KeychainManager()
     
     private let service = "com.filevault.app"
     private let passwordKey = "userPassword"
     private let biometricEnabledKey = "biometricEnabled"
+    private let authTypeKey = "authenticationType"
     
     private init() {}
     
@@ -97,6 +124,24 @@ class KeychainManager {
         } catch {
             return false
         }
+    }
+    
+    // MARK: - Authentication Type Management
+    
+    func setAuthenticationType(_ type: AuthenticationType) {
+        UserDefaults.standard.set(type.rawValue, forKey: authTypeKey)
+    }
+    
+    func getAuthenticationType() -> AuthenticationType {
+        guard let rawValue = UserDefaults.standard.string(forKey: authTypeKey),
+              let type = AuthenticationType(rawValue: rawValue) else {
+            return .passcode4 // Default to 4-digit passcode
+        }
+        return type
+    }
+    
+    func isAuthenticationTypeSet() -> Bool {
+        return UserDefaults.standard.string(forKey: authTypeKey) != nil
     }
     
     // MARK: - Biometric Settings

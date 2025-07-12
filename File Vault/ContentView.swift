@@ -11,6 +11,8 @@ import Photos
 struct ContentView: View {
     @State private var isAuthenticated = false
     @State private var isPasswordSet = false
+    @State private var isAuthTypeSet = false
+    @State private var selectedAuthType: AuthenticationType?
     @State private var isInBackground = false
     @State private var isCheckingBiometric = false
     @State private var shouldShowPasscode = false
@@ -23,11 +25,17 @@ struct ContentView: View {
         return KeychainManager.shared.isPasswordSet()
     }
     
+    // Check if auth type is already set
+    private var hasAuthType: Bool {
+        return KeychainManager.shared.isAuthenticationTypeSet()
+    }
+    
     var body: some View {
         ZStack {
             mainContent
             
-            if shouldShowPrivacyOverlay {
+            // Only show privacy overlay if user is fully registered and authenticated
+            if shouldShowPrivacyOverlay && isPasswordSet {
                 EnhancedPrivacyOverlay()
             }
         }
@@ -51,9 +59,37 @@ struct ContentView: View {
     
     @ViewBuilder
     private var mainContent: some View {
-        if !isPasswordSet {
-            PasscodeView(isSettingPasscode: true) {
-                handlePasscodeSet()
+        if !isAuthTypeSet {
+            // First time setup - choose auth type
+            AuthTypeSelectionView { authType in
+                selectedAuthType = authType
+                isAuthTypeSet = true
+            }
+        } else if !isPasswordSet {
+            // Setup the chosen authentication method
+            if let authType = selectedAuthType {
+                if authType.isPasscode {
+                    PasscodeSetupView(authType: authType, onPasscodeSet: {
+                        handlePasscodeSet()
+                    }, onCancel: {
+                        // Go back to auth type selection
+                        selectedAuthType = nil
+                        isAuthTypeSet = false
+                    })
+                } else {
+                    PasswordSetupView(onPasswordSet: {
+                        handlePasswordSet()
+                    }, onCancel: {
+                        // Go back to auth type selection
+                        selectedAuthType = nil
+                        isAuthTypeSet = false
+                    })
+                }
+            } else {
+                // Fallback to existing flow
+                PasscodeView(isSettingPasscode: true) {
+                    handlePasscodeSet()
+                }
             }
         } else if !isAuthenticated {
             if isCheckingBiometric {
@@ -72,6 +108,20 @@ struct ContentView: View {
     
     private func handleOnAppear() {
         isPasswordSet = KeychainManager.shared.isPasswordSet()
+        isAuthTypeSet = KeychainManager.shared.isAuthenticationTypeSet()
+        
+        // For existing users who have password but no auth type set, default to password
+        if isPasswordSet && !isAuthTypeSet {
+            KeychainManager.shared.setAuthenticationType(.password)
+            isAuthTypeSet = true
+            selectedAuthType = .password
+        }
+        
+        // If auth type is set but no selected type, get it from storage
+        if isAuthTypeSet && selectedAuthType == nil {
+            selectedAuthType = KeychainManager.shared.getAuthenticationType()
+        }
+        
         // ContentView appeared - checking authentication state
         
         // Request photo library permission
@@ -84,10 +134,13 @@ struct ContentView: View {
     }
     
     private func handleWillResignActive() {
-        shouldShowPrivacyOverlay = true
+        // Only activate privacy protection if registration is complete
+        if isPasswordSet {
+            shouldShowPrivacyOverlay = true
+            KeychainManager.shared.setLastBackgroundTime()
+            print("DEBUG: App going to background, showing enhanced privacy overlay")
+        }
         isInBackground = true
-        KeychainManager.shared.setLastBackgroundTime()
-        print("DEBUG: App going to background, showing enhanced privacy overlay")
     }
     
     private func handleDidBecomeActive() {
@@ -115,8 +168,11 @@ struct ContentView: View {
     }
     
     private func handleDidEnterBackground() {
-        shouldShowPrivacyOverlay = true
-        print("DEBUG: App entered background, showing enhanced privacy overlay")
+        // Only activate privacy protection if registration is complete
+        if isPasswordSet {
+            shouldShowPrivacyOverlay = true
+            print("DEBUG: App entered background, showing enhanced privacy overlay")
+        }
     }
     
     private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
@@ -166,7 +222,18 @@ struct ContentView: View {
     }
     
     private func handlePasscodeSet() {
-                    // Passcode set successfully
+        // Passcode set successfully
+        isPasswordSet = true
+        isAuthenticated = true
+        
+        // Setup encryption key for file storage
+        if let password = try? KeychainManager.shared.getPassword() {
+            FileStorageManager.shared.setupEncryptionKey(from: password)
+        }
+    }
+    
+    private func handlePasswordSet() {
+        // Password set successfully
         isPasswordSet = true
         isAuthenticated = true
         

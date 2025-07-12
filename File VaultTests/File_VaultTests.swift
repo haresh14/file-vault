@@ -84,6 +84,58 @@ struct File_VaultTests {
         biometricManager.resetFailureCount()
     }
     
+    @Test func testNewAuthenticationTypeFlow() async throws {
+        let keychainManager = KeychainManager.shared
+        let fileStorageManager = FileStorageManager.shared
+        
+        // Test different authentication types
+        let testPasscode4 = "1234"
+        let testPasscode6 = "123456"
+        let testPassword = "SecurePassword123!"
+        
+        // Test 4-digit passcode
+        keychainManager.setAuthenticationType(.passcode4)
+        try keychainManager.savePassword(testPasscode4)
+        #expect(keychainManager.getAuthenticationType() == .passcode4, "Auth type should be passcode4")
+        #expect(keychainManager.isPasswordSet() == true, "Passcode should be stored")
+        
+        let retrieved4 = try keychainManager.getPassword()
+        #expect(retrieved4 == testPasscode4, "Retrieved passcode should match")
+        
+        // Test 6-digit passcode
+        keychainManager.setAuthenticationType(.passcode6)
+        try keychainManager.savePassword(testPasscode6)
+        #expect(keychainManager.getAuthenticationType() == .passcode6, "Auth type should be passcode6")
+        
+        let retrieved6 = try keychainManager.getPassword()
+        #expect(retrieved6 == testPasscode6, "Retrieved passcode should match")
+        
+        // Test password
+        keychainManager.setAuthenticationType(.password)
+        try keychainManager.savePassword(testPassword)
+        #expect(keychainManager.getAuthenticationType() == .password, "Auth type should be password")
+        
+        let retrievedPassword = try keychainManager.getPassword()
+        #expect(retrievedPassword == testPassword, "Retrieved password should match")
+        
+        // Test file operations with password auth
+        fileStorageManager.setupEncryptionKey(from: testPassword)
+        let testData = "Password auth test".data(using: .utf8)!
+        let vaultItem = try fileStorageManager.saveFile(
+            data: testData,
+            fileName: "password_test.txt",
+            fileType: "text/plain"
+        )
+        
+        let retrievedData = try fileStorageManager.loadFile(vaultItem: vaultItem)
+        #expect(retrievedData == testData, "File should be accessible with password auth")
+        
+        // Cleanup
+        try fileStorageManager.deleteFile(vaultItem: vaultItem)
+        try keychainManager.deletePassword()
+        UserDefaults.standard.removeObject(forKey: "authenticationType")
+    }
+    
     @Test func testSecurityManagerIntegration() async throws {
         let securityManager = SecurityManager.shared
         let keychainManager = KeychainManager.shared

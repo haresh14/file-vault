@@ -77,6 +77,46 @@ struct KeychainManagerTests {
         try manager.deletePassword()
     }
     
+    // MARK: - Authentication Type Tests
+    
+    @Test func testAuthenticationTypeSettings() async throws {
+        let manager = KeychainManager.shared
+        
+        // Test default state (should not be set initially)
+        #expect(manager.isAuthenticationTypeSet() == false, "Auth type should not be set initially")
+        
+        // Test setting different auth types
+        let testTypes: [AuthenticationType] = [.passcode4, .passcode6, .password]
+        
+        for authType in testTypes {
+            manager.setAuthenticationType(authType)
+            #expect(manager.isAuthenticationTypeSet() == true, "Auth type should be set")
+            #expect(manager.getAuthenticationType() == authType, "Retrieved auth type should match set type")
+        }
+        
+        // Test default fallback when no type is set
+        UserDefaults.standard.removeObject(forKey: "authenticationType")
+        let defaultType = manager.getAuthenticationType()
+        #expect(defaultType == .passcode4, "Default auth type should be passcode4")
+    }
+    
+    @Test func testAuthenticationTypeProperties() async throws {
+        // Test passcode types
+        #expect(AuthenticationType.passcode4.isPasscode == true, "passcode4 should be a passcode type")
+        #expect(AuthenticationType.passcode6.isPasscode == true, "passcode6 should be a passcode type")
+        #expect(AuthenticationType.password.isPasscode == false, "password should not be a passcode type")
+        
+        // Test digit counts
+        #expect(AuthenticationType.passcode4.digitCount == 4, "passcode4 should have 4 digits")
+        #expect(AuthenticationType.passcode6.digitCount == 6, "passcode6 should have 6 digits")
+        #expect(AuthenticationType.password.digitCount == nil, "password should have no digit count")
+        
+        // Test display names
+        #expect(AuthenticationType.passcode4.displayName == "4-Digit Passcode", "passcode4 display name should be correct")
+        #expect(AuthenticationType.passcode6.displayName == "6-Digit Passcode", "passcode6 display name should be correct")
+        #expect(AuthenticationType.password.displayName == "Password", "password display name should be correct")
+    }
+    
     // MARK: - Biometric Settings Tests
     
     @Test func testBiometricSettings() async throws {
