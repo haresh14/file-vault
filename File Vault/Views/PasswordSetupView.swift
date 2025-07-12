@@ -19,6 +19,7 @@ struct PasswordSetupView: View {
     @State private var showConfirmPassword: Bool = false
     @FocusState private var isPasswordFocused: Bool
     @FocusState private var isConfirmPasswordFocused: Bool
+    @Environment(\.dismiss) private var dismiss
     
     private var isPasswordValid: Bool {
         password.count >= 6
@@ -29,24 +30,14 @@ struct PasswordSetupView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 30) {
-                headerSection
-                passwordInputSection
-                
-                Spacer()
-            }
-            .padding()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if let onCancel = onCancel {
-                        Button("Cancel") {
-                            onCancel()
-                        }
-                    }
-                }
-            }
+        VStack(spacing: 30) {
+            headerSection
+            passwordInputSection
+            
+            Spacer()
         }
+        .padding()
+        .navigationBarBackButtonHidden(false)
     }
     
     // MARK: - View Components
@@ -284,8 +275,10 @@ enum PasswordStrength {
 }
 
 #Preview {
-    PasswordSetupView(
-        onPasswordSet: { print("Password set") },
-        onCancel: { print("Cancelled") }
-    )
+    NavigationView {
+        PasswordSetupView(
+            onPasswordSet: { print("Password set") },
+            onCancel: { print("Cancelled") }
+        )
+    }
 } 

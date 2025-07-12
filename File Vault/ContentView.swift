@@ -60,43 +60,22 @@ struct ContentView: View {
     @ViewBuilder
     private var mainContent: some View {
         if !isAuthTypeSet {
-            // First time setup - choose auth type
+            // First time setup - choose auth type with native navigation
             AuthTypeSelectionView { authType in
                 selectedAuthType = authType
                 isAuthTypeSet = true
+                handleAuthTypeSelected(authType)
             }
         } else if !isPasswordSet {
-            // Setup the chosen authentication method
-            if let authType = selectedAuthType {
-                if authType.isPasscode {
-                    PasscodeSetupView(authType: authType, onPasscodeSet: {
-                        handlePasscodeSet()
-                    }, onCancel: {
-                        // Go back to auth type selection
-                        selectedAuthType = nil
-                        isAuthTypeSet = false
-                    })
-                } else {
-                    PasswordSetupView(onPasswordSet: {
-                        handlePasswordSet()
-                    }, onCancel: {
-                        // Go back to auth type selection
-                        selectedAuthType = nil
-                        isAuthTypeSet = false
-                    })
-                }
-            } else {
-                // Fallback to existing flow
-                PasscodeView(isSettingPasscode: true) {
-                    handlePasscodeSet()
-                }
+            // This should not happen with the new flow, but keeping as fallback
+            PasscodeView(isSettingPasscode: true) {
+                handlePasscodeSet()
             }
         } else if !isAuthenticated {
             if isCheckingBiometric {
                 // Show loading state while checking biometric
                 BiometricCheckView()
             } else if shouldShowPasscode {
-                // Only show passcode after biometric check is complete
                 PasscodeView(isSettingPasscode: false) {
                     handleAuthentication()
                 }
@@ -104,6 +83,12 @@ struct ContentView: View {
         } else {
             MainTabView()
         }
+    }
+    
+    private func handleAuthTypeSelected(_ authType: AuthenticationType) {
+        // The setup is now handled within the AuthTypeSelectionView navigation
+        // When setup is complete, this callback will be triggered
+        handlePasscodeSet()
     }
     
     private func handleOnAppear() {

@@ -18,10 +18,11 @@ struct ChangeAuthenticationView: View {
     @State private var isCurrentPasswordVerified: Bool = false
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
+    @State private var navigationPath = NavigationPath()
     @FocusState private var isCurrentPasswordFocused: Bool
     
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 30) {
                 if !isCurrentPasswordVerified {
                     currentPasswordSection
@@ -41,6 +42,23 @@ struct ChangeAuthenticationView: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.blue)
                     }
+                }
+            }
+            .navigationDestination(for: AuthenticationType.self) { authType in
+                if authType.isPasscode {
+                    PasscodeSetupView(authType: authType, onPasscodeSet: {
+                        onAuthChanged()
+                        dismiss()
+                    }, onCancel: {
+                        navigationPath.removeLast()
+                    })
+                } else {
+                    PasswordSetupView(onPasswordSet: {
+                        onAuthChanged()
+                        dismiss()
+                    }, onCancel: {
+                        navigationPath.removeLast()
+                    })
                 }
             }
         }
@@ -252,34 +270,8 @@ struct ChangeAuthenticationView: View {
     }
     
     private func proceedToNewAuth() {
-        // Navigate to appropriate setup view based on new auth type
-        dismiss()
-        
-        // Present the new auth setup
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first {
-                
-                let setupView: AnyView
-                if newAuthType.isPasscode {
-                    setupView = AnyView(
-                        PasscodeSetupView(authType: newAuthType, onPasscodeSet: {
-                            onAuthChanged()
-                        }, onCancel: nil)
-                    )
-                } else {
-                    setupView = AnyView(
-                        PasswordSetupView(onPasswordSet: {
-                            onAuthChanged()
-                        }, onCancel: nil)
-                    )
-                }
-                
-                let hostingController = UIHostingController(rootView: setupView)
-                hostingController.modalPresentationStyle = .fullScreen
-                window.rootViewController?.present(hostingController, animated: true)
-            }
-        }
+        // Navigate to setup view using native navigation
+        navigationPath.append(newAuthType)
     }
     
     private func showError(message: String) {

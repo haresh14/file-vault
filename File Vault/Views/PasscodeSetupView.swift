@@ -17,6 +17,7 @@ struct PasscodeSetupView: View {
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var isConfirming: Bool = false
+    @Environment(\.dismiss) private var dismiss
     
     private var digitCount: Int {
         authType.digitCount ?? 4
@@ -31,29 +32,24 @@ struct PasscodeSetupView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 40) {
-                headerSection
-                passcodeInputSection
-                
-                Spacer()
-                
-                bottomSection
-            }
-            .padding()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if isConfirming {
-                        Button("Back") {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isConfirming = false
-                                confirmPasscode = ""
-                                showError = false
-                            }
-                        }
-                    } else if let onCancel = onCancel {
-                        Button("Cancel") {
-                            onCancel()
+        VStack(spacing: 40) {
+            headerSection
+            passcodeInputSection
+            
+            Spacer()
+            
+            bottomSection
+        }
+        .padding()
+        .navigationBarBackButtonHidden(false)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                if isConfirming {
+                    Button("Back") {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isConfirming = false
+                            confirmPasscode = ""
+                            showError = false
                         }
                     }
                 }
@@ -158,9 +154,11 @@ struct PasscodeSetupView: View {
 }
 
 #Preview {
-    PasscodeSetupView(
-        authType: .passcode4,
-        onPasscodeSet: { print("Passcode set") },
-        onCancel: { print("Cancelled") }
-    )
+    NavigationView {
+        PasscodeSetupView(
+            authType: .passcode4,
+            onPasscodeSet: { print("Passcode set") },
+            onCancel: { print("Cancelled") }
+        )
+    }
 } 

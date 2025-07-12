@@ -10,9 +10,10 @@ import SwiftUI
 struct AuthTypeSelectionView: View {
     let onAuthTypeSelected: (AuthenticationType) -> Void
     @State private var selectedType: AuthenticationType = .passcode4
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 30) {
                 headerSection
                 
@@ -26,6 +27,21 @@ struct AuthTypeSelectionView: View {
             .padding()
             .navigationTitle("Security Setup")
             .navigationBarTitleDisplayMode(.large)
+            .navigationDestination(for: AuthenticationType.self) { authType in
+                if authType.isPasscode {
+                    PasscodeSetupView(authType: authType, onPasscodeSet: {
+                        onAuthTypeSelected(authType)
+                    }, onCancel: {
+                        navigationPath.removeLast()
+                    })
+                } else {
+                    PasswordSetupView(onPasswordSet: {
+                        onAuthTypeSelected(authType)
+                    }, onCancel: {
+                        navigationPath.removeLast()
+                    })
+                }
+            }
         }
     }
     
@@ -36,11 +52,6 @@ struct AuthTypeSelectionView: View {
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 60))
                 .foregroundColor(.blue)
-            
-            Text("Choose Security Method")
-                .font(.title2)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
             
             Text("Select how you'd like to secure your vault")
                 .font(.subheadline)
@@ -62,7 +73,9 @@ struct AuthTypeSelectionView: View {
     }
     
     private var continueButton: some View {
-        Button(action: { onAuthTypeSelected(selectedType) }) {
+        Button(action: { 
+            navigationPath.append(selectedType)
+        }) {
             HStack(spacing: 8) {
                 Text("Continue")
                     .font(.system(size: 17, weight: .semibold))
