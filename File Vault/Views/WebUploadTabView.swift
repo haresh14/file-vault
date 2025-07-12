@@ -173,7 +173,7 @@ struct WebUploadTabView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .sheet(isPresented: $showQRCode) {
-            QRCodeView(url: webServer.serverURL)
+            WebUploadQRCodeView(url: webServer.serverURL)
         }
         .sheet(isPresented: $showInstructions) {
             InstructionsView()
@@ -194,6 +194,101 @@ struct WebUploadTabView: View {
         // Show feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
+    }
+}
+
+struct WebUploadQRCodeView: View {
+    let url: String
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                Text("Scan QR Code")
+                    .font(.title)
+                    .fontWeight(.bold)
+                
+                Text("Scan this code with your phone's camera to quickly access the upload page")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                // QR Code
+                if let qrImage = generateQRCode(from: url) {
+                    Image(uiImage: qrImage)
+                        .interpolation(.none)
+                        .resizable()
+                        .frame(width: 200, height: 200)
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 200, height: 200)
+                        .overlay(
+                            VStack {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.orange)
+                                Text("Failed to generate QR code")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                    .multilineTextAlignment(.center)
+                            }
+                        )
+                }
+                
+                Text(url)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.blue)
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                
+                Button("Copy URL") {
+                    UIPasteboard.general.string = url
+                    dismiss()
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .cornerRadius(12)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("QR Code")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func generateQRCode(from string: String) -> UIImage? {
+        guard let data = string.data(using: .utf8) else { return nil }
+        
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("H", forKey: "inputCorrectionLevel")
+        
+        guard let ciImage = filter.outputImage else { return nil }
+        
+        // Scale up the QR code for better quality
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
+        let scaledCIImage = ciImage.transformed(by: transform)
+        
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(scaledCIImage, from: scaledCIImage.extent) else { return nil }
+        
+        return UIImage(cgImage: cgImage)
     }
 }
 
