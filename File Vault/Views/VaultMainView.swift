@@ -34,7 +34,7 @@ enum SortOption: String, CaseIterable {
 }
 
 struct VaultMainView: View {
-    @State private var showSettings = false
+
     @State private var showPhotoPicker = false
     @State private var isImporting = false
     @State private var importProgress: Double = 0
@@ -141,10 +141,6 @@ struct VaultMainView: View {
                         Button("Select All") {
                             selectedVaultItems = Set(vaultItems)
                         }
-                    } else {
-                        Button(action: { showSettings = true }) {
-                            Image(systemName: "gear")
-                        }
                     }
                 }
                 
@@ -185,9 +181,7 @@ struct VaultMainView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-            }
+
             .sheet(isPresented: $showPhotoPicker) {
                 PhotoPickerView { assets in
                     importAssets(assets)

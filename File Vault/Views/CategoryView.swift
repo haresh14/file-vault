@@ -42,7 +42,7 @@ enum CategoryType: String, CaseIterable {
 
 struct CategoryView: View {
     @State private var allVaultItems: [VaultItem] = []
-    @State private var showSettings = false
+
     @Environment(\.managedObjectContext) var context
     
     var photoItems: [VaultItem] {
@@ -105,16 +105,8 @@ struct CategoryView: View {
             }
                     .navigationTitle("Categories")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "gear")
-                }
-            }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
+
+
         .onAppear {
             loadVaultItems()
         }

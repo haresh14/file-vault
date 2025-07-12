@@ -44,7 +44,7 @@ struct FolderView: View {
     @State private var importProgress: Double = 0
     @State private var showSortActionSheet = false
     @State private var showAddActionSheet = false
-    @State private var showSettings = false
+
     @State private var sortOption: FolderSortOption = .name
     @State private var sortAscending: Bool = true
     @State private var isSelectionMode = false
@@ -132,10 +132,6 @@ struct FolderView: View {
                                 Image(systemName: "chevron.left")
                                 Text("Back")
                             }
-                        }
-                    } else {
-                        Button(action: { showSettings = true }) {
-                            Image(systemName: "gear")
                         }
                     }
                 }
@@ -262,9 +258,7 @@ struct FolderView: View {
                 .presentationDetents([.fraction(0.3)])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-            }
+
             .sheet(isPresented: $showMoveSheet) {
                 FolderPickerView(
                     selectedFolders: selectedFolders,
