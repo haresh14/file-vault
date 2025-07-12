@@ -91,24 +91,49 @@ struct FolderView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Breadcrumb navigation
-                if currentFolder != nil {
-                    breadcrumbView
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6))
+            ZStack {
+                VStack(spacing: 0) {
+                    // Breadcrumb navigation
+                    if currentFolder != nil {
+                        breadcrumbView
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6))
+                    }
+                    
+                    // Content
+                    if folders.isEmpty && files.isEmpty {
+                        VStack {
+                            emptyStateView
+                                .padding(.top, 80)
+                            Spacer()
+                        }
+                    } else {
+                        folderContentView
+                    }
                 }
                 
-                // Content
-                if folders.isEmpty && files.isEmpty {
+                // Floating Action Button
+                if isSelectionMode && (!selectedFolders.isEmpty || !selectedFiles.isEmpty) {
                     VStack {
-                        emptyStateView
-                            .padding(.top, 80)
                         Spacer()
+                        HStack {
+                            Spacer()
+                            
+                            Button(action: {
+                                showDeleteAlert = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .frame(width: 56, height: 56)
+                                    .background(Color.red)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 4)
+                            }
+                        }
+                        .padding()
                     }
-                } else {
-                    folderContentView
                 }
             }
             .navigationTitle(currentFolder?.displayName ?? "Folders")
@@ -146,11 +171,10 @@ struct FolderView: View {
                     }
                 }
                 
-                if isSelectionMode && (!selectedFolders.isEmpty || !selectedFiles.isEmpty) {
+                if isSelectionMode {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: { showDeleteAlert = true }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
+                        Button("Select All") {
+                            selectAllItems()
                         }
                     }
                 }
@@ -483,6 +507,11 @@ struct FolderView: View {
         } else {
             selectedFiles.insert(file)
         }
+    }
+    
+    private func selectAllItems() {
+        selectedFolders = Set(folders)
+        selectedFiles = Set(files)
     }
     
     private func deleteSelectedItems() {

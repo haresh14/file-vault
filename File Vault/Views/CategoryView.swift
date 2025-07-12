@@ -182,49 +182,74 @@ struct CategoryFilesView: View {
     ]
     
     var body: some View {
-        Group {
-            if items.isEmpty {
-                VStack(spacing: 20) {
-                    Image(systemName: categoryType.systemImage)
-                        .font(.system(size: 80))
-                        .foregroundColor(.gray)
-                    
-                    Text("No \(categoryType.rawValue)")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text("Files of this type will appear here when you add them to your vault")
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+        ZStack {
+            Group {
+                if items.isEmpty {
+                    VStack(spacing: 20) {
+                        Image(systemName: categoryType.systemImage)
+                            .font(.system(size: 80))
+                            .foregroundColor(.gray)
+                        
+                        Text("No \(categoryType.rawValue)")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Files of this type will appear here when you add them to your vault")
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 2) {
+                            ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
+                                VaultItemCell(
+                                    item: item,
+                                    isSelected: selectedItems.contains(item),
+                                    isSelectionMode: isSelectionMode,
+                                    onTap: {
+                                        if isSelectionMode {
+                                            toggleSelection(item)
+                                        } else {
+                                            mediaViewerIndex = index
+                                            showUnifiedMediaViewer = true
+                                        }
+                                    },
+                                    onLongPress: {
+                                        if !isSelectionMode {
+                                            enterSelectionMode()
+                                            selectedItems.insert(item)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 2) {
-                        ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
-                            VaultItemCell(
-                                item: item,
-                                isSelected: selectedItems.contains(item),
-                                isSelectionMode: isSelectionMode,
-                                onTap: {
-                                    if isSelectionMode {
-                                        toggleSelection(item)
-                                    } else {
-                                        mediaViewerIndex = index
-                                        showUnifiedMediaViewer = true
-                                    }
-                                },
-                                onLongPress: {
-                                    if !isSelectionMode {
-                                        enterSelectionMode()
-                                        selectedItems.insert(item)
-                                    }
-                                }
-                            )
+            }
+            
+            // Floating Action Button
+            if isSelectionMode && !selectedItems.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        
+                        Button(action: {
+                            showDeleteAlert = true
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 56, height: 56)
+                                .background(Color.red)
+                                .clipShape(Circle())
+                                .shadow(radius: 4)
                         }
                     }
-                    .padding(.horizontal, 2)
+                    .padding()
                 }
             }
         }
@@ -249,11 +274,10 @@ struct CategoryFilesView: View {
                 }
             }
             
-            if isSelectionMode && !selectedItems.isEmpty {
+            if isSelectionMode {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { showDeleteAlert = true }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
+                    Button("Select All") {
+                        selectAllItems()
                     }
                 }
             }
@@ -334,6 +358,10 @@ struct CategoryFilesView: View {
         } else {
             selectedItems.insert(item)
         }
+    }
+    
+    private func selectAllItems() {
+        selectedItems = Set(items)
     }
     
     private func deleteSelectedItems() {

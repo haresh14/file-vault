@@ -188,15 +188,8 @@ struct VaultMainView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if isSelectionMode {
-                        if selectedVaultItems.isEmpty {
-                            Button("Select All") {
-                                selectedVaultItems = Set(vaultItems)
-                            }
-                        } else {
-                            Button(action: { showDeleteAlert = true }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.red)
-                            }
+                        Button("Select All") {
+                            selectedVaultItems = Set(vaultItems)
                         }
                     } else {
                         Button(action: { showWebUpload = true }) {
