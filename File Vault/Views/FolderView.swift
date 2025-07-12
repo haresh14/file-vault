@@ -9,22 +9,38 @@ import SwiftUI
 
 struct FolderView: View {
     @State private var folders: [Folder] = []
+    @State private var files: [VaultItem] = []
     @State private var showCreateFolder = false
     @State private var newFolderName = ""
     @State private var currentFolder: Folder? = nil
     @State private var showRenameFolder = false
     @State private var folderToRename: Folder? = nil
     @State private var renameText = ""
+    @State private var showUnifiedMediaViewer = false
+    @State private var mediaViewerIndex = 0
     
     @Environment(\.managedObjectContext) var context
     
     var body: some View {
         NavigationView {
-            Group {
-                if folders.isEmpty {
-                    emptyStateView
+            VStack(spacing: 0) {
+                // Breadcrumb navigation
+                if currentFolder != nil {
+                    breadcrumbView
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray6))
+                }
+                
+                // Content
+                if folders.isEmpty && files.isEmpty {
+                    VStack {
+                        emptyStateView
+                            .padding(.top, 80)
+                        Spacer()
+                    }
                 } else {
-                    folderListView
+                    folderContentView
                 }
             }
             .navigationTitle(currentFolder?.displayName ?? "Folders")
@@ -70,22 +86,71 @@ struct FolderView: View {
             } message: {
                 Text("Enter a new name for the folder")
             }
+            .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+                UnifiedMediaViewerView(
+                    mediaItems: files,
+                    initialIndex: mediaViewerIndex
+                )
+            }
         }
     }
     
     // MARK: - Views
     
+    private var breadcrumbView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Home button
+                Button(action: {
+                    currentFolder = nil
+                    loadFolders()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "house.fill")
+                            .font(.caption)
+                        Text("Home")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.blue)
+                }
+                
+                if let currentFolder = currentFolder {
+                    let breadcrumbs = currentFolder.breadcrumbPath
+                    
+                    ForEach(Array(breadcrumbs.enumerated()), id: \.offset) { index, folder in
+                        HStack(spacing: 8) {
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Button(action: {
+                                navigateToFolder(folder, fromBreadcrumb: true)
+                            }) {
+                                Text(folder.displayName)
+                                    .font(.caption)
+                                    .foregroundColor(index == breadcrumbs.count - 1 ? .primary : .blue)
+                                    .fontWeight(index == breadcrumbs.count - 1 ? .semibold : .regular)
+                            }
+                            .disabled(index == breadcrumbs.count - 1)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+    
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "folder.badge.plus")
+            Image(systemName: currentFolder == nil ? "folder.badge.plus" : "folder")
                 .font(.system(size: 80))
                 .foregroundColor(.gray)
             
-            Text("No Folders Yet")
+            Text(currentFolder == nil ? "No Folders Yet" : "Empty Folder")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Create folders to organize your files")
+            Text(currentFolder == nil ? "Create folders to organize your files" : "Add files or create subfolders to organize your content")
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -102,16 +167,32 @@ struct FolderView: View {
         }
     }
     
-    private var folderListView: some View {
+    private var folderContentView: some View {
         List {
-            ForEach(folders) { folder in
-                FolderRowView(folder: folder) {
-                    navigateToFolder(folder)
-                } onRename: {
-                    startRenaming(folder)
+            // Folders section
+            if !folders.isEmpty {
+                Section("Folders") {
+                    ForEach(folders) { folder in
+                        FolderRowView(folder: folder) {
+                            navigateToFolder(folder)
+                        } onRename: {
+                            startRenaming(folder)
+                        }
+                    }
+                    .onDelete(perform: deleteFolders)
                 }
             }
-            .onDelete(perform: deleteFolders)
+            
+            // Files section
+            if !files.isEmpty {
+                Section("Files") {
+                    ForEach(files) { file in
+                        FileRowView(file: file) {
+                            viewFile(file)
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -120,8 +201,10 @@ struct FolderView: View {
     private func loadFolders() {
         if let currentFolder = currentFolder {
             folders = currentFolder.subfoldersArray
+            files = currentFolder.itemsArray
         } else {
             folders = CoreDataManager.shared.fetchRootFolders()
+            files = CoreDataManager.shared.fetchVaultItems(in: nil)
         }
     }
     
@@ -136,8 +219,19 @@ struct FolderView: View {
         loadFolders()
     }
     
-    private func navigateToFolder(_ folder: Folder) {
-        currentFolder = folder
+    private func navigateToFolder(_ folder: Folder, fromBreadcrumb: Bool = false) {
+        if fromBreadcrumb {
+            // For breadcrumb navigation, check if we're going to root
+            if let breadcrumbs = currentFolder?.breadcrumbPath, 
+               let firstFolder = breadcrumbs.first,
+               folder == firstFolder {
+                currentFolder = nil // Go to root
+            } else {
+                currentFolder = folder
+            }
+        } else {
+            currentFolder = folder
+        }
         loadFolders()
     }
     
@@ -172,6 +266,13 @@ struct FolderView: View {
             CoreDataManager.shared.deleteFolder(folder)
         }
         loadFolders()
+    }
+    
+    private func viewFile(_ file: VaultItem) {
+        if let index = files.firstIndex(where: { $0.objectID == file.objectID }) {
+            mediaViewerIndex = index
+            showUnifiedMediaViewer = true
+        }
     }
 }
 
@@ -212,6 +313,91 @@ struct FolderRowView: View {
                 Label("Rename", systemImage: "pencil")
             }
         }
+    }
+}
+
+struct FileRowView: View {
+    let file: VaultItem
+    let onTap: () -> Void
+    
+    @State private var thumbnail: UIImage?
+    
+    var body: some View {
+        HStack {
+            // Thumbnail
+            Group {
+                if let thumbnail = thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 40, height: 40)
+                        .clipped()
+                        .cornerRadius(6)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 40, height: 40)
+                        .cornerRadius(6)
+                        .overlay(
+                            Image(systemName: file.isVideo ? "video.fill" : "photo.fill")
+                                .foregroundColor(.gray)
+                                .font(.caption)
+                        )
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(file.fileName ?? "Unknown")
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                HStack {
+                    Text(file.fileType?.uppercased() ?? "FILE")
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(file.isVideo ? Color.red : Color.blue)
+                        .cornerRadius(4)
+                    
+                    Text(formatFileSize(file.fileSize))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            if file.isVideo {
+                Image(systemName: "play.circle")
+                    .foregroundColor(.secondary)
+                    .font(.title3)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+        .onAppear {
+            loadThumbnail()
+        }
+    }
+    
+    private func loadThumbnail() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: file)
+            
+            DispatchQueue.main.async {
+                self.thumbnail = loadedThumbnail
+            }
+        }
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 
