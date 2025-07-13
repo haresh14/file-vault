@@ -297,6 +297,21 @@ class WebServerManager: ObservableObject {
             print("DEBUG: ⬆️ POST /upload request received - Handling file upload")
             print("DEBUG: ⬆️ Request data size: \(data.count) bytes")
             handleFileUpload(requestData: data, connection: connection)
+        case ("POST", "/api/folder/create"):
+            print("DEBUG: 📁 POST /api/folder/create - Creating folder")
+            handleCreateFolder(requestData: data, connection: connection)
+        case ("POST", "/api/folder/rename"):
+            print("DEBUG: ✏️ POST /api/folder/rename - Renaming folder")
+            handleRenameFolder(requestData: data, connection: connection)
+        case ("POST", "/api/folder/delete"):
+            print("DEBUG: 🗑️ POST /api/folder/delete - Deleting folder")
+            handleDeleteFolder(requestData: data, connection: connection)
+        case ("POST", "/api/file/delete"):
+            print("DEBUG: 🗑️ POST /api/file/delete - Deleting file")
+            handleDeleteFile(requestData: data, connection: connection)
+        case ("POST", "/api/bulk/delete"):
+            print("DEBUG: 🗑️ POST /api/bulk/delete - Bulk deleting items")
+            handleBulkDelete(requestData: data, connection: connection)
         case ("GET", "/status"):
             print("DEBUG: Serving status page")
             serveStatusPage(connection: connection)
@@ -555,6 +570,314 @@ class WebServerManager: ObservableObject {
             
             // Also trigger a general refresh notification
             NotificationCenter.default.post(name: Notification.Name("VaultDataChanged"), object: nil)
+        }
+    }
+    
+    // MARK: - Folder Management Handlers
+    
+    private func handleCreateFolder(requestData: Data, connection: NWConnection) {
+        print("DEBUG: 📁 handleCreateFolder called")
+        
+        guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
+            sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
+            return
+        }
+        
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let folderName = json["name"] as? String,
+                  !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Folder name is required")
+                return
+            }
+            
+            let parentFolderId = json["parentId"] as? String
+            let parentFolder: Folder?
+            
+            if let parentIdString = parentFolderId, !parentIdString.isEmpty,
+               let parentId = UUID(uuidString: parentIdString) {
+                parentFolder = CoreDataManager.shared.fetchFolder(by: parentId)
+            } else {
+                parentFolder = nil
+            }
+            
+            let newFolder = CoreDataManager.shared.createFolder(name: folderName.trimmingCharacters(in: .whitespacesAndNewlines), parent: parentFolder)
+            
+            print("DEBUG: ✅ Created folder: \(newFolder.displayName)")
+            sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder created successfully")
+            
+            // Notify UI to refresh
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            }
+            
+        } catch {
+            print("DEBUG: ❌ Error creating folder: \(error)")
+            sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to create folder")
+        }
+    }
+    
+    private func handleRenameFolder(requestData: Data, connection: NWConnection) {
+        print("DEBUG: ✏️ handleRenameFolder called")
+        
+        guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
+            sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
+            return
+        }
+        
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let folderIdString = json["folderId"] as? String,
+                  let newName = json["newName"] as? String,
+                  let folderId = UUID(uuidString: folderIdString),
+                  !newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Folder ID and new name are required")
+                return
+            }
+            
+            guard let folder = CoreDataManager.shared.fetchFolder(by: folderId) else {
+                sendJSONResponse(connection: connection, statusCode: 404, success: false, message: "Folder not found")
+                return
+            }
+            
+            let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+            CoreDataManager.shared.updateFolder(folder, name: trimmedName)
+            
+            print("DEBUG: ✅ Renamed folder to: \(trimmedName)")
+            sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder renamed successfully")
+            
+            // Notify UI to refresh
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            }
+            
+        } catch {
+            print("DEBUG: ❌ Error renaming folder: \(error)")
+            sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to rename folder")
+        }
+    }
+    
+    private func handleDeleteFolder(requestData: Data, connection: NWConnection) {
+        print("DEBUG: 🗑️ handleDeleteFolder called")
+        
+        guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
+            sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
+            return
+        }
+        
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let folderIdString = json["folderId"] as? String,
+                  let folderId = UUID(uuidString: folderIdString) else {
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Folder ID is required")
+                return
+            }
+            
+            guard let folder = CoreDataManager.shared.fetchFolder(by: folderId) else {
+                sendJSONResponse(connection: connection, statusCode: 404, success: false, message: "Folder not found")
+                return
+            }
+            
+            // Delete all files in the folder and subfolders
+            deleteAllItemsInFolder(folder)
+            
+            // Delete the folder itself
+            CoreDataManager.shared.deleteFolder(folder)
+            
+            print("DEBUG: ✅ Deleted folder and all its contents")
+            sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder deleted successfully")
+            
+            // Notify UI to refresh
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            }
+            
+        } catch {
+            print("DEBUG: ❌ Error deleting folder: \(error)")
+            sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to delete folder")
+        }
+    }
+    
+    private func handleDeleteFile(requestData: Data, connection: NWConnection) {
+        print("DEBUG: 🗑️ handleDeleteFile called")
+        
+        guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
+            sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
+            return
+        }
+        
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let fileIdString = json["fileId"] as? String,
+                  let fileId = UUID(uuidString: fileIdString) else {
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "File ID is required")
+                return
+            }
+            
+            let vaultItems = CoreDataManager.shared.fetchAllVaultItems()
+            guard let vaultItem = vaultItems.first(where: { $0.id == fileId }) else {
+                sendJSONResponse(connection: connection, statusCode: 404, success: false, message: "File not found")
+                return
+            }
+            
+            try FileStorageManager.shared.deleteFile(vaultItem: vaultItem)
+            
+            print("DEBUG: ✅ Deleted file: \(vaultItem.fileName ?? "Unknown")")
+            sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "File deleted successfully")
+            
+            // Notify UI to refresh
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            }
+            
+        } catch {
+            print("DEBUG: ❌ Error deleting file: \(error)")
+            sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to delete file")
+        }
+    }
+    
+    private func handleBulkDelete(requestData: Data, connection: NWConnection) {
+        print("DEBUG: 🗑️ handleBulkDelete called")
+        
+        guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
+            sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
+            return
+        }
+        
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let items = json["items"] as? [[String: Any]] else {
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Items array is required")
+                return
+            }
+            
+            var deletedCount = 0
+            var failedCount = 0
+            var errors: [String] = []
+            
+            for item in items {
+                guard let type = item["type"] as? String,
+                      let idString = item["id"] as? String,
+                      let id = UUID(uuidString: idString) else {
+                    failedCount += 1
+                    errors.append("Invalid item format")
+                    continue
+                }
+                
+                do {
+                    if type == "folder" {
+                        guard let folder = CoreDataManager.shared.fetchFolder(by: id) else {
+                            failedCount += 1
+                            errors.append("Folder not found: \(idString)")
+                            continue
+                        }
+                        
+                        // Delete all files in the folder and subfolders
+                        deleteAllItemsInFolder(folder)
+                        
+                        // Delete the folder itself
+                        CoreDataManager.shared.deleteFolder(folder)
+                        deletedCount += 1
+                        
+                    } else if type == "file" {
+                        let vaultItems = CoreDataManager.shared.fetchAllVaultItems()
+                        guard let vaultItem = vaultItems.first(where: { $0.id == id }) else {
+                            failedCount += 1
+                            errors.append("File not found: \(idString)")
+                            continue
+                        }
+                        
+                        try FileStorageManager.shared.deleteFile(vaultItem: vaultItem)
+                        deletedCount += 1
+                        
+                    } else {
+                        failedCount += 1
+                        errors.append("Unknown item type: \(type)")
+                    }
+                } catch {
+                    failedCount += 1
+                    errors.append("Error deleting \(type): \(error.localizedDescription)")
+                }
+            }
+            
+            let isSuccess = deletedCount > 0
+            let statusCode = failedCount == 0 ? 200 : (deletedCount > 0 ? 207 : 400) // 207 = Partial success
+            
+            var message = "Deleted \(deletedCount) item(s)"
+            if failedCount > 0 {
+                message += ", failed to delete \(failedCount) item(s)"
+            }
+            
+            var responseData: [String: Any] = [
+                "deletedCount": deletedCount,
+                "failedCount": failedCount
+            ]
+            
+            if !errors.isEmpty {
+                responseData["errors"] = errors
+            }
+            
+            sendJSONResponse(connection: connection, statusCode: statusCode, success: isSuccess, message: message, data: responseData)
+            
+            // Notify UI to refresh
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            }
+            
+        } catch {
+            print("DEBUG: ❌ Error in bulk delete: \(error)")
+            sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to process bulk delete")
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func extractJSONFromRequest(requestData: Data) -> Data? {
+        // Find the end of HTTP headers (double CRLF)
+        let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
+        guard let headerEndRange = requestData.range(of: headerEndMarker) else {
+            print("DEBUG: No HTTP header end marker found")
+            return nil
+        }
+        
+        // Extract body (JSON data)
+        let bodyData = requestData.subdata(in: headerEndRange.upperBound..<requestData.endIndex)
+        return bodyData.isEmpty ? nil : bodyData
+    }
+    
+    private func sendJSONResponse(connection: NWConnection, statusCode: Int, success: Bool, message: String, data: [String: Any]? = nil) {
+        var responseData: [String: Any] = [
+            "success": success,
+            "message": message
+        ]
+        
+        if let additionalData = data {
+            responseData.merge(additionalData) { _, new in new }
+        }
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: responseData)
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+            sendHTTPResponse(connection: connection, statusCode: statusCode, contentType: "application/json", body: jsonString)
+        } catch {
+            print("DEBUG: Error creating JSON response: \(error)")
+            sendHTTPResponse(connection: connection, statusCode: 500, contentType: "application/json", body: "{\"success\": false, \"message\": \"Internal server error\"}")
+        }
+    }
+    
+    private func deleteAllItemsInFolder(_ folder: Folder) {
+        // Delete all files in this folder
+        for item in folder.itemsArray {
+            do {
+                try FileStorageManager.shared.deleteFile(vaultItem: item)
+            } catch {
+                print("DEBUG: Error deleting file \(item.fileName ?? "Unknown"): \(error)")
+            }
+        }
+        
+        // Recursively delete all items in subfolders
+        for subfolder in folder.subfoldersArray {
+            deleteAllItemsInFolder(subfolder)
         }
     }
     

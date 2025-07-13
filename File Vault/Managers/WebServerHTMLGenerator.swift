@@ -78,12 +78,24 @@ extension WebServerManager {
         for folder in folders {
             let itemCount = folder.totalItemCount
             let folderIdString = folder.id?.uuidString ?? ""
+            let escapedFolderName = folder.displayName.replacingOccurrences(of: "'", with: "\\'")
             folderItems += """
-                <div class="file-item" onclick="navigateToFolder('\(folderIdString)')" style="cursor: pointer;">
+                <div class="file-item" data-type="folder" data-id="\(folderIdString)" data-name="\(escapedFolderName)">
+                    <div class="item-checkbox">
+                        <input type="checkbox" class="item-select" onchange="updateSelectionState()">
+                    </div>
                     <div class="file-icon">📁</div>
-                    <div class="file-info">
+                    <div class="file-info" onclick="navigateToFolder('\(folderIdString)')" style="cursor: pointer; flex: 1;">
                         <div class="file-name">\(folder.displayName)</div>
                         <div class="file-meta">\(itemCount) items</div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn rename-btn" onclick="event.stopPropagation(); showRenameDialog('\(folderIdString)', '\(escapedFolderName)')" title="Rename folder">
+                            ✏️
+                        </button>
+                        <button class="action-btn delete-btn" onclick="event.stopPropagation(); showDeleteConfirmation('folder', '\(folderIdString)', '\(escapedFolderName)')" title="Delete folder">
+                            🗑️
+                        </button>
                     </div>
                 </div>
             """
@@ -94,12 +106,22 @@ extension WebServerManager {
             let fileIcon = getFileIcon(fileType: file.fileType ?? "")
             let fileSize = formatFileSize(size: file.fileSize)
             let fileName = file.fileName ?? "Unknown"
+            let fileIdString = file.id?.uuidString ?? ""
+            let escapedFileName = fileName.replacingOccurrences(of: "'", with: "\\'")
             fileItems += """
-                <div class="file-item">
+                <div class="file-item" data-type="file" data-id="\(fileIdString)" data-name="\(escapedFileName)">
+                    <div class="item-checkbox">
+                        <input type="checkbox" class="item-select" onchange="updateSelectionState()">
+                    </div>
                     <div class="file-icon">\(fileIcon)</div>
-                    <div class="file-info">
+                    <div class="file-info" style="flex: 1;">
                         <div class="file-name">\(fileName)</div>
                         <div class="file-meta">\(fileSize)</div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn delete-btn" onclick="showDeleteConfirmation('file', '\(fileIdString)', '\(escapedFileName)')" title="Delete file">
+                            🗑️
+                        </button>
                     </div>
                 </div>
             """
@@ -139,7 +161,7 @@ extension WebServerManager {
                     border-radius: 20px;
                     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
                     padding: 30px;
-                    max-width: 900px;
+                    max-width: 1100px;
                     width: 100%;
                     margin: 0 auto;
                     max-height: 90vh;
@@ -166,6 +188,7 @@ extension WebServerManager {
                     margin-bottom: 20px;
                     font-size: 14px;
                     color: #666;
+                    border: 1px solid #e1e5e9;
                 }
                 
                 .breadcrumbs a {
@@ -186,32 +209,124 @@ extension WebServerManager {
                 }
                 
                 .explorer-header {
+                    margin-bottom: 15px;
+                }
+                
+                .header-buttons {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 20px;
+                    width: 100%;
                 }
                 
-                .explorer-title {
-                    font-size: 18px;
+                .action-buttons {
+                    display: flex;
+                    gap: 10px;
+                }
+                
+                .selection-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                }
+                
+                .select-all-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    font-weight: 500;
+                }
+                
+                .item-checkbox {
+                    display: block;
+                    margin-right: 10px;
+                }
+                
+                .item-checkbox input[type="checkbox"] {
+                    margin: 0;
+                    cursor: pointer;
+                    transform: scale(1.2);
+                    accent-color: #667eea;
+                    width: 18px;
+                    height: 18px;
+                }
+                
+                .select-all-container input[type="checkbox"] {
+                    margin: 0 8px 0 0;
+                    cursor: pointer;
+                    transform: scale(1.3);
+                    accent-color: #667eea;
+                    width: 16px;
+                    height: 16px;
+                }
+                
+                .delete-selected-btn {
+                    background: #dc3545;
+                    color: white;
+                }
+                
+                .delete-selected-btn:hover {
+                    background: #c82333;
+                }
+                
+
+                
+                .action-button {
+                    border: none;
+                    padding: 10px 16px;
+                    border-radius: 8px;
+                    font-size: 14px;
                     font-weight: 600;
-                    color: #333;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
                 }
                 
                 .upload-button {
                     background: #667eea;
                     color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: background 0.3s ease;
                 }
                 
                 .upload-button:hover {
                     background: #5a6fd8;
+                }
+                
+                .new-folder-btn {
+                    background: #28a745;
+                    color: white;
+                }
+                
+                .new-folder-btn:hover {
+                    background: #218838;
+                }
+                
+                .file-actions {
+                    display: flex;
+                    gap: 5px;
+                    align-items: center;
+                }
+                
+                .action-btn {
+                    background: none;
+                    border: none;
+                    font-size: 16px;
+                    cursor: pointer;
+                    padding: 5px;
+                    border-radius: 4px;
+                    transition: background 0.2s ease;
+                }
+                
+                .action-btn:hover {
+                    background: rgba(0, 0, 0, 0.1);
+                }
+                
+                .rename-btn:hover {
+                    background: rgba(255, 193, 7, 0.2);
+                }
+                
+                .delete-btn:hover {
+                    background: rgba(220, 53, 69, 0.2);
                 }
                 
                 .file-list {
@@ -576,10 +691,20 @@ extension WebServerManager {
                         margin: 15px;
                     }
                     
-                    .explorer-header {
+                    .header-buttons {
                         flex-direction: column;
                         gap: 15px;
                         align-items: stretch;
+                    }
+                    
+                    .action-buttons {
+                        justify-content: center;
+                    }
+                    
+                    .selection-controls {
+                        flex-wrap: wrap;
+                        gap: 10px;
+                        justify-content: center;
                     }
                 }
             </style>
@@ -590,14 +715,25 @@ extension WebServerManager {
                     <h1 class="title">🔐 File Vault</h1>
                 </div>
                 
-                <div class="breadcrumbs">
-                    \(breadcrumbs)
-                </div>
-                
                 <div class="explorer-container">
                     <div class="explorer-header">
-                        <div class="explorer-title">Files and Folders</div>
-                        <button class="upload-button" onclick="showUploadDialog()">📤 Upload Files</button>
+                        <div class="header-buttons">
+                            <div class="selection-controls">
+                                <label class="select-all-container">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                    <span>Select All</span>
+                                </label>
+                                <button class="action-button delete-selected-btn" onclick="deleteSelectedItems()" id="deleteSelectedBtn" style="display: none;">🗑️ Delete Selected</button>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-button new-folder-btn" onclick="showNewFolderDialog()">📁 New Folder</button>
+                                <button class="action-button upload-button" onclick="showUploadDialog()">📤 Upload Files</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="breadcrumbs">
+                        \(breadcrumbs)
                     </div>
                     
                     <div class="file-list">
@@ -648,6 +784,60 @@ extension WebServerManager {
                     <div id="uploadProgressText" class="upload-progress-text">Uploading files...</div>
                     <div id="uploadProgressDetail" class="upload-progress-detail">Preparing upload...</div>
                     <div id="uploadProgressPercentage" class="progress-percentage" style="display: none;">0%</div>
+                </div>
+            </div>
+            
+            <!-- New Folder Dialog -->
+            <div id="newFolderDialog" class="upload-dialog" style="display: none;">
+                <div class="upload-dialog-content" style="max-width: 400px;">
+                    <div class="upload-dialog-header">
+                        <h3>Create New Folder</h3>
+                        <button class="close-button" onclick="hideNewFolderDialog()">×</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <input type="text" id="folderNameInput" placeholder="Enter folder name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        <div style="margin-top: 15px; text-align: right;">
+                            <button onclick="hideNewFolderDialog()" style="margin-right: 10px; padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
+                            <button onclick="createFolder()" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Create</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rename Folder Dialog -->
+            <div id="renameFolderDialog" class="upload-dialog" style="display: none;">
+                <div class="upload-dialog-content" style="max-width: 400px;">
+                    <div class="upload-dialog-header">
+                        <h3>Rename Folder</h3>
+                        <button class="close-button" onclick="hideRenameDialog()">×</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <input type="text" id="renameFolderInput" placeholder="Enter new name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        <div style="margin-top: 15px; text-align: right;">
+                            <button onclick="hideRenameDialog()" style="margin-right: 10px; padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
+                            <button onclick="renameFolder()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">Rename</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Delete Confirmation Dialog -->
+            <div id="deleteConfirmationDialog" class="upload-dialog" style="display: none;">
+                <div class="upload-dialog-content" style="max-width: 500px;">
+                    <div class="upload-dialog-header">
+                        <h3>Confirm Deletion</h3>
+                        <button class="close-button" onclick="hideDeleteConfirmation()">×</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div id="deleteMessage" style="margin-bottom: 20px; line-height: 1.5;"></div>
+                        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 10px; margin-bottom: 20px;">
+                            <strong>⚠️ Warning:</strong> This action cannot be undone.
+                        </div>
+                        <div style="text-align: right;">
+                            <button onclick="hideDeleteConfirmation()" style="margin-right: 10px; padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
+                            <button onclick="confirmDelete()" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -987,8 +1177,386 @@ extension WebServerManager {
                 
                 // Handle escape key
                 document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape' && uploadDialog.style.display === 'flex') {
-                        hideUploadDialog();
+                    if (e.key === 'Escape') {
+                        if (uploadDialog.style.display === 'flex') {
+                            hideUploadDialog();
+                        } else if (newFolderDialog.style.display === 'flex') {
+                            hideNewFolderDialog();
+                        } else if (renameFolderDialog.style.display === 'flex') {
+                            hideRenameDialog();
+                        } else if (deleteConfirmationDialog.style.display === 'flex') {
+                            hideDeleteConfirmation();
+                        }
+                    }
+                });
+                
+                // Folder management variables
+                const newFolderDialog = document.getElementById('newFolderDialog');
+                const renameFolderDialog = document.getElementById('renameFolderDialog');
+                const folderNameInput = document.getElementById('folderNameInput');
+                const renameFolderInput = document.getElementById('renameFolderInput');
+                let currentRenameFolderId = null;
+                
+                // New Folder Dialog Functions
+                function showNewFolderDialog() {
+                    newFolderDialog.style.display = 'flex';
+                    folderNameInput.value = '';
+                    folderNameInput.focus();
+                }
+                
+                function hideNewFolderDialog() {
+                    newFolderDialog.style.display = 'none';
+                    folderNameInput.value = '';
+                }
+                
+                function createFolder() {
+                    const folderName = folderNameInput.value.trim();
+                    if (!folderName) {
+                        alert('Please enter a folder name');
+                        return;
+                    }
+                    
+                    const data = {
+                        name: folderName,
+                        parentId: currentFolderId || ''
+                    };
+                    
+                    fetch('/api/folder/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            hideNewFolderDialog();
+                            window.location.reload();
+                        } else {
+                            alert('Error creating folder: ' + result.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error creating folder');
+                    });
+                }
+                
+                // Rename Folder Dialog Functions
+                function showRenameDialog(folderId, currentName) {
+                    currentRenameFolderId = folderId;
+                    renameFolderInput.value = currentName;
+                    renameFolderDialog.style.display = 'flex';
+                    renameFolderInput.focus();
+                    renameFolderInput.select();
+                }
+                
+                function hideRenameDialog() {
+                    renameFolderDialog.style.display = 'none';
+                    renameFolderInput.value = '';
+                    currentRenameFolderId = null;
+                }
+                
+                function renameFolder() {
+                    const newName = renameFolderInput.value.trim();
+                    if (!newName) {
+                        alert('Please enter a folder name');
+                        return;
+                    }
+                    
+                    if (!currentRenameFolderId) {
+                        alert('No folder selected');
+                        return;
+                    }
+                    
+                    const data = {
+                        folderId: currentRenameFolderId,
+                        newName: newName
+                    };
+                    
+                    fetch('/api/folder/rename', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            // Update the folder name in the UI immediately
+                            const folderItem = document.querySelector(`[data-id="${currentRenameFolderId}"]`);
+                            if (folderItem) {
+                                const folderNameElement = folderItem.querySelector('.file-name');
+                                if (folderNameElement) {
+                                    folderNameElement.textContent = newName;
+                                }
+                                // Update data attribute for future operations
+                                folderItem.dataset.name = newName.replace(/'/g, "\\'");
+                            }
+                            hideRenameDialog();
+                        } else {
+                            alert('Error renaming folder: ' + result.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error renaming folder');
+                    });
+                }
+                
+                // Selection Management
+                let pendingDeletion = null;
+                
+                function updateSelectionState() {
+                    const checkboxes = document.querySelectorAll('.item-select');
+                    const selectedCheckboxes = document.querySelectorAll('.item-select:checked');
+                    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+                    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+                    
+                    // Update delete button visibility
+                    const hasSelections = selectedCheckboxes.length > 0;
+                    deleteSelectedBtn.style.display = hasSelections ? 'inline-block' : 'none';
+                    
+                    // Update select all checkbox
+                    if (selectedCheckboxes.length === checkboxes.length && checkboxes.length > 0) {
+                        selectAllCheckbox.checked = true;
+                        selectAllCheckbox.indeterminate = false;
+                    } else if (selectedCheckboxes.length > 0) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = true;
+                    } else {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = false;
+                    }
+                    
+                    console.log(`Selection updated: ${selectedCheckboxes.length} items selected`);
+                }
+                
+                function toggleSelectAll() {
+                    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+                    const checkboxes = document.querySelectorAll('.item-select');
+                    
+                    checkboxes.forEach(checkbox => {
+                        checkbox.checked = selectAllCheckbox.checked;
+                    });
+                    
+                    updateSelectionState();
+                }
+                
+                function getSelectedItems() {
+                    const selectedCheckboxes = document.querySelectorAll('.item-select:checked');
+                    const items = [];
+                    
+                    selectedCheckboxes.forEach(checkbox => {
+                        const fileItem = checkbox.closest('.file-item');
+                        items.push({
+                            type: fileItem.dataset.type,
+                            id: fileItem.dataset.id,
+                            name: fileItem.dataset.name
+                        });
+                    });
+                    
+                    return items;
+                }
+                
+                function clearAllSelections() {
+                    const checkboxes = document.querySelectorAll('.item-select');
+                    checkboxes.forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                    updateSelectionState();
+                }
+                
+                // Delete Functions
+                function showDeleteConfirmation(type, id, name) {
+                    const items = [{type, id, name}];
+                    showDeleteDialog(items);
+                }
+                
+                function deleteSelectedItems() {
+                    const items = getSelectedItems();
+                    if (items.length === 0) return;
+                    showDeleteDialog(items);
+                }
+                
+                function showDeleteDialog(items) {
+                    const deleteDialog = document.getElementById('deleteConfirmationDialog');
+                    const deleteMessage = document.getElementById('deleteMessage');
+                    
+                    pendingDeletion = items;
+                    
+                    let message = '';
+                    const folderCount = items.filter(item => item.type === 'folder').length;
+                    const fileCount = items.filter(item => item.type === 'file').length;
+                    
+                    if (items.length === 1) {
+                        const item = items[0];
+                        message = `Are you sure you want to delete the ${item.type} "<strong>${item.name}</strong>"?`;
+                        if (item.type === 'folder') {
+                            message += ' This will also delete all files and subfolders inside it.';
+                        }
+                    } else {
+                        message = `Are you sure you want to delete the following items?<br><br>`;
+                        if (folderCount > 0) {
+                            message += `• <strong>${folderCount}</strong> folder${folderCount > 1 ? 's' : ''} (including all contents)<br>`;
+                        }
+                        if (fileCount > 0) {
+                            message += `• <strong>${fileCount}</strong> file${fileCount > 1 ? 's' : ''}`;
+                        }
+                    }
+                    
+                    deleteMessage.innerHTML = message;
+                    deleteDialog.style.display = 'flex';
+                }
+                
+                function hideDeleteConfirmation() {
+                    const deleteDialog = document.getElementById('deleteConfirmationDialog');
+                    deleteDialog.style.display = 'none';
+                    pendingDeletion = null;
+                }
+                
+                function confirmDelete() {
+                    if (!pendingDeletion) return;
+                    
+                    const items = pendingDeletion;
+                    hideDeleteConfirmation();
+                    
+                    if (items.length === 1) {
+                        // Single item deletion
+                        const item = items[0];
+                        const deletePromise = item.type === 'folder' ? deleteFolder(item.id) : deleteFile(item.id);
+                        
+                        deletePromise
+                            .then(result => {
+                                if (result.success) {
+                                    window.location.reload();
+                                } else {
+                                    alert('Error deleting item: ' + result.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error deleting item:', error);
+                                alert('Error deleting item');
+                            });
+                    } else {
+                        // Bulk deletion
+                        bulkDeleteItems(items)
+                            .then(result => {
+                                if (result.success) {
+                                    // Clear selections before reload
+                                    clearAllSelections();
+                                    window.location.reload();
+                                } else {
+                                    alert('Error during bulk delete: ' + result.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error during bulk delete:', error);
+                                alert('Error during bulk delete');
+                            });
+                    }
+                }
+                
+                function deleteFolder(folderId) {
+                    const data = {
+                        folderId: folderId
+                    };
+                    
+                    return fetch('/api/folder/delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json());
+                }
+                
+                function deleteFile(fileId) {
+                    const data = {
+                        fileId: fileId
+                    };
+                    
+                    return fetch('/api/file/delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json());
+                }
+                
+                function bulkDeleteItems(items) {
+                    const data = {
+                        items: items
+                    };
+                    
+                    return fetch('/api/bulk/delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json());
+                }
+                
+                // Handle Enter key for dialogs
+                folderNameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        createFolder();
+                    }
+                });
+                
+                renameFolderInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        renameFolder();
+                    }
+                });
+                
+                // Handle dialog click outside to close
+                newFolderDialog.addEventListener('click', (e) => {
+                    if (e.target === newFolderDialog) {
+                        hideNewFolderDialog();
+                    }
+                });
+                
+                renameFolderDialog.addEventListener('click', (e) => {
+                    if (e.target === renameFolderDialog) {
+                        hideRenameDialog();
+                    }
+                });
+                
+                const deleteConfirmationDialog = document.getElementById('deleteConfirmationDialog');
+                deleteConfirmationDialog.addEventListener('click', (e) => {
+                    if (e.target === deleteConfirmationDialog) {
+                        hideDeleteConfirmation();
+                    }
+                });
+                
+                // Add row click functionality
+                document.addEventListener('click', (e) => {
+                    const fileItem = e.target.closest('.file-item');
+                    const folderItem = e.target.closest('.folder-item');
+                    
+                    if (fileItem || folderItem) {
+                        // Don't trigger selection if clicking on delete button, rename button, or checkbox
+                        if (e.target.closest('.delete-btn') || 
+                            e.target.closest('.rename-btn') || 
+                            e.target.type === 'checkbox' ||
+                            e.target.closest('a[href]')) {
+                            return;
+                        }
+                        
+                        // Find the checkbox in this row
+                        const checkbox = (fileItem || folderItem).querySelector('input[type="checkbox"]');
+                        if (checkbox) {
+                            checkbox.checked = !checkbox.checked;
+                            updateSelectionState();
+                        }
                     }
                 });
             </script>
