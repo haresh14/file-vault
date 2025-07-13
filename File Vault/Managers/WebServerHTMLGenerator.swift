@@ -80,7 +80,7 @@ extension WebServerManager {
             let folderIdString = folder.id?.uuidString ?? ""
             let escapedFolderName = folder.displayName.replacingOccurrences(of: "'", with: "\\'")
             folderItems += """
-                <div class="file-item" data-type="folder" data-id="\(folderIdString)" data-name="\(escapedFolderName)">
+                <div class="file-item folder-item" data-type="folder" data-id="\(folderIdString)" data-name="\(escapedFolderName)">
                     <div class="item-checkbox">
                         <input type="checkbox" class="item-select" onchange="updateSelectionState()">
                     </div>
@@ -361,6 +361,28 @@ extension WebServerManager {
                     border-bottom: none;
                 }
                 
+                .file-item.folder-item {
+                    background: linear-gradient(135deg, #f8f9ff 0%, #e8f4fd 100%);
+                    border-left: 4px solid #667eea;
+                    font-weight: 500;
+                }
+                
+                .file-item.folder-item:hover {
+                    background: linear-gradient(135deg, #e8f4fd 0%, #d6eaff 100%);
+                    transform: translateY(-1px);
+                    box-shadow: 0 3px 12px rgba(102, 126, 234, 0.15);
+                }
+                
+                .file-item.folder-item .file-icon {
+                    font-size: 22px;
+                    color: #667eea;
+                }
+                
+                .file-item.folder-item .file-name {
+                    color: #4a5568;
+                    font-weight: 600;
+                }
+                
                 .file-icon {
                     font-size: 20px;
                     margin-right: 12px;
@@ -411,8 +433,8 @@ extension WebServerManager {
                     background: white;
                     border-radius: 16px;
                     width: 90%;
-                    max-width: 500px;
-                    max-height: 90vh;
+                    max-width: 700px;
+                    max-height: 95vh;
                     overflow-y: auto;
                     box-shadow: 0 20px 40px rgba(0,0,0,0.2);
                 }
@@ -1540,10 +1562,11 @@ extension WebServerManager {
                 // Add row click functionality
                 document.addEventListener('click', (e) => {
                     const fileItem = e.target.closest('.file-item');
-                    const folderItem = e.target.closest('.folder-item');
                     
-                    if (fileItem || folderItem) {
-                        // Don't trigger selection if clicking on delete button, rename button, or checkbox
+                    if (fileItem) {
+                        const isFolder = fileItem.classList.contains('folder-item');
+                        
+                        // Don't trigger selection if clicking on action buttons, checkbox, or links
                         if (e.target.closest('.delete-btn') || 
                             e.target.closest('.rename-btn') || 
                             e.target.type === 'checkbox' ||
@@ -1551,8 +1574,13 @@ extension WebServerManager {
                             return;
                         }
                         
-                        // Find the checkbox in this row
-                        const checkbox = (fileItem || folderItem).querySelector('input[type="checkbox"]');
+                        // For folders: don't trigger selection if clicking on the navigable area (.file-info)
+                        if (isFolder && e.target.closest('.file-info')) {
+                            return; // Let the navigation happen without selection
+                        }
+                        
+                        // For files or non-navigable areas of folders: toggle selection
+                        const checkbox = fileItem.querySelector('input[type="checkbox"]');
                         if (checkbox) {
                             checkbox.checked = !checkbox.checked;
                             updateSelectionState();
