@@ -90,6 +90,9 @@ extension WebServerManager {
                         <div class="file-meta">\(itemCount) items</div>
                     </div>
                     <div class="file-actions">
+                        <button class="action-btn download-btn" onclick="event.stopPropagation(); downloadFolder('\(folderIdString)')" title="Download folder as ZIP">
+                            📥
+                        </button>
                         <button class="action-btn rename-btn" onclick="event.stopPropagation(); showRenameDialog('\(folderIdString)', '\(escapedFolderName)')" title="Rename folder">
                             ✏️
                         </button>
@@ -119,6 +122,9 @@ extension WebServerManager {
                         <div class="file-meta">\(fileSize)</div>
                     </div>
                     <div class="file-actions">
+                        <button class="action-btn download-btn" onclick="downloadFile('\(fileIdString)')" title="Download file">
+                            📥
+                        </button>
                         <button class="action-btn delete-btn" onclick="showDeleteConfirmation('file', '\(fileIdString)', '\(escapedFileName)')" title="Delete file">
                             🗑️
                         </button>
@@ -319,6 +325,10 @@ extension WebServerManager {
                 
                 .action-btn:hover {
                     background: rgba(0, 0, 0, 0.1);
+                }
+                
+                .download-btn:hover {
+                    background: rgba(40, 167, 69, 0.2);
                 }
                 
                 .rename-btn:hover {
@@ -1526,6 +1536,17 @@ extension WebServerManager {
                     .then(response => response.json());
                 }
                 
+                // Download Functions
+                function downloadFile(fileId) {
+                    const downloadUrl = `/download/file/${fileId}`;
+                    window.open(downloadUrl, '_blank');
+                }
+                
+                function downloadFolder(folderId) {
+                    const downloadUrl = `/download/folder/${folderId}`;
+                    window.open(downloadUrl, '_blank');
+                }
+                
                 // Handle Enter key for dialogs
                 folderNameInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
@@ -1569,6 +1590,7 @@ extension WebServerManager {
                         // Don't trigger selection if clicking on action buttons, checkbox, or links
                         if (e.target.closest('.delete-btn') || 
                             e.target.closest('.rename-btn') || 
+                            e.target.closest('.download-btn') ||
                             e.target.type === 'checkbox' ||
                             e.target.closest('a[href]')) {
                             return;

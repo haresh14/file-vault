@@ -312,6 +312,12 @@ class WebServerManager: ObservableObject {
         case ("POST", "/api/bulk/delete"):
             print("DEBUG: 🗑️ POST /api/bulk/delete - Bulk deleting items")
             handleBulkDelete(requestData: data, connection: connection)
+        case ("GET", let p) where p.hasPrefix("/download/file/"):
+            print("DEBUG: 📥 GET /download/file/ - Downloading file")
+            handleFileDownload(path: p, connection: connection)
+        case ("GET", let p) where p.hasPrefix("/download/folder/"):
+            print("DEBUG: 📥 GET /download/folder/ - Downloading folder as ZIP")
+            handleFolderDownload(path: p, connection: connection)
         case ("GET", "/status"):
             print("DEBUG: Serving status page")
             serveStatusPage(connection: connection)
@@ -830,6 +836,209 @@ class WebServerManager: ObservableObject {
         }
     }
     
+    // MARK: - Download Handlers
+    
+    private func handleFileDownload(path: String, connection: NWConnection) {
+        print("DEBUG: 📥 handleFileDownload called with path: \(path)")
+        
+        // Extract file ID from path: /download/file/{fileId}
+        let pathComponents = path.components(separatedBy: "/")
+        guard pathComponents.count >= 4,
+              pathComponents[1] == "download",
+              pathComponents[2] == "file",
+              let fileId = UUID(uuidString: pathComponents[3]) else {
+            print("DEBUG: ❌ Invalid file download path: \(path)")
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "Invalid file ID")
+            return
+        }
+        
+        // Find the file
+        let vaultItems = CoreDataManager.shared.fetchAllVaultItems()
+        guard let vaultItem = vaultItems.first(where: { $0.id == fileId }) else {
+            print("DEBUG: ❌ File not found: \(fileId)")
+            sendHTTPResponse(connection: connection, statusCode: 404, body: "File not found")
+            return
+        }
+        
+        // Get file data
+        do {
+            let fileData = try FileStorageManager.shared.loadFile(vaultItem: vaultItem)
+            let fileName = vaultItem.fileName ?? "download"
+            let fileType = vaultItem.fileType ?? "application/octet-stream"
+            
+            print("DEBUG: ✅ Serving file: \(fileName), size: \(fileData.count) bytes, type: \(fileType)")
+            
+            // Send file with proper headers
+            sendFileResponse(
+                connection: connection,
+                data: fileData,
+                fileName: fileName,
+                contentType: fileType
+            )
+            
+        } catch {
+            print("DEBUG: ❌ Error reading file data: \(error)")
+            sendHTTPResponse(connection: connection, statusCode: 500, body: "Error reading file")
+        }
+    }
+    
+    private func handleFolderDownload(path: String, connection: NWConnection) {
+        print("DEBUG: 📥 handleFolderDownload called with path: \(path)")
+        
+        // Extract folder ID from path: /download/folder/{folderId}
+        let pathComponents = path.components(separatedBy: "/")
+        guard pathComponents.count >= 4,
+              pathComponents[1] == "download",
+              pathComponents[2] == "folder",
+              let folderId = UUID(uuidString: pathComponents[3]) else {
+            print("DEBUG: ❌ Invalid folder download path: \(path)")
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "Invalid folder ID")
+            return
+        }
+        
+        // Find the folder
+        guard let folder = CoreDataManager.shared.fetchFolder(by: folderId) else {
+            print("DEBUG: ❌ Folder not found: \(folderId)")
+            sendHTTPResponse(connection: connection, statusCode: 404, body: "Folder not found")
+            return
+        }
+        
+        // Create ZIP file
+        do {
+            let zipData = try createZipFromFolder(folder)
+            let zipFileName = "\(folder.displayName).zip"
+            
+            print("DEBUG: ✅ Created ZIP for folder: \(folder.displayName), size: \(zipData.count) bytes")
+            
+            // Send ZIP file
+            sendFileResponse(
+                connection: connection,
+                data: zipData,
+                fileName: zipFileName,
+                contentType: "application/zip"
+            )
+            
+        } catch {
+            print("DEBUG: ❌ Error creating ZIP: \(error)")
+            sendHTTPResponse(connection: connection, statusCode: 500, body: "Error creating ZIP file")
+        }
+    }
+    
+    private func sendFileResponse(connection: NWConnection, data: Data, fileName: String, contentType: String) {
+        let statusText = HTTPStatusText.text(for: 200)
+        let encodedFileName = fileName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fileName
+        
+        let response = """
+        HTTP/1.1 200 \(statusText)\r
+        Content-Type: \(contentType)\r
+        Content-Length: \(data.count)\r
+        Content-Disposition: attachment; filename="\(encodedFileName)"\r
+        Cache-Control: no-cache\r
+        Connection: close\r
+        \r
+
+        """
+        
+        guard let responseHeaderData = response.data(using: .utf8) else {
+            print("DEBUG: Failed to create response header data")
+            connection.cancel()
+            return
+        }
+        
+        print("DEBUG: Sending file response: \(fileName), size: \(data.count) bytes")
+        
+        // Send headers first
+        connection.send(content: responseHeaderData, completion: .contentProcessed { error in
+            if let error = error {
+                print("DEBUG: Error sending file headers: \(error)")
+                connection.cancel()
+                return
+            }
+            
+            // Then send file data
+            connection.send(content: data, completion: .contentProcessed { error in
+                if let error = error {
+                    print("DEBUG: Error sending file data: \(error)")
+                } else {
+                    print("DEBUG: File sent successfully: \(fileName)")
+                }
+                
+                // Close connection after sending
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
+                    connection.cancel()
+                }
+            })
+        })
+    }
+    
+    private func createZipFromFolder(_ folder: Folder) throws -> Data {
+        // Create a temporary directory for the ZIP operation
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        defer {
+            // Clean up temp directory
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+        
+        // Create folder structure and copy files
+        try createFolderStructure(folder: folder, in: tempDir, relativePath: "")
+        
+        // Create ZIP file
+        let zipFileURL = tempDir.appendingPathComponent("\(folder.displayName).zip")
+        try createZipFile(from: tempDir, to: zipFileURL, excluding: [zipFileURL.lastPathComponent])
+        
+        // Read ZIP data
+        return try Data(contentsOf: zipFileURL)
+    }
+    
+    private func createFolderStructure(folder: Folder, in baseURL: URL, relativePath: String) throws {
+        let folderPath = relativePath.isEmpty ? folder.displayName : "\(relativePath)/\(folder.displayName)"
+        let folderURL = baseURL.appendingPathComponent(folderPath)
+        
+        // Create folder directory
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        
+        // Copy all files in this folder
+        for item in folder.itemsArray {
+            let fileData = try FileStorageManager.shared.loadFile(vaultItem: item)
+            let fileName = item.fileName ?? "unknown"
+            let fileURL = folderURL.appendingPathComponent(fileName)
+            try fileData.write(to: fileURL)
+        }
+        
+        // Recursively handle subfolders
+        for subfolder in folder.subfoldersArray {
+            try createFolderStructure(folder: subfolder, in: baseURL, relativePath: folderPath)
+        }
+    }
+    
+    private func createZipFile(from sourceURL: URL, to destinationURL: URL, excluding excludeFiles: [String] = []) throws {
+        // Use the built-in Archive functionality
+        let fileManager = FileManager.default
+        let coordinator = NSFileCoordinator()
+        var error: NSError?
+        
+        coordinator.coordinate(readingItemAt: sourceURL, options: [.forUploading], error: &error) { (zipURL) in
+            do {
+                // Copy the automatically created zip to our destination
+                if fileManager.fileExists(atPath: zipURL.path) {
+                    try fileManager.copyItem(at: zipURL, to: destinationURL)
+                } else {
+                    // Fallback: create a simple archive by manually writing ZIP structure
+                    // For now, just throw an error if the automatic zip fails
+                    throw FileStorageError.importFailed
+                }
+            } catch {
+                print("DEBUG: Error in ZIP creation: \(error)")
+            }
+        }
+        
+        if let error = error {
+            throw error
+        }
+    }
+    
     // MARK: - Helper Methods
     
     private func extractJSONFromRequest(requestData: Data) -> Data? {
@@ -1048,8 +1257,6 @@ extension WebServerManager {
         print("DEBUG: End boundary string: '--\(boundary)--'")
         
         var parts: [MultipartPart] = []
-        var searchRange = data.startIndex..<data.endIndex
-        var partIndex = 0
         
         // Find all boundary positions first
         var boundaryPositions: [Range<Data.Index>] = []
