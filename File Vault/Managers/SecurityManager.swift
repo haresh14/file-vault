@@ -14,6 +14,7 @@ class SecurityManager: ObservableObject {
     
     @Published var isScreenshotProtectionEnabled = true
     @Published var isRecordingProtectionEnabled = true
+    @Published var isJailbreakProtectionEnabled = true
     
     private var overlayWindow: UIWindow?
     private var isProtectionActive = false
@@ -21,6 +22,7 @@ class SecurityManager: ObservableObject {
     private init() {
         setupScreenshotProtection()
         setupRecordingProtection()
+        setupJailbreakProtection()
     }
     
     // MARK: - Screenshot Protection
@@ -55,6 +57,17 @@ class SecurityManager: ObservableObject {
             name: UIScreen.capturedDidChangeNotification,
             object: nil
         )
+    }
+    
+    private func setupJailbreakProtection() {
+        // Perform jailbreak detection on app launch
+        DispatchQueue.global(qos: .userInitiated).async {
+            if self.isJailbreakProtectionEnabled && JailbreakDetectionManager.shared.isDeviceJailbroken() {
+                DispatchQueue.main.async {
+                    JailbreakDetectionManager.shared.handleJailbreakDetection()
+                }
+            }
+        }
     }
     
     @objc private func userDidTakeScreenshot() {
@@ -193,6 +206,21 @@ class SecurityManager: ObservableObject {
         
         if !enabled {
             hideRecordingProtection()
+        }
+    }
+    
+    func enableJailbreakProtection(_ enabled: Bool) {
+        isJailbreakProtectionEnabled = enabled
+        
+        if enabled {
+            // Perform immediate jailbreak check
+            DispatchQueue.global(qos: .userInitiated).async {
+                if JailbreakDetectionManager.shared.isDeviceJailbroken() {
+                    DispatchQueue.main.async {
+                        JailbreakDetectionManager.shared.handleJailbreakDetection()
+                    }
+                }
+            }
         }
     }
     

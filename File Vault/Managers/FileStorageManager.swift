@@ -22,7 +22,7 @@ class FileStorageManager {
     private let thumbnailsDirectory: URL
     
     // Encryption key derived from user's passcode
-    private var encryptionKey: SymmetricKey?
+    internal var encryptionKey: SymmetricKey?
     
     // MARK: - Helper Functions
     

@@ -102,12 +102,17 @@ struct SettingsView: View {
                     securityManager.enableRecordingProtection(newValue)
                 }
             
+            Toggle("Jailbreak Protection", isOn: $securityManager.isJailbreakProtectionEnabled)
+                .onChange(of: securityManager.isJailbreakProtectionEnabled) { newValue in
+                    securityManager.enableJailbreakProtection(newValue)
+                }
+            
             VStack(alignment: .leading, spacing: 5) {
                 Text("Enhanced Protection")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
-                Text("Protects your vault contents from screenshots and screen recording attempts.")
+                Text("Protects your vault contents from screenshots, screen recording, and jailbroken devices.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

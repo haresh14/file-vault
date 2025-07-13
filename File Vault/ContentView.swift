@@ -92,6 +92,9 @@ struct ContentView: View {
     }
     
     private func handleOnAppear() {
+        // Perform jailbreak detection first
+        performJailbreakCheck()
+        
         isPasswordSet = KeychainManager.shared.isPasswordSet()
         isAuthTypeSet = KeychainManager.shared.isAuthenticationTypeSet()
         
@@ -115,6 +118,21 @@ struct ContentView: View {
         // If password is set but not authenticated, check if we should show biometric
         if isPasswordSet && !isAuthenticated {
             checkBiometricAuthentication()
+        }
+    }
+    
+    private func performJailbreakCheck() {
+        // Perform comprehensive security check in background
+        DispatchQueue.global(qos: .userInitiated).async {
+            if SecurityManager.shared.isJailbreakProtectionEnabled {
+                let securityResult = AntiTamperingManager.shared.performSecurityCheck()
+                
+                if !securityResult.isSecure {
+                    DispatchQueue.main.async {
+                        AntiTamperingManager.shared.handleSecurityThreats(securityResult)
+                    }
+                }
+            }
         }
     }
     
