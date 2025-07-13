@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import BackgroundTasks
 
 @main
 struct File_VaultApp: App {
@@ -16,6 +17,10 @@ struct File_VaultApp: App {
         WindowGroup {
             ContentView()
                 .environment(\.managedObjectContext, coreDataManager.context)
+                .onAppear {
+                    // Initialize WebServerManager to register background tasks
+                    _ = WebServerManager.shared
+                }
         }
     }
 }

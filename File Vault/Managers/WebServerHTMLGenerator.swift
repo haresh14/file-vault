@@ -1061,7 +1061,7 @@ extension WebServerManager {
                     uploadSpinner.style.display = 'block';
                     uploadSuccessIcon.style.display = 'none';
                     uploadProgressText.textContent = 'Uploading files...';
-                    uploadProgressDetail.textContent = 'Preparing upload...';
+                    uploadProgressDetail.textContent = 'Keep the File Vault app open during upload...';
                     uploadProgressPercentage.style.display = 'none';
                 }
                 
@@ -1179,10 +1179,20 @@ extension WebServerManager {
                             hideProgress();
                             resetUploadButton();
                             hideUploadOverlay();
-                            showStatus('Upload failed: Network error', true);
+                            showStatus('Upload failed: Network error. Please check your connection and try again.', true);
+                        });
+                        
+                        xhr.addEventListener('timeout', () => {
+                            hideProgress();
+                            resetUploadButton();
+                            hideUploadOverlay();
+                            showStatus('Upload timed out. Please try uploading smaller files or check your connection.', true);
                         });
                         
                         xhr.open('POST', '/upload', true);
+                        
+                        // Set longer timeout for large file uploads (5 minutes)
+                        xhr.timeout = 300000;
                         
                         // Also send folder ID in header as backup
                         if (currentFolderId && currentFolderId !== '') {

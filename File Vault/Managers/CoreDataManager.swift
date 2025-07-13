@@ -16,13 +16,27 @@ class CoreDataManager {
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "FileVault")
         
-        // Enable encryption for Core Data
-        let storeDescription = container.persistentStoreDescriptions.first
-        storeDescription?.setOption(FileProtectionType.complete as NSObject, forKey: NSPersistentStoreFileProtectionKey)
+        // Configure store description
+        if let storeDescription = container.persistentStoreDescriptions.first {
+            // Use a less restrictive file protection level that allows Core Data to work properly
+            storeDescription.setOption(FileProtectionType.completeUntilFirstUserAuthentication as NSObject, 
+                                     forKey: NSPersistentStoreFileProtectionKey)
+            
+            // Set store URL to ensure it's in the correct location
+            let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let storeURL = documentsDirectory.appendingPathComponent("FileVault.sqlite")
+            storeDescription.url = storeURL
+            
+            print("DEBUG: Core Data store URL: \(storeURL.path)")
+        }
         
-        container.loadPersistentStores { _, error in
+        container.loadPersistentStores { storeDescription, error in
             if let error = error as NSError? {
+                print("DEBUG: Core Data store loading failed: \(error), \(error.userInfo)")
+                print("DEBUG: Store description: \(storeDescription)")
                 fatalError("Unresolved error \(error), \(error.userInfo)")
+            } else {
+                print("DEBUG: Core Data store loaded successfully at: \(storeDescription.url?.path ?? "unknown")")
             }
         }
         

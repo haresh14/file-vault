@@ -9,6 +9,8 @@ import Foundation
 import Network
 import CoreData
 import SwiftUI
+import BackgroundTasks
+import UIKit
 
 class WebServerManager: ObservableObject {
     static let shared = WebServerManager()
@@ -20,8 +22,13 @@ class WebServerManager: ObservableObject {
     private var listener: NWListener?
     private var connections: [NWConnection] = []
     private let serverPort = 8080
+    private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
+    private var activeUploads: Set<String> = []
     
-    private init() {}
+    private init() {
+        setupBackgroundTaskSupport()
+        setupAppLifecycleObservers()
+    }
     
     func startServer() {
         print("DEBUG: startServer called")
@@ -81,6 +88,8 @@ class WebServerManager: ObservableObject {
         connections.forEach { $0.cancel() }
         connections.removeAll()
         
+        endBackgroundTask()
+        
         DispatchQueue.main.async {
             self.isRunning = false
             self.serverURL = ""
@@ -88,6 +97,78 @@ class WebServerManager: ObservableObject {
         }
         
         print("DEBUG: Web server stopped")
+    }
+    
+    // MARK: - Background Task Support
+    
+    private func setupBackgroundTaskSupport() {
+        // Register background task identifier
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.haresh.FileVault.upload-processing", using: nil) { task in
+            self.handleBackgroundUploadTask(task as! BGProcessingTask)
+        }
+    }
+    
+    private func setupAppLifecycleObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func appWillEnterBackground() {
+        if isRunning && !activeUploads.isEmpty {
+            startBackgroundTask()
+        }
+    }
+    
+    @objc private func appDidBecomeActive() {
+        // Background processing is no longer needed when app is active
+        endBackgroundTask()
+    }
+    
+    private func startBackgroundTask() {
+        endBackgroundTask() // End any existing task
+        
+        backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(withName: "WebServerUpload") {
+            // This block is called when the background time is about to expire
+            print("DEBUG: Background task time expiring, ending gracefully")
+            self.endBackgroundTask()
+        }
+        
+        print("DEBUG: Started background task for web server uploads")
+    }
+    
+    private func endBackgroundTask() {
+        if backgroundTaskIdentifier != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+            backgroundTaskIdentifier = .invalid
+            print("DEBUG: Ended background task")
+        }
+    }
+    
+    private func handleBackgroundUploadTask(_ task: BGProcessingTask) {
+        task.expirationHandler = {
+            task.setTaskCompleted(success: false)
+        }
+        
+        // Keep the server running for background uploads
+        if !isRunning {
+            startServer()
+        }
+        
+        // Complete the task when uploads are done
+        DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
+            task.setTaskCompleted(success: true)
+        }
     }
     
     // MARK: - Connection Handling
@@ -414,6 +495,15 @@ class WebServerManager: ObservableObject {
         print("DEBUG: 🔄 handleFileUpload called with data size: \(requestData.count)")
         print("DEBUG: 🔄 Starting file upload processing...")
         
+        // Generate unique upload ID for tracking
+        let uploadId = UUID().uuidString
+        activeUploads.insert(uploadId)
+        
+        // Start background task if app is backgrounded
+        if UIApplication.shared.applicationState != .active {
+            startBackgroundTask()
+        }
+        
         // Find the end of HTTP headers (double CRLF)
         let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
         guard let headerEndRange = requestData.range(of: headerEndMarker) else {
@@ -564,6 +654,14 @@ class WebServerManager: ObservableObject {
         }
         """
         sendHTTPResponse(connection: connection, statusCode: statusCode, contentType: "application/json", body: response)
+        
+        // Clean up upload tracking
+        activeUploads.remove(uploadId)
+        
+        // End background task if no more active uploads
+        if activeUploads.isEmpty {
+            endBackgroundTask()
+        }
         
         // Notify UI to refresh with more comprehensive notifications
         DispatchQueue.main.async {

@@ -401,9 +401,10 @@
 				DEVELOPMENT_TEAM = AYL8H487NP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use Face ID to unlock your secure vault";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save photos and videos to your photo library";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Access your photo library to import photos and videos into your secure vault";
+				INFOPLIST_KEY_UIBackgroundModes = "background-fetch background-processing";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -434,9 +435,10 @@
 				DEVELOPMENT_TEAM = AYL8H487NP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use Face ID to unlock your secure vault";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save photos and videos to your photo library";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Access your photo library to import photos and videos into your secure vault";
+				INFOPLIST_KEY_UIBackgroundModes = "background-fetch background-processing";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

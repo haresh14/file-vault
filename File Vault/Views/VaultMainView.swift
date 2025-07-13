@@ -286,15 +286,15 @@ struct VaultMainView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "folder.badge.plus")
+            Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 80))
                 .foregroundColor(.gray)
             
-            Text("No Files")
+            Text("No Media Files")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Add photos, videos, documents, and other files to see them here")
+            Text("Add photos and videos to see them here in your gallery")
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -304,10 +304,11 @@ struct VaultMainView: View {
     // MARK: - Functions
     
     private func loadVaultItems() {
-        let items = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
-        vaultItems = items
+        let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
+        // Filter to only show photos and videos in the Gallery
+        vaultItems = allItems.filter { $0.isImage || $0.isVideo }
         
-        // Items loaded successfully from all folders
+        // Items loaded successfully from all folders (photos and videos only)
     }
     
     private func toggleSelection(for item: VaultItem) {
