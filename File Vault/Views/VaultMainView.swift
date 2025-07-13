@@ -9,6 +9,7 @@ import SwiftUI
 import PhotosUI
 import Photos
 import AVFoundation
+import UniformTypeIdentifiers
 
 enum SortOption: String, CaseIterable {
     case userDefault = "User Default"
@@ -36,6 +37,7 @@ enum SortOption: String, CaseIterable {
 struct VaultMainView: View {
 
     @State private var showPhotoPicker = false
+    @State private var showDocumentPicker = false
     @State private var isImporting = false
     @State private var importProgress: Double = 0
     @State private var vaultItems: [VaultItem] = []
@@ -187,6 +189,11 @@ struct VaultMainView: View {
                     importAssets(assets)
                 }
             }
+            .sheet(isPresented: $showDocumentPicker) {
+                DocumentPickerView { dataArray in
+                    importDocuments(dataArray)
+                }
+            }
             .sheet(isPresented: $showWebUpload) {
                 WebUploadView()
             }
@@ -215,12 +222,16 @@ struct VaultMainView: View {
                         showAddActionSheet = false
                         showPhotoPicker = true
                     },
+                    onAddFiles: {
+                        showAddActionSheet = false
+                        showDocumentPicker = true
+                    },
                     onWebUpload: {
                         showAddActionSheet = false
                         showWebUpload = true
                     }
                 )
-                .presentationDetents([.fraction(0.3)])
+                .presentationDetents([.fraction(0.4)])
                 .presentationDragIndicator(.visible)
             }
             .overlay(
@@ -275,15 +286,15 @@ struct VaultMainView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "photo.on.rectangle.angled")
+            Image(systemName: "folder.badge.plus")
                 .font(.system(size: 80))
                 .foregroundColor(.gray)
             
-            Text("No Media Files")
+            Text("No Files")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Add photos and videos to see them here from all your folders")
+            Text("Add photos, videos, documents, and other files to see them here")
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -308,21 +319,61 @@ struct VaultMainView: View {
     }
     
     private func viewItem(_ item: VaultItem) {
-        if item.isImage {
-            // Show photo viewer for images - but now use unified viewer
-            if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
-                mediaViewerIndex = index
-                showUnifiedMediaViewer = true
-            }
-        } else if item.isVideo {
-            // Show video player for videos - but now use unified viewer
+        if item.isImage || item.isVideo {
+            // Show unified viewer for images and videos
             if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
                 mediaViewerIndex = index
                 showUnifiedMediaViewer = true
             }
         } else {
-            // Handle other file types if needed
-            print("Unsupported file type: \(item.fileType ?? "unknown")")
+            // For now, just show an alert for non-media files
+            // TODO: Add document viewer in future update
+            print("Document file tapped: \(item.fileName ?? "unknown") - Preview will be added in future update")
+        }
+    }
+    
+    private func getFileIcon(for item: VaultItem) -> String {
+        if item.isImage {
+            return "photo.fill"
+        } else if item.isVideo {
+            return "video.fill"
+        } else if item.isAudio {
+            return "music.note"
+        } else if item.isDocument {
+            // More specific document icons based on file type
+            guard let fileType = item.fileType?.lowercased() else { return "doc.fill" }
+            
+            if fileType.contains("pdf") {
+                return "doc.richtext.fill"
+            } else if fileType.contains("word") || fileType.contains("doc") {
+                return "doc.text.fill"
+            } else if fileType.contains("excel") || fileType.contains("sheet") {
+                return "tablecells.fill"
+            } else if fileType.contains("powerpoint") || fileType.contains("presentation") {
+                return "rectangle.on.rectangle.angled.fill"
+            } else if fileType.contains("zip") || fileType.contains("rar") || fileType.contains("7z") {
+                return "archivebox.fill"
+            } else if fileType.contains("text") || fileType.contains("txt") {
+                return "doc.plaintext.fill"
+            } else {
+                return "doc.fill"
+            }
+        } else {
+            return "questionmark.circle.fill"
+        }
+    }
+    
+    private func getFileIconColor(for item: VaultItem) -> Color {
+        if item.isImage {
+            return .blue
+        } else if item.isVideo {
+            return .purple
+        } else if item.isAudio {
+            return .green
+        } else if item.isDocument {
+            return .orange
+        } else {
+            return .gray
         }
     }
     
@@ -358,6 +409,46 @@ struct VaultMainView: View {
             }
         }
     }
+    
+    private func importDocuments(_ dataArray: [(Data, String)]) {
+        guard !dataArray.isEmpty else { return }
+        
+        showDocumentPicker = false
+        isImporting = true
+        importProgress = 0
+        
+        let totalItems = Double(dataArray.count)
+        var processedItems = 0.0
+        
+        for (data, fileName) in dataArray {
+            do {
+                let fileType = FileStorageManager.shared.determineFileType(from: fileName)
+                
+                _ = try FileStorageManager.shared.saveFile(
+                    data: data,
+                    fileName: fileName,
+                    fileType: fileType
+                )
+                
+                print("Successfully imported file: \(fileName)")
+                
+            } catch {
+                print("Error importing file \(fileName): \(error)")
+            }
+            
+            DispatchQueue.main.async {
+                processedItems += 1
+                importProgress = processedItems / totalItems
+                
+                if processedItems == totalItems {
+                    isImporting = false
+                    loadVaultItems()
+                }
+            }
+        }
+    }
+    
+
     
     private func moveSelectedItems(to destinationFolder: Folder?) {
         for item in selectedVaultItems {
@@ -407,6 +498,51 @@ struct VaultItemCell: View {
     @State private var isLoadingThumbnail = true
     @State private var isPressed = false
     
+    private func getFileIcon(for item: VaultItem) -> String {
+        if item.isImage {
+            return "photo.fill"
+        } else if item.isVideo {
+            return "video.fill"
+        } else if item.isAudio {
+            return "music.note"
+        } else if item.isDocument {
+            // More specific document icons based on file type
+            guard let fileType = item.fileType?.lowercased() else { return "doc.fill" }
+            
+            if fileType.contains("pdf") {
+                return "doc.richtext.fill"
+            } else if fileType.contains("word") || fileType.contains("doc") {
+                return "doc.text.fill"
+            } else if fileType.contains("excel") || fileType.contains("sheet") {
+                return "tablecells.fill"
+            } else if fileType.contains("powerpoint") || fileType.contains("presentation") {
+                return "rectangle.on.rectangle.angled.fill"
+            } else if fileType.contains("zip") || fileType.contains("rar") || fileType.contains("7z") {
+                return "archivebox.fill"
+            } else if fileType.contains("text") || fileType.contains("txt") {
+                return "doc.plaintext.fill"
+            } else {
+                return "doc.fill"
+            }
+        } else {
+            return "questionmark.circle.fill"
+        }
+    }
+    
+    private func getFileIconColor(for item: VaultItem) -> Color {
+        if item.isImage {
+            return .blue
+        } else if item.isVideo {
+            return .purple
+        } else if item.isAudio {
+            return .green
+        } else if item.isDocument {
+            return .orange
+        } else {
+            return .gray
+        }
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
@@ -426,17 +562,32 @@ struct VaultItemCell: View {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
-                    Image(systemName: item.isVideo ? "video.fill" : "photo.fill")
+                    // Show appropriate icon based on file type
+                    Image(systemName: getFileIcon(for: item))
                         .font(.largeTitle)
-                        .foregroundColor(.gray)
+                        .foregroundColor(getFileIconColor(for: item))
                 }
                 
-                // Video indicator
+                // File type indicator
                 if item.isVideo {
                     VStack {
                         Spacer()
                         HStack {
                             Image(systemName: "video.fill")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(4)
+                                .background(Color.black.opacity(0.6))
+                                .cornerRadius(4)
+                            Spacer()
+                        }
+                        .padding(4)
+                    }
+                } else if item.isDocument || item.isAudio {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Image(systemName: item.isDocument ? "doc.fill" : "music.note")
                                 .font(.caption)
                                 .foregroundColor(.white)
                                 .padding(4)
@@ -788,6 +939,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
 
 struct AddActionSheet: View {
     let onAddPhotos: () -> Void
+    let onAddFiles: () -> Void
     let onWebUpload: () -> Void
     @Environment(\.dismiss) private var dismiss
     @StateObject private var webServer = WebServerManager.shared
@@ -804,6 +956,28 @@ struct AddActionSheet: View {
                                 .frame(width: 20)
                             
                             Text("Add from Photos")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                    
+                    Divider()
+                        .padding(.leading, 60)
+                    
+                    Button(action: onAddFiles) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text("Add from Files")
                                 .font(.body)
                                 .foregroundColor(.primary)
                             
@@ -921,4 +1095,6 @@ struct SortPopupView: View {
         }
     }
 }
+
+
 

@@ -517,7 +517,7 @@ class WebServerManager: ObservableObject {
             if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
                 do {
                     // Determine file type based on extension
-                    let fileType = determineFileType(from: fileName)
+                    let fileType = FileStorageManager.shared.determineFileType(from: fileName)
                     print("DEBUG: Determined file type: \(fileType) for file: \(fileName)")
                     
                     // Save file using FileStorageManager
@@ -1128,56 +1128,7 @@ class WebServerManager: ObservableObject {
         return address
     }
     
-    private func determineFileType(from fileName: String) -> String {
-        let fileExtension = (fileName as NSString).pathExtension.lowercased()
-        
-        switch fileExtension {
-        case "jpg", "jpeg":
-            return "image/jpeg"
-        case "png":
-            return "image/png"
-        case "heic":
-            return "image/heic"
-        case "gif":
-            return "image/gif"
-        case "webp":
-            return "image/webp"
-        case "mp4":
-            return "video/mp4"
-        case "mov":
-            return "video/quicktime"
-        case "m4v":
-            return "video/x-m4v"
-        case "mkv":
-            return "video/x-matroska"
-        case "avi":
-            return "video/x-msvideo"
-        case "webm":
-            return "video/webm"
-        case "flv":
-            return "video/x-flv"
-        case "wmv":
-            return "video/x-ms-wmv"
-        case "3gp":
-            return "video/3gpp"
-        case "pdf":
-            return "application/pdf"
-        case "txt":
-            return "text/plain"
-        case "doc", "docx":
-            return "application/msword"
-        case "mp3":
-            return "audio/mpeg"
-        case "wav":
-            return "audio/wav"
-        case "m4a":
-            return "audio/mp4"
-        case "aac":
-            return "audio/aac"
-        default:
-            return "application/octet-stream"
-        }
-    }
+
 }
 
 // MARK: - HTTP Status Codes

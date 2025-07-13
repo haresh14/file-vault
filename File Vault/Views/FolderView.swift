@@ -7,6 +7,9 @@
 
 import SwiftUI
 import Photos
+import UniformTypeIdentifiers
+
+
 
 enum FolderSortOption: String, CaseIterable {
     case name = "Name"
@@ -40,6 +43,7 @@ struct FolderView: View {
     @State private var showUnifiedMediaViewer = false
     @State private var mediaViewerIndex = 0
     @State private var showPhotoPicker = false
+    @State private var showDocumentPicker = false
     @State private var isImporting = false
     @State private var importProgress: Double = 0
     @State private var showSortActionSheet = false
@@ -225,6 +229,11 @@ struct FolderView: View {
                     importAssets(assets)
                 }
             }
+            .sheet(isPresented: $showDocumentPicker) {
+                DocumentPickerView { dataArray in
+                    importDocuments(dataArray)
+                }
+            }
             .sheet(isPresented: $showSortActionSheet) {
                 FolderSortPopupView(
                     currentSortOption: sortOption,
@@ -250,12 +259,16 @@ struct FolderView: View {
                         showAddActionSheet = false
                         showPhotoPicker = true
                     },
+                    onAddFiles: {
+                        showAddActionSheet = false
+                        showDocumentPicker = true
+                    },
                     onCreateFolder: {
                         showAddActionSheet = false
                         showCreateFolder = true
                     }
                 )
-                .presentationDetents([.fraction(0.3)])
+                .presentationDetents([.fraction(0.4)])
                 .presentationDragIndicator(.visible)
             }
 
@@ -617,6 +630,47 @@ struct FolderView: View {
             }
         }
     }
+    
+    private func importDocuments(_ dataArray: [(Data, String)]) {
+        guard !dataArray.isEmpty else { return }
+        
+        showDocumentPicker = false
+        isImporting = true
+        importProgress = 0
+        
+        let totalItems = Double(dataArray.count)
+        var processedItems = 0.0
+        
+        for (data, fileName) in dataArray {
+            do {
+                let fileType = FileStorageManager.shared.determineFileType(from: fileName)
+                
+                _ = try FileStorageManager.shared.saveFile(
+                    data: data,
+                    fileName: fileName,
+                    fileType: fileType,
+                    targetFolder: currentFolder
+                )
+                
+                print("Successfully imported file: \(fileName)")
+                
+            } catch {
+                print("Error importing file \(fileName): \(error)")
+            }
+            
+            DispatchQueue.main.async {
+                processedItems += 1
+                importProgress = processedItems / totalItems
+                
+                if processedItems == totalItems {
+                    isImporting = false
+                    loadFolders()
+                }
+            }
+        }
+    }
+    
+
 }
 
 // MARK: - Supporting Views
@@ -883,6 +937,7 @@ struct SelectableFileRowView: View {
 
 struct FolderAddActionSheet: View {
     let onAddPhotos: () -> Void
+    let onAddFiles: () -> Void
     let onCreateFolder: () -> Void
     @Environment(\.dismiss) private var dismiss
     
@@ -898,6 +953,28 @@ struct FolderAddActionSheet: View {
                                 .frame(width: 20)
                             
                             Text("Add from Photos")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                    
+                    Divider()
+                        .padding(.leading, 60)
+                    
+                    Button(action: onAddFiles) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .frame(width: 20)
+                            
+                            Text("Add from Files")
                                 .font(.body)
                                 .foregroundColor(.primary)
                             

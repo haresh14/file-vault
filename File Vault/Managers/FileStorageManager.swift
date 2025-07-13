@@ -26,6 +26,61 @@ class FileStorageManager {
     
     // MARK: - Helper Functions
     
+    func determineFileType(from fileName: String) -> String {
+        let fileExtension = (fileName as NSString).pathExtension.lowercased()
+        
+        switch fileExtension {
+        case "jpg", "jpeg":
+            return "image/jpeg"
+        case "png":
+            return "image/png"
+        case "heic", "heif":
+            return "image/heic"
+        case "gif":
+            return "image/gif"
+        case "tiff", "tif":
+            return "image/tiff"
+        case "webp":
+            return "image/webp"
+        case "mp4":
+            return "video/mp4"
+        case "mov":
+            return "video/quicktime"
+        case "m4v":
+            return "video/x-m4v"
+        case "mkv":
+            return "video/x-matroska"
+        case "avi":
+            return "video/x-msvideo"
+        case "webm":
+            return "video/webm"
+        case "flv":
+            return "video/x-flv"
+        case "wmv":
+            return "video/x-ms-wmv"
+        case "3gp":
+            return "video/3gpp"
+        case "mp3":
+            return "audio/mpeg"
+        case "wav":
+            return "audio/wav"
+        case "m4a":
+            return "audio/mp4"
+        case "aac":
+            return "audio/aac"
+        case "pdf":
+            return "application/pdf"
+        case "txt":
+            return "text/plain"
+        case "doc":
+            return "application/msword"
+        case "docx":
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        default:
+            return "application/octet-stream"
+        }
+    }
+    
     private func convertUTIToMimeType(_ uti: String) -> String {
         print("DEBUG: Converting UTI: \(uti)")
         
@@ -160,14 +215,24 @@ class FileStorageManager {
         
         if fileType.hasPrefix("image/") {
             print("DEBUG: Generating image thumbnail...")
-            thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
-            print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
+            do {
+                thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
+                print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
+            } catch {
+                print("DEBUG: Failed to generate image thumbnail: \(error)")
+                // Continue without thumbnail - don't fail the entire import
+            }
         } else if fileType.hasPrefix("video/") {
             print("DEBUG: Generating video thumbnail...")
-            thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
-            print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
+            do {
+                thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
+                print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
+            } catch {
+                print("DEBUG: Failed to generate video thumbnail: \(error)")
+                // Continue without thumbnail - don't fail the entire import
+            }
         } else {
-            print("DEBUG: Skipping thumbnail generation for fileType: \(fileType)")
+            print("DEBUG: Skipping thumbnail generation for non-media fileType: \(fileType)")
         }
         
         // Create Core Data entry using synchronous method for direct calls
@@ -218,14 +283,24 @@ class FileStorageManager {
             
             if fileType.hasPrefix("image/") {
                 print("DEBUG: Generating image thumbnail...")
-                thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
-                print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
+                do {
+                    thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
+                    print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
+                } catch {
+                    print("DEBUG: Failed to generate image thumbnail: \(error)")
+                    // Continue without thumbnail - don't fail the entire import
+                }
             } else if fileType.hasPrefix("video/") {
                 print("DEBUG: Generating video thumbnail...")
-                thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
-                print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
+                do {
+                    thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
+                    print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
+                } catch {
+                    print("DEBUG: Failed to generate video thumbnail: \(error)")
+                    // Continue without thumbnail - don't fail the entire import
+                }
             } else {
-                print("DEBUG: Skipping thumbnail generation for fileType: \(fileType)")
+                print("DEBUG: Skipping thumbnail generation for non-media fileType: \(fileType)")
             }
             
             // Create Core Data entry using background context
