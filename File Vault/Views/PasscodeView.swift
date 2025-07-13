@@ -87,9 +87,6 @@ struct PasscodeView: View {
             .font(.system(size: 60))
             .foregroundColor(.blue)
             .padding(.bottom, 20)
-            #if DEBUG
-            .onLongPressGesture(minimumDuration: 3.0, perform: performDebugReset)
-            #endif
     }
     
     private var titleText: some View {
@@ -363,14 +360,5 @@ struct PasscodeView: View {
             showError = false
         }
     }
-    
-    #if DEBUG
-    private func performDebugReset() {
-        // Resetting app via long press
-        try? KeychainManager.shared.deletePassword()
-        KeychainManager.shared.setBiometricEnabled(false)
-        KeychainManager.shared.clearLastBackgroundTime()
-        exit(0)
-    }
-    #endif
+
 } 
