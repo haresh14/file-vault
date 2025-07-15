@@ -358,6 +358,20 @@ class FileStorageManager {
         CoreDataManager.shared.deleteVaultItem(vaultItem)
     }
     
+    func cleanupFileStorage(vaultItem: VaultItem) {
+        // Delete main file storage only (no Core Data deletion)
+        if let fileName = vaultItem.fileName {
+            let fileURL = vaultDirectory.appendingPathComponent(fileName)
+            try? fileManager.removeItem(at: fileURL)
+        }
+        
+        // Delete thumbnail storage only
+        if let thumbnailFileName = vaultItem.thumbnailFileName {
+            let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
+            try? fileManager.removeItem(at: thumbnailURL)
+        }
+    }
+    
     // MARK: - Encryption/Decryption
     
     private func encryptData(_ data: Data, using key: SymmetricKey) throws -> Data {

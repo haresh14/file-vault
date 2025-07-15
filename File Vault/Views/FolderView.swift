@@ -499,7 +499,7 @@ struct FolderView: View {
     private func performSwipeDelete() {
         for item in itemsToDelete {
             if let folder = item as? Folder {
-                CoreDataManager.shared.deleteFolder(folder)
+                CoreDataManager.shared.deleteFolderCompletely(folder)
             } else if let file = item as? VaultItem {
                 do {
                     try FileStorageManager.shared.deleteFile(vaultItem: file)
@@ -569,9 +569,9 @@ struct FolderView: View {
     }
     
     private func deleteSelectedItems() {
-        // Delete selected folders
+        // Delete selected folders completely (includes file storage cleanup)
         for folder in selectedFolders {
-            CoreDataManager.shared.deleteFolder(folder)
+            CoreDataManager.shared.deleteFolderCompletely(folder)
         }
         
         // Delete selected files

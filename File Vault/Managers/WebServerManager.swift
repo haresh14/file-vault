@@ -782,13 +782,10 @@ class WebServerManager: ObservableObject {
                 return
             }
             
-            // Delete all files in the folder and subfolders
-            deleteAllItemsInFolder(folder)
+            // Delete the folder completely (includes file storage cleanup and Core Data cascade deletion)
+            CoreDataManager.shared.deleteFolderCompletely(folder)
             
-            // Delete the folder itself
-            CoreDataManager.shared.deleteFolder(folder)
-            
-            print("DEBUG: ✅ Deleted folder and all its contents")
+            print("DEBUG: ✅ Deleted folder and all its contents completely")
             sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder deleted successfully")
             
             // Notify UI to refresh
@@ -876,11 +873,8 @@ class WebServerManager: ObservableObject {
                             continue
                         }
                         
-                        // Delete all files in the folder and subfolders
-                        deleteAllItemsInFolder(folder)
-                        
-                        // Delete the folder itself
-                        CoreDataManager.shared.deleteFolder(folder)
+                        // Delete the folder completely (includes file storage cleanup and Core Data cascade deletion)
+                        CoreDataManager.shared.deleteFolderCompletely(folder)
                         deletedCount += 1
                         
                     } else if type == "file" {
@@ -1172,21 +1166,7 @@ class WebServerManager: ObservableObject {
         }
     }
     
-    private func deleteAllItemsInFolder(_ folder: Folder) {
-        // Delete all files in this folder
-        for item in folder.itemsArray {
-            do {
-                try FileStorageManager.shared.deleteFile(vaultItem: item)
-            } catch {
-                print("DEBUG: Error deleting file \(item.fileName ?? "Unknown"): \(error)")
-            }
-        }
-        
-        // Recursively delete all items in subfolders
-        for subfolder in folder.subfoldersArray {
-            deleteAllItemsInFolder(subfolder)
-        }
-    }
+
     
     // MARK: - Utility Methods
     

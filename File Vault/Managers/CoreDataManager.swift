@@ -177,6 +177,27 @@ class CoreDataManager {
         save()
     }
     
+    func deleteFolderCompletely(_ folder: Folder) {
+        // First, clean up file storage for all files in this folder and subfolders
+        cleanupFolderFileStorage(folder)
+        
+        // Then delete the folder (Core Data cascade deletion will handle VaultItems and subfolders)
+        context.delete(folder)
+        save()
+    }
+    
+    private func cleanupFolderFileStorage(_ folder: Folder) {
+        // Clean up file storage for all files in this folder
+        for item in folder.itemsArray {
+            FileStorageManager.shared.cleanupFileStorage(vaultItem: item)
+        }
+        
+        // Recursively clean up storage for all subfolders
+        for subfolder in folder.subfoldersArray {
+            cleanupFolderFileStorage(subfolder)
+        }
+    }
+    
     func fetchRootFolders() -> [Folder] {
         let request: NSFetchRequest<Folder> = Folder.fetchRequest()
         request.predicate = NSPredicate(format: "parent == nil")
