@@ -18,6 +18,7 @@ class WebServerManager: ObservableObject {
     @Published var isRunning = false
     @Published var serverURL: String = ""
     @Published var connectedDevices: [String] = []
+    @Published var isDownloadEnabled = false // Default to disabled
     
     private var listener: NWListener?
     private var connections: [NWConnection] = []
@@ -25,9 +26,13 @@ class WebServerManager: ObservableObject {
     private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
     private var activeUploads: Set<String> = []
     
+    // UserDefaults key for download setting
+    private let downloadEnabledKey = "webServerDownloadEnabled"
+    
     private init() {
         setupBackgroundTaskSupport()
         setupAppLifecycleObservers()
+        loadDownloadSetting()
     }
     
     func startServer() {
@@ -480,7 +485,7 @@ class WebServerManager: ObservableObject {
         }
         
         print("DEBUG: Final currentFolderId being passed to HTML: '\(currentFolderId ?? "nil")'")
-        let html = generateUploadHTML(currentFolderId: currentFolderId)
+        let html = generateUploadHTML(currentFolderId: currentFolderId, downloadEnabled: isDownloadEnabled)
         sendHTTPResponse(connection: connection, statusCode: 200, body: html)
     }
     
@@ -933,6 +938,13 @@ class WebServerManager: ObservableObject {
     private func handleFileDownload(path: String, connection: NWConnection) {
         print("DEBUG: 📥 handleFileDownload called with path: \(path)")
         
+        // Check if downloads are enabled
+        guard isDownloadEnabled else {
+            print("DEBUG: ❌ Downloads are disabled")
+            sendHTTPResponse(connection: connection, statusCode: 403, body: "Downloads are currently disabled")
+            return
+        }
+        
         // Extract file ID from path: /download/file/{fileId}
         let pathComponents = path.components(separatedBy: "/")
         guard pathComponents.count >= 4,
@@ -976,6 +988,13 @@ class WebServerManager: ObservableObject {
     
     private func handleFolderDownload(path: String, connection: NWConnection) {
         print("DEBUG: 📥 handleFolderDownload called with path: \(path)")
+        
+        // Check if downloads are enabled
+        guard isDownloadEnabled else {
+            print("DEBUG: ❌ Downloads are disabled")
+            sendHTTPResponse(connection: connection, statusCode: 403, body: "Downloads are currently disabled")
+            return
+        }
         
         // Extract folder ID from path: /download/folder/{folderId}
         let pathComponents = path.components(separatedBy: "/")
@@ -1206,6 +1225,24 @@ class WebServerManager: ObservableObject {
         return address
     }
     
+    // MARK: - Download Setting Management
+    
+    private func loadDownloadSetting() {
+        let defaults = UserDefaults.standard
+        isDownloadEnabled = defaults.bool(forKey: downloadEnabledKey)
+        print("DEBUG: Loaded download setting: \(isDownloadEnabled)")
+    }
+    
+    private func saveDownloadSetting() {
+        let defaults = UserDefaults.standard
+        defaults.set(isDownloadEnabled, forKey: downloadEnabledKey)
+        print("DEBUG: Saved download setting: \(isDownloadEnabled)")
+    }
+    
+    func setDownloadEnabled(_ enabled: Bool) {
+        isDownloadEnabled = enabled
+        saveDownloadSetting()
+    }
 
 }
 

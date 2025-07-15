@@ -128,6 +128,28 @@ struct WebUploadView: View {
                         }
                     }
                     
+                    // Download Settings
+                    if webServer.isRunning {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Download Settings:")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            
+                            Toggle("Enable Downloads from Web", isOn: Binding(
+                                get: { webServer.isDownloadEnabled },
+                                set: { webServer.setDownloadEnabled($0) }
+                            ))
+                            .toggleStyle(SwitchToggleStyle(tint: .blue))
+                            
+                            Text("When enabled, users can download files from the web interface. Disabled by default for security.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                    
                     // Instructions
                     if webServer.isRunning {
                         VStack(alignment: .leading, spacing: 12) {

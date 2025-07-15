@@ -70,7 +70,7 @@ extension WebServerManager {
         return String(format: "%.1f %@", formattedSize, sizes[i])
     }
     
-    func generateUploadHTML(currentFolderId: String? = nil) -> String {
+    func generateUploadHTML(currentFolderId: String? = nil, downloadEnabled: Bool = false) -> String {
         let (folders, files) = getFolderContents(folderId: currentFolderId)
         let breadcrumbs = generateBreadcrumbs(folderId: currentFolderId)
         
@@ -90,9 +90,11 @@ extension WebServerManager {
                         <div class="file-meta">\(itemCount) items</div>
                     </div>
                     <div class="file-actions">
+                        \(downloadEnabled ? """
                         <button class="action-btn download-btn" onclick="event.stopPropagation(); downloadFolder('\(folderIdString)')" title="Download folder as ZIP">
                             📥
                         </button>
+                        """ : "")
                         <button class="action-btn rename-btn" onclick="event.stopPropagation(); showRenameDialog('\(folderIdString)', '\(escapedFolderName)')" title="Rename folder">
                             ✏️
                         </button>
@@ -122,9 +124,11 @@ extension WebServerManager {
                         <div class="file-meta">\(fileSize)</div>
                     </div>
                     <div class="file-actions">
+                        \(downloadEnabled ? """
                         <button class="action-btn download-btn" onclick="downloadFile('\(fileIdString)')" title="Download file">
                             📥
                         </button>
+                        """ : "")
                         <button class="action-btn delete-btn" onclick="showDeleteConfirmation('file', '\(fileIdString)', '\(escapedFileName)')" title="Delete file">
                             🗑️
                         </button>
