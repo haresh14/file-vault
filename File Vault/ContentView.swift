@@ -55,6 +55,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             handleDidEnterBackground()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TriggerSecurityLock"))) { _ in
+            handleSecurityLockTrigger()
+        }
     }
     
     @ViewBuilder
@@ -262,6 +265,29 @@ struct ContentView: View {
             print("DEBUG: Photo library permission denied or restricted. Please enable it in Settings.")
         @unknown default:
             print("DEBUG: Unknown photo library status.")
+        }
+    }
+    
+    private func handleSecurityLockTrigger() {
+        print("DEBUG: Security lock triggered - locking app")
+        
+        // Only lock if user is currently authenticated
+        if isAuthenticated {
+            isAuthenticated = false
+            
+            // Set background time to ensure authentication is required
+            KeychainManager.shared.setLastBackgroundTime()
+            
+            // Show a brief feedback to user
+            DispatchQueue.main.async {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                impactFeedback.impactOccurred()
+            }
+            
+            // Trigger proper authentication flow
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                checkBiometricAuthentication()
+            }
         }
     }
 }

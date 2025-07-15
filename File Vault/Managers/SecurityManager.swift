@@ -8,19 +8,30 @@
 import Foundation
 import UIKit
 import SwiftUI
+import CoreMotion
 
 class SecurityManager: ObservableObject {
     static let shared = SecurityManager()
     
     @Published var isScreenshotProtectionEnabled = true
     @Published var isRecordingProtectionEnabled = true
+    @Published var isShakeToLockEnabled = false
+    @Published var isFlipToLockEnabled = false
     
     private var overlayWindow: UIWindow?
     private var isProtectionActive = false
     
+    // Motion detection
+    private let motionManager = CMMotionManager()
+    private var lastOrientation: UIDeviceOrientation = .portrait
+    private let shakeThreshold: Double = 2.5
+    private let flipDetectionInterval: TimeInterval = 0.1
+    
     private init() {
+        loadSettings()
         setupScreenshotProtection()
         setupRecordingProtection()
+        setupMotionDetection()
     }
     
     // MARK: - Screenshot Protection
@@ -204,8 +215,138 @@ class SecurityManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "SecurityLogs")
     }
     
+    // MARK: - Settings Management
+    
+    private func loadSettings() {
+        isShakeToLockEnabled = UserDefaults.standard.bool(forKey: "shakeToLockEnabled")
+        isFlipToLockEnabled = UserDefaults.standard.bool(forKey: "flipToLockEnabled")
+    }
+    
+    func enableShakeToLock(_ enabled: Bool) {
+        isShakeToLockEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "shakeToLockEnabled")
+        
+        if enabled {
+            startShakeDetection()
+        } else {
+            stopShakeDetection()
+        }
+    }
+    
+    func enableFlipToLock(_ enabled: Bool) {
+        isFlipToLockEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "flipToLockEnabled")
+        
+        if enabled {
+            startFlipDetection()
+        } else {
+            stopFlipDetection()
+        }
+    }
+    
+    // MARK: - Motion Detection Setup
+    
+    private func setupMotionDetection() {
+        if isShakeToLockEnabled {
+            startShakeDetection()
+        }
+        
+        if isFlipToLockEnabled {
+            startFlipDetection()
+        }
+        
+        // Setup device orientation monitoring
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        lastOrientation = UIDevice.current.orientation
+    }
+    
+    // MARK: - Shake Detection
+    
+    private func startShakeDetection() {
+        guard motionManager.isAccelerometerAvailable else {
+            print("DEBUG: Accelerometer not available for shake detection")
+            return
+        }
+        
+        motionManager.accelerometerUpdateInterval = 0.1
+        motionManager.startAccelerometerUpdates(to: .main) { [weak self] (data, error) in
+            guard let self = self, let accelerometerData = data else { return }
+            
+            let acceleration = accelerometerData.acceleration
+            let magnitude = sqrt(acceleration.x * acceleration.x + 
+                               acceleration.y * acceleration.y + 
+                               acceleration.z * acceleration.z)
+            
+            if magnitude > self.shakeThreshold {
+                print("DEBUG: Shake detected! Magnitude: \(magnitude)")
+                self.triggerSecurityLock(reason: "Shake detected")
+            }
+        }
+        
+        print("DEBUG: Shake detection started")
+    }
+    
+    private func stopShakeDetection() {
+        motionManager.stopAccelerometerUpdates()
+        print("DEBUG: Shake detection stopped")
+    }
+    
+    // MARK: - Flip Detection
+    
+    private func startFlipDetection() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(deviceOrientationDidChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+        print("DEBUG: Flip detection started")
+    }
+    
+    private func stopFlipDetection() {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+        print("DEBUG: Flip detection stopped")
+    }
+    
+    @objc private func deviceOrientationDidChange() {
+        let currentOrientation = UIDevice.current.orientation
+        
+        // Check for face-down flip (most common flip-to-lock gesture)
+        if currentOrientation == .faceDown && lastOrientation != .faceDown {
+            print("DEBUG: Face-down flip detected!")
+            triggerSecurityLock(reason: "Device flipped face-down")
+        }
+        // Check for face-up to face-down flip
+        else if currentOrientation == .faceDown && lastOrientation == .faceUp {
+            print("DEBUG: Face-up to face-down flip detected!")
+            triggerSecurityLock(reason: "Device flipped")
+        }
+        
+        lastOrientation = currentOrientation
+    }
+    
+    // MARK: - Security Lock Trigger
+    
+    private func triggerSecurityLock(reason: String) {
+        print("DEBUG: Security lock triggered - \(reason)")
+        
+        // Log the security event
+        logSecurityEvent(reason)
+        
+        // Post notification to lock the app
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("TriggerSecurityLock"), object: nil)
+        }
+    }
+    
     deinit {
         NotificationCenter.default.removeObserver(self)
+        motionManager.stopAccelerometerUpdates()
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
     }
 }
 

@@ -93,13 +93,23 @@ struct SettingsView: View {
     private var advancedSecuritySection: some View {
         Section("Advanced Security") {
             Toggle("Screenshot Protection", isOn: $securityManager.isScreenshotProtectionEnabled)
-                .onChange(of: securityManager.isScreenshotProtectionEnabled) { newValue in
+                .onChange(of: securityManager.isScreenshotProtectionEnabled) { _, newValue in
                     securityManager.enableScreenshotProtection(newValue)
                 }
             
             Toggle("Screen Recording Protection", isOn: $securityManager.isRecordingProtectionEnabled)
-                .onChange(of: securityManager.isRecordingProtectionEnabled) { newValue in
+                .onChange(of: securityManager.isRecordingProtectionEnabled) { _, newValue in
                     securityManager.enableRecordingProtection(newValue)
+                }
+            
+            Toggle("Shake to Lock", isOn: $securityManager.isShakeToLockEnabled)
+                .onChange(of: securityManager.isShakeToLockEnabled) { _, newValue in
+                    securityManager.enableShakeToLock(newValue)
+                }
+            
+            Toggle("Flip to Lock", isOn: $securityManager.isFlipToLockEnabled)
+                .onChange(of: securityManager.isFlipToLockEnabled) { _, newValue in
+                    securityManager.enableFlipToLock(newValue)
                 }
             
             VStack(alignment: .leading, spacing: 5) {
@@ -107,7 +117,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
-                Text("Protects your vault contents from screenshots and screen recording attempts.")
+                Text("• Screenshot/Recording: Protects vault contents from capture attempts\n• Shake to Lock: Locks app when device is shaken vigorously\n• Flip to Lock: Locks app when device is flipped face-down")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -226,14 +236,14 @@ struct SettingsView: View {
                 Text(timeout.displayName).tag(timeout)
             }
         }
-        .onChange(of: lockTimeout) { newValue in
+        .onChange(of: lockTimeout) { _, newValue in
             KeychainManager.shared.setLockTimeout(newValue)
         }
     }
     
     private var biometricToggle: some View {
         Toggle("Enable Biometric Authentication", isOn: $biometricEnabled)
-            .onChange(of: biometricEnabled) { newValue in
+            .onChange(of: biometricEnabled) { _, newValue in
                 handleBiometricToggle(newValue)
             }
     }
