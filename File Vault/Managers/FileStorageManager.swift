@@ -733,6 +733,81 @@ class FileStorageManager {
     }
 }
 
+// MARK: - File Storage Cleanup
+
+extension FileStorageManager {
+    
+    func clearAllStoredFiles() {
+        print("DEBUG: Clearing all stored files...")
+        
+        let fileManager = FileManager.default
+        
+        // Clear vault directory
+        if fileManager.fileExists(atPath: vaultDirectory.path) {
+            do {
+                // Remove all contents of vault directory
+                let vaultContents = try fileManager.contentsOfDirectory(at: vaultDirectory, includingPropertiesForKeys: nil)
+                for fileURL in vaultContents {
+                    try fileManager.removeItem(at: fileURL)
+                }
+                print("DEBUG: Vault directory contents cleared")
+            } catch {
+                print("ERROR: Failed to clear vault directory: \(error)")
+            }
+        }
+        
+        // Clear thumbnails directory
+        if fileManager.fileExists(atPath: thumbnailsDirectory.path) {
+            do {
+                // Remove all contents of thumbnails directory
+                let thumbnailContents = try fileManager.contentsOfDirectory(at: thumbnailsDirectory, includingPropertiesForKeys: nil)
+                for fileURL in thumbnailContents {
+                    try fileManager.removeItem(at: fileURL)
+                }
+                print("DEBUG: Thumbnails directory contents cleared")
+            } catch {
+                print("ERROR: Failed to clear thumbnails directory: \(error)")
+            }
+        }
+        
+        // Clear encryption key
+        encryptionKey = nil
+        
+        print("DEBUG: All stored files cleared")
+    }
+    
+    func deleteAllStorageDirectories() {
+        print("DEBUG: Deleting all storage directories...")
+        
+        let fileManager = FileManager.default
+        
+        // Delete vault directory completely
+        if fileManager.fileExists(atPath: vaultDirectory.path) {
+            do {
+                try fileManager.removeItem(at: vaultDirectory)
+                print("DEBUG: Vault directory deleted")
+            } catch {
+                print("ERROR: Failed to delete vault directory: \(error)")
+            }
+        }
+        
+        // Delete thumbnails directory completely
+        if fileManager.fileExists(atPath: thumbnailsDirectory.path) {
+            do {
+                try fileManager.removeItem(at: thumbnailsDirectory)
+                print("DEBUG: Thumbnails directory deleted")
+            } catch {
+                print("ERROR: Failed to delete thumbnails directory: \(error)")
+            }
+        }
+        
+        // Clear encryption key
+        encryptionKey = nil
+        
+        print("DEBUG: All storage directories deleted")
+    }
+}
+
 // MARK: - Errors
 
 enum FileStorageError: LocalizedError {

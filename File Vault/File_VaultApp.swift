@@ -18,9 +18,23 @@ struct File_VaultApp: App {
             ContentView()
                 .environment(\.managedObjectContext, coreDataManager.context)
                 .onAppear {
+                    // Check for first launch and perform cleanup if needed
+                    handleFirstLaunchCleanup()
+                    
                     // Initialize WebServerManager to register background tasks
                     _ = WebServerManager.shared
                 }
+        }
+    }
+    
+    private func handleFirstLaunchCleanup() {
+        let appDataManager = AppDataManager.shared
+        
+        if appDataManager.isFirstLaunch {
+            print("DEBUG: 🚀 First app launch detected - performing cleanup...")
+            appDataManager.performFirstLaunchCleanup()
+        } else {
+            print("DEBUG: ✅ Not first launch - no cleanup needed")
         }
     }
 }

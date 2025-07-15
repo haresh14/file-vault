@@ -223,6 +223,19 @@ class CoreDataManager {
         }
     }
     
+    func fetchFolder(by id: UUID) -> Folder? {
+        let request: NSFetchRequest<Folder> = Folder.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        do {
+            return try context.fetch(request).first
+        } catch {
+            print("Error fetching folder by ID: \(error)")
+            return nil
+        }
+    }
+
     func fetchVaultItems(in folder: Folder?) -> [VaultItem] {
         let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
         
@@ -252,6 +265,80 @@ class CoreDataManager {
         } catch {
             print("Error fetching all vault items: \(error)")
             return []
+        }
+    }
+    
+    // MARK: - Data Cleanup
+    
+    func clearAllCoreData() {
+        print("DEBUG: Clearing all Core Data...")
+        
+        // Delete all VaultItems
+        let vaultItemRequest: NSFetchRequest<NSFetchRequestResult> = VaultItem.fetchRequest()
+        let vaultItemDeleteRequest = NSBatchDeleteRequest(fetchRequest: vaultItemRequest)
+        
+        do {
+            try context.execute(vaultItemDeleteRequest)
+            print("DEBUG: All VaultItems deleted")
+        } catch {
+            print("ERROR: Failed to delete VaultItems: \(error)")
+        }
+        
+        // Delete all Folders
+        let folderRequest: NSFetchRequest<NSFetchRequestResult> = Folder.fetchRequest()
+        let folderDeleteRequest = NSBatchDeleteRequest(fetchRequest: folderRequest)
+        
+        do {
+            try context.execute(folderDeleteRequest)
+            print("DEBUG: All Folders deleted")
+        } catch {
+            print("ERROR: Failed to delete Folders: \(error)")
+        }
+        
+        // Save the context to persist deletions
+        save()
+        
+        // Reset the context to ensure it's clean
+        context.reset()
+        
+        print("DEBUG: Core Data cleared and context reset")
+    }
+    
+    func deleteCoreDataStore() {
+        print("DEBUG: Deleting Core Data store files...")
+        
+        guard let storeURL = persistentContainer.persistentStoreDescriptions.first?.url else {
+            print("ERROR: Could not get store URL")
+            return
+        }
+        
+        let coordinator = persistentContainer.persistentStoreCoordinator
+        
+        do {
+            // Remove the persistent store
+            if let store = coordinator.persistentStores.first {
+                try coordinator.remove(store)
+                print("DEBUG: Persistent store removed")
+            }
+            
+            // Delete all Core Data files
+            let fileManager = FileManager.default
+            let storeFiles = [
+                storeURL,
+                storeURL.appendingPathExtension("wal"),
+                storeURL.appendingPathExtension("shm")
+            ]
+            
+            for fileURL in storeFiles {
+                if fileManager.fileExists(atPath: fileURL.path) {
+                    try fileManager.removeItem(at: fileURL)
+                    print("DEBUG: Deleted Core Data file: \(fileURL.lastPathComponent)")
+                }
+            }
+            
+            print("DEBUG: Core Data store files deleted")
+        } catch {
+            print("ERROR: Failed to delete Core Data store: \(error)")
         }
     }
     
@@ -288,18 +375,5 @@ class CoreDataManager {
         folder.name = name
         folder.updatedAt = Date()
         save()
-    }
-    
-    func fetchFolder(by id: UUID) -> Folder? {
-        let request: NSFetchRequest<Folder> = Folder.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-        request.fetchLimit = 1
-        
-        do {
-            return try context.fetch(request).first
-        } catch {
-            print("Error fetching folder by ID: \(error)")
-            return nil
-        }
     }
 } 

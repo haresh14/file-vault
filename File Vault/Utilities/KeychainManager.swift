@@ -221,4 +221,36 @@ class KeychainManager {
     func clearLastBackgroundTime() {
         UserDefaults.standard.removeObject(forKey: lastBackgroundTimeKey)
     }
+    
+    // MARK: - Data Cleanup
+    
+    func clearAllKeychainData() {
+        print("DEBUG: Clearing all keychain data...")
+        
+        // Clear password from keychain
+        try? deletePassword()
+        
+        print("DEBUG: Keychain data cleared")
+    }
+    
+    func clearAllUserDefaultsData() {
+        print("DEBUG: Clearing all UserDefaults data...")
+        
+        // Clear authentication settings
+        UserDefaults.standard.removeObject(forKey: authTypeKey)
+        UserDefaults.standard.removeObject(forKey: biometricEnabledKey)
+        
+        // Clear lock timeout settings
+        UserDefaults.standard.removeObject(forKey: lockTimeoutKey)
+        UserDefaults.standard.removeObject(forKey: lastBackgroundTimeKey)
+        
+        // Clear biometric failure data (from BiometricAuthManager)
+        UserDefaults.standard.removeObject(forKey: "biometricFailureCount")
+        UserDefaults.standard.removeObject(forKey: "lastBiometricFailureTime")
+        
+        // Synchronize to ensure changes are written
+        UserDefaults.standard.synchronize()
+        
+        print("DEBUG: UserDefaults data cleared")
+    }
 } 

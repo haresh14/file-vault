@@ -150,8 +150,15 @@ struct SettingsView: View {
     private var developerSection: some View {
         Section(header: Text("Developer Options")) {
             Button(action: { showResetAlert = true }) {
-                Label("Reset App (Delete All Data)", systemImage: "exclamationmark.triangle")
+                Label("Complete App Reset", systemImage: "exclamationmark.triangle")
                     .foregroundColor(.red)
+            }
+            
+            Button(action: { 
+                performFirstLaunchCleanup() 
+            }) {
+                Label("Simulate First Launch Cleanup", systemImage: "arrow.clockwise")
+                    .foregroundColor(.orange)
             }
             
             Button(action: { showDeleteFilesAlert = true }) {
@@ -159,13 +166,13 @@ struct SettingsView: View {
                     .foregroundColor(.orange)
             }
         }
-        .alert("Reset App", isPresented: $showResetAlert) {
+        .alert("Complete App Reset", isPresented: $showResetAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) {
-                resetApp()
+                performCompleteReset()
             }
         } message: {
-            Text("This will delete all data including your passcode and files. You'll need to set up the app again.")
+            Text("This will completely reset the app to first-launch state. All data including keychain, files, and settings will be deleted.")
         }
         .alert("Delete All Files", isPresented: $showDeleteFilesAlert) {
             Button("Cancel", role: .cancel) { }
@@ -309,6 +316,24 @@ struct SettingsView: View {
         } catch {
             print("Error resetting app: \(error)")
         }
+    }
+    
+    private func performCompleteReset() {
+        print("DEBUG: Developer triggered complete app reset")
+        AppDataManager.shared.performCompleteAppReset()
+        showResetConfirmation = true
+    }
+    
+    private func performFirstLaunchCleanup() {
+        print("DEBUG: Developer triggered first launch cleanup simulation")
+        AppDataManager.shared.clearAllAppData()
+        
+        // Refresh the view and show success
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        }
+        
+        dismiss()
     }
     
     private func performDeleteAllFiles() {
