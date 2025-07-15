@@ -23,11 +23,15 @@ struct ChangeAuthenticationView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(spacing: 30) {
-                if !isCurrentPasswordVerified {
-                    currentPasswordSection
-                } else {
-                    newAuthSelectionSection
+            VStack {
+                Spacer()
+                
+                VStack(spacing: 30) {
+                    if !isCurrentPasswordVerified {
+                        currentPasswordSection
+                    } else {
+                        newAuthSelectionSection
+                    }
                 }
                 
                 Spacer()
@@ -71,7 +75,6 @@ struct ChangeAuthenticationView: View {
             headerSection
             currentPasswordInput
             errorView
-            verifyButton
         }
     }
     
@@ -139,36 +142,11 @@ struct ChangeAuthenticationView: View {
                     }
                 }
             }
+            // For passwords, verification happens on submit (Enter key)
         }
     }
     
-    private var verifyButton: some View {
-        Button(action: verifyCurrentPassword) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.shield")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Verify")
-                    .font(.system(size: 17, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isVerifyButtonEnabled ? Color.blue : Color.gray)
-            )
-        }
-        .disabled(!isVerifyButtonEnabled)
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var isVerifyButtonEnabled: Bool {
-        if currentAuthType.isPasscode, let digitCount = currentAuthType.digitCount {
-            return currentPassword.count == digitCount
-        } else {
-            return !currentPassword.isEmpty
-        }
-    }
+
     
     private var newAuthSelectionSection: some View {
         VStack(spacing: 20) {

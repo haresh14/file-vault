@@ -32,9 +32,13 @@ struct PasscodeSetupView: View {
     }
     
     var body: some View {
-        VStack(spacing: 40) {
-            headerSection
-            passcodeInputSection
+        VStack {
+            Spacer()
+            
+            VStack(spacing: 40) {
+                headerSection
+                passcodeInputSection
+            }
             
             Spacer()
             

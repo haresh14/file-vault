@@ -14,12 +14,16 @@ struct AuthTypeSelectionView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(spacing: 30) {
-                headerSection
+            VStack {
+                Spacer()
                 
-                VStack(spacing: 20) {
-                    selectionCards
-                    continueButton
+                VStack(spacing: 30) {
+                    headerSection
+                    
+                    VStack(spacing: 20) {
+                        selectionCards
+                        continueButton
+                    }
                 }
                 
                 Spacer()

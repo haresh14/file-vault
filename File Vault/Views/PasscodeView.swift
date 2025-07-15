@@ -41,25 +41,27 @@ struct PasscodeView: View {
         ZStack {
             backgroundGradient
             
-            VStack(spacing: 30) {
+            VStack {
                 Spacer()
                 
-                lockIcon
-                if isSettingPasscode {
-                    titleText
-                }
-                subtitleText
-                
-                VStack(spacing: 20) {
-                    passcodeFields
-                    if !isSettingPasscode {
-                        errorView
-                    }
+                VStack(spacing: 30) {
+                    lockIcon
                     if isSettingPasscode {
-                        errorView
-                        actionButton
+                        titleText
                     }
-                    cancelButton
+                    subtitleText
+                    
+                    VStack(spacing: 20) {
+                        passcodeFields
+                        if !isSettingPasscode {
+                            errorView
+                        }
+                        if isSettingPasscode {
+                            errorView
+                            actionButton
+                        }
+                        cancelButton
+                    }
                 }
                 
                 Spacer()
