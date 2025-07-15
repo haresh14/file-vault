@@ -13,6 +13,7 @@ struct PasscodeView: View {
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var showPassword: Bool = false
+    @State private var showRecovery: Bool = false
     @FocusState private var isPasscodeFocused: Bool
     
     let isSettingPasscode: Bool
@@ -55,6 +56,7 @@ struct PasscodeView: View {
                         passcodeFields
                         if !isSettingPasscode {
                             errorView
+                            recoveryButton
                         }
                         if isSettingPasscode {
                             errorView
@@ -71,6 +73,14 @@ struct PasscodeView: View {
             .padding()
         }
         .onAppear(perform: handleOnAppear)
+        .sheet(isPresented: $showRecovery) {
+            AccountRecoveryView {
+                // Recovery completed successfully
+                showRecovery = false
+                passcode = ""
+                showError = false
+            }
+        }
     }
     
     // MARK: - View Components
@@ -239,6 +249,17 @@ struct PasscodeView: View {
                 .foregroundColor(.blue)
             }
             .padding(.bottom, 30)
+        }
+    }
+    
+    @ViewBuilder
+    private var recoveryButton: some View {
+        if !isSettingPasscode && RecoveryManager.shared.hasRecoveryMethodsEnabled() {
+            Button("Forgot Password?") {
+                showRecovery = true
+            }
+            .foregroundColor(.blue)
+            .font(.caption)
         }
     }
     

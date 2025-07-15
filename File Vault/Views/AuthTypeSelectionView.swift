@@ -11,6 +11,7 @@ struct AuthTypeSelectionView: View {
     let onAuthTypeSelected: (AuthenticationType) -> Void
     @State private var selectedType: AuthenticationType = .passcode4
     @State private var navigationPath = NavigationPath()
+    @State private var authSetupComplete = false
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -34,16 +35,28 @@ struct AuthTypeSelectionView: View {
             .navigationDestination(for: AuthenticationType.self) { authType in
                 if authType.isPasscode {
                     PasscodeSetupView(authType: authType, onPasscodeSet: {
-                        onAuthTypeSelected(authType)
+                        navigateToRecoverySetup(authType: authType)
                     }, onCancel: {
                         navigationPath.removeLast()
                     })
                 } else {
                     PasswordSetupView(onPasswordSet: {
-                        onAuthTypeSelected(authType)
+                        navigateToRecoverySetup(authType: authType)
                     }, onCancel: {
                         navigationPath.removeLast()
                     })
+                }
+            }
+            .navigationDestination(for: String.self) { destination in
+                if destination == "recovery_setup" {
+                    RecoverySetupView(
+                        onRecoverySetup: {
+                            completeSetup()
+                        },
+                        onSkip: {
+                            completeSetup()
+                        }
+                    )
                 }
             }
         }
@@ -96,6 +109,18 @@ struct AuthTypeSelectionView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func navigateToRecoverySetup(authType: AuthenticationType) {
+        selectedType = authType
+        authSetupComplete = true
+        navigationPath.append("recovery_setup")
+    }
+    
+    private func completeSetup() {
+        onAuthTypeSelected(selectedType)
     }
 }
 

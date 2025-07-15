@@ -155,7 +155,7 @@ class SecurityManager: ObservableObject {
     
     // MARK: - Security Events
     
-    private func logSecurityEvent(_ event: String) {
+    func logSecurityEvent(_ event: String) {
         let timestamp = Date()
         let logEntry = "\(timestamp): \(event)"
         print("SECURITY LOG: \(logEntry)")
