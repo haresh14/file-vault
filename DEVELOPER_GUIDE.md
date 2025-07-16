@@ -24,40 +24,22 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 
 Since iOS requires explicit user permission for accessing sensitive features, we need to add descriptions for why our app needs these permissions.
 
-### Method 1: Using Xcode's Interface (Recommended for beginners)
+### Setting Up Privacy Permissions
 
-1. **Open the project in Xcode**
+The app needs Face ID permission to work properly.
 
-2. **Select the project settings**:
-   - In the left sidebar (Navigator), click on the blue project icon at the top (named "File Vault")
-   - This opens the project settings in the main editor
+### Method 1: Through Xcode UI
 
-3. **Navigate to Info tab**:
-   - In the main editor, you'll see tabs like "General", "Signing & Capabilities", "Info", etc.
-   - Click on the "Info" tab
-
-4. **Add privacy permissions**:
-   - Look for a section called "Custom iOS Target Properties"
-   - Hover over any existing row and click the "+" button that appears
-   - A dropdown will appear - start typing the permission key name
-   
-5. **Add Face ID permission**:
-   - Click the "+" button
+1. **Select the project**: Click on "File Vault" at the top of the navigator
+2. **Select the target**: Make sure "File Vault" target is selected
+3. **Go to Info tab**: Click on the "Info" tab
+4. **Add Face ID permission**:
+   - Click the "+" button under "Custom iOS Target Properties"
    - Type: `Privacy - Face ID Usage Description`
    - Press Enter
    - In the Value column, type: `File Vault uses Face ID to protect your private photos and videos`
 
-6. **Add Photo Library permission**:
-   - Click the "+" button again
-   - Type: `Privacy - Photo Library Usage Description`
-   - Press Enter
-   - In the Value column, type: `File Vault needs access to your photo library to import photos and videos`
-
-7. **Add Photo Library Add permission**:
-   - Click the "+" button again
-   - Type: `Privacy - Photo Library Additions Usage Description`
-   - Press Enter
-   - In the Value column, type: `File Vault needs permission to save photos and videos to your photo library`
+> **Note**: Photo library permissions are NOT needed! The app uses Apple's secure PHPickerViewController which runs in a separate process and provides photos without requiring any permissions. This is more secure as the app never has direct access to your photo library.
 
 ### Method 2: Direct Info.plist Edit
 
@@ -78,10 +60,6 @@ Since iOS requires explicit user permission for accessing sensitive features, we
    <dict>
        <key>NSFaceIDUsageDescription</key>
        <string>File Vault uses Face ID to protect your private photos and videos</string>
-       <key>NSPhotoLibraryUsageDescription</key>
-       <string>File Vault needs access to your photo library to import photos and videos</string>
-       <key>NSPhotoLibraryAddUsageDescription</key>
-       <string>File Vault needs permission to save photos and videos to your photo library</string>
    </dict>
    </plist>
    ```

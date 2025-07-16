@@ -195,8 +195,8 @@ struct VaultMainView: View {
             }
 
             .sheet(isPresented: $showPhotoPicker) {
-                PhotoPickerView { assets in
-                    importAssets(assets)
+                PhotoPickerView { results in
+                    importAssets(results)
                 }
             }
             .sheet(isPresented: $showDocumentPicker) {
@@ -388,33 +388,135 @@ struct VaultMainView: View {
         }
     }
     
-    private func importAssets(_ assets: [PHAsset]) {
-        guard !assets.isEmpty else { return }
+    private func importAssets(_ results: [PHPickerResult]) {
+        guard !results.isEmpty else { return }
         
         showPhotoPicker = false
         isImporting = true
         importProgress = 0
         
-        let totalItems = Double(assets.count)
+        let totalItems = Double(results.count)
         var processedItems = 0.0
         
-        for asset in assets {
-            FileStorageManager.shared.importFromPhotoLibrary(asset: asset) { result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(_):
-                        // Asset imported successfully
-                        break
-                    case .failure(let error):
-                        print("Error importing asset: \(error)")
+        for result in results {
+            // Handle images
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { image, error in
+                    guard let uiImage = image as? UIImage else {
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                        return
                     }
                     
+                    // Convert UIImage to Data
+                    guard let imageData = uiImage.jpegData(compressionQuality: 1.0) ?? uiImage.pngData() else {
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                        return
+                    }
+                    
+                    let fileName = "IMG_\(Date().timeIntervalSince1970).jpg"
+                    let fileType = "image/jpeg"
+                    
+                    do {
+                        _ = try FileStorageManager.shared.saveFile(
+                            data: imageData,
+                            fileName: fileName,
+                            fileType: fileType
+                        )
+                        
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                    } catch {
+                        print("Error saving image: \(error)")
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                    }
+                }
+            }
+            // Handle videos
+            else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, error in
+                    guard let url = url else {
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                        return
+                    }
+                    
+                    do {
+                        let data = try Data(contentsOf: url)
+                        let fileName = "VID_\(Date().timeIntervalSince1970).mov"
+                        let fileType = "video/quicktime"
+                        
+                        _ = try FileStorageManager.shared.saveFile(
+                            data: data,
+                            fileName: fileName,
+                            fileType: fileType
+                        )
+                        
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                    } catch {
+                        print("Error saving video: \(error)")
+                        DispatchQueue.main.async {
+                            processedItems += 1
+                            self.importProgress = processedItems / totalItems
+                            
+                            if processedItems == totalItems {
+                                self.isImporting = false
+                                self.loadVaultItems()
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Unknown type
+                DispatchQueue.main.async {
                     processedItems += 1
-                    importProgress = processedItems / totalItems
+                    self.importProgress = processedItems / totalItems
                     
                     if processedItems == totalItems {
-                        isImporting = false
-                        loadVaultItems()
+                        self.isImporting = false
+                        self.loadVaultItems()
                     }
                 }
             }
@@ -901,7 +1003,7 @@ struct GalleryFolderPickerView: View {
 // MARK: - Photo Picker
 
 struct PhotoPickerView: UIViewControllerRepresentable {
-    let completion: ([PHAsset]) -> Void
+    let completion: ([PHPickerResult]) -> Void
     @Environment(\.presentationMode) var presentationMode
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
@@ -933,15 +1035,8 @@ struct PhotoPickerView: UIViewControllerRepresentable {
             
             guard !results.isEmpty else { return }
             
-            let identifiers = results.compactMap(\.assetIdentifier)
-            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
-            
-            var assets: [PHAsset] = []
-            fetchResult.enumerateObjects { asset, _, _ in
-                assets.append(asset)
-            }
-            
-            parent.completion(assets)
+            // Instead of trying to fetch PHAssets, pass the results directly
+            parent.completion(results)
         }
     }
 }

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Photos
 
 struct ContentView: View {
     @State private var isAuthenticated = false
@@ -112,8 +111,8 @@ struct ContentView: View {
         
         // ContentView appeared - checking authentication state
         
-        // Request photo library permission
-        requestPhotoLibraryPermission()
+        // No need to request photo library permission when using PHPickerViewController
+        // The system picker handles permissions internally
         
         // If password is set but not authenticated, check if we should show biometric
         if isPasswordSet && !isAuthenticated {
@@ -249,29 +248,6 @@ struct ContentView: View {
         // Setup encryption key for file storage
         if let password = try? KeychainManager.shared.getPassword() {
             FileStorageManager.shared.setupEncryptionKey(from: password)
-        }
-    }
-    
-    private func requestPhotoLibraryPermission() {
-        let photoLibraryStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        
-        switch photoLibraryStatus {
-        case .authorized:
-            print("DEBUG: Photo library permission already granted.")
-        case .limited:
-            print("DEBUG: Photo library permission limited. User can select specific photos.")
-        case .notDetermined:
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-                if status == .authorized || status == .limited {
-                    print("DEBUG: Photo library permission granted (full or limited).")
-                } else {
-                    print("DEBUG: Photo library permission denied or restricted.")
-                }
-            }
-        case .denied, .restricted:
-            print("DEBUG: Photo library permission denied or restricted. Please enable it in Settings.")
-        @unknown default:
-            print("DEBUG: Unknown photo library status.")
         }
     }
     

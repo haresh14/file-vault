@@ -62,10 +62,8 @@ Please refer to our comprehensive [Developer Guide](DEVELOPER_GUIDE.md) which in
 
 ### Quick Setup (Experienced Developers)
 1. Open `File Vault.xcodeproj` in Xcode
-2. Add these privacy keys to Info.plist:
+2. Add Face ID privacy key to Info.plist:
    - `NSFaceIDUsageDescription`
-   - `NSPhotoLibraryUsageDescription`
-   - `NSPhotoLibraryAddUsageDescription`
 3. Build and run (Cmd+R)
 
 ## Security Features
@@ -74,6 +72,7 @@ Please refer to our comprehensive [Developer Guide](DEVELOPER_GUIDE.md) which in
 - **Biometric Authentication**: Optional Face ID/Touch ID support
 - **Auto-lock**: App automatically locks after 30 seconds in background
 - **Core Data Encryption**: Data protection enabled with `FileProtectionType.complete`
+- **Privacy-First Photo Access**: Uses Apple's secure PHPickerViewController which runs out-of-process, ensuring the app never has direct access to your photo library
 
 ## Current Issues (TODO)
 
