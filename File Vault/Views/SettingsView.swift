@@ -47,11 +47,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done", action: { dismiss() })
-                }
-            }
+            // Removed Done button from toolbar
         }
         .alert("Biometric Authentication", isPresented: $showBiometricAlert) {
             Button("OK") { }

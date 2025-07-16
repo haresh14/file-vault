@@ -44,7 +44,7 @@ struct MainTabView: View {
                 .tag(3)
             
             // Settings tab that opens as sheet
-            Color.clear
+            SettingsView()
                 .tabItem {
                     Image(systemName: "gear")
                     Text("Settings")
@@ -52,18 +52,6 @@ struct MainTabView: View {
                 .tag(4)
         }
         .accentColor(.blue)
-        .onChange(of: selectedTab) { oldValue, newValue in
-            if newValue == 4 { // Settings tab
-                showSettings = true
-                // Reset to previous tab to prevent staying on empty settings tab
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    selectedTab = oldValue
-                }
-            }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
     }
 }
 
