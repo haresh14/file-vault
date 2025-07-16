@@ -10,6 +10,13 @@ import SwiftUI
 struct PasswordSetupView: View {
     let onPasswordSet: () -> Void
     let onCancel: (() -> Void)?
+    let isFakePasswordSetup: Bool
+    
+    init(onPasswordSet: @escaping () -> Void, onCancel: (() -> Void)? = nil, isFakePasswordSetup: Bool = false) {
+        self.onPasswordSet = onPasswordSet
+        self.onCancel = onCancel
+        self.isFakePasswordSetup = isFakePasswordSetup
+    }
     
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
@@ -64,11 +71,13 @@ struct PasswordSetupView: View {
     
     private var headerSection: some View {
         VStack(spacing: 16) {
-            Image(systemName: "key.fill")
+            Image(systemName: isFakePasswordSetup ? "theatermasks.fill" : "key.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(isFakePasswordSetup ? .orange : .blue)
             
-            Text("Create a strong password to protect your vault")
+            Text(isFakePasswordSetup ? 
+                 "Create a fake password that shows an empty vault when used" :
+                 "Create a strong password to protect your vault")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -171,7 +180,7 @@ struct PasswordSetupView: View {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 16, weight: .semibold))
-                Text("Set Password")
+                Text(isFakePasswordSetup ? "Set Fake Password" : "Set Password")
                     .font(.system(size: 17, weight: .semibold))
             }
             .foregroundColor(.white)
@@ -217,14 +226,38 @@ struct PasswordSetupView: View {
             return
         }
         
-        // Save password and auth type
-        do {
-            try KeychainManager.shared.savePassword(cleanPassword)
-            KeychainManager.shared.setAuthenticationType(.password)
-            onPasswordSet()
-        } catch {
-            print("ERROR: Failed to save password: \(error)")
-            showError(message: "Failed to save password")
+        if isFakePasswordSetup {
+            // Save fake password
+            do {
+                // Validate fake password is different from main password
+                let mainPassword = try KeychainManager.shared.getPassword()
+                if cleanPassword == mainPassword {
+                    showError(message: "Fake password must be different from your main password")
+                    password = ""
+                    confirmPassword = ""
+                    return
+                }
+                
+                try KeychainManager.shared.saveFakePassword(cleanPassword)
+                onPasswordSet()
+            } catch KeychainError.duplicateEntry {
+                showError(message: "Fake password must be different from your main password")
+                password = ""
+                confirmPassword = ""
+            } catch {
+                print("ERROR: Failed to save fake password: \(error)")
+                showError(message: "Failed to save fake password")
+            }
+        } else {
+            // Save regular password and auth type
+            do {
+                try KeychainManager.shared.savePassword(cleanPassword)
+                KeychainManager.shared.setAuthenticationType(.password)
+                onPasswordSet()
+            } catch {
+                print("ERROR: Failed to save password: \(error)")
+                showError(message: "Failed to save password")
+            }
         }
     }
     

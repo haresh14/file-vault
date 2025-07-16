@@ -16,8 +16,13 @@ struct SettingsView: View {
     @State private var lockTimeout = KeychainManager.shared.getLockTimeout()
     @State private var showBiometricAlert = false
     @State private var showChangeAuthSheet = false
-    @State private var showChangeAuthConfirmation = false
+    @State private var showFakePasswordSheet = false
+    @State private var showFakePasswordAlert = false
+    @State private var fakePasswordAlertMessage = ""
+    @State private var showAuthChangeAlert = false
+    @State private var isFakePasswordSet = false
     @StateObject private var securityManager = SecurityManager.shared
+    @StateObject private var loginStateManager = LoginStateManager.shared
     @State private var storageInfo: (fileCount: Int, usedSpace: Int64) = (0, 0)
     
     private var currentAuthType: AuthenticationType {
@@ -27,14 +32,16 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                securitySection
-                advancedSecuritySection
-                lockBehaviorSection
-                infoSection
-                
-                #if DEBUG
-                developerSection
-                #endif
+                if loginStateManager.canAccessFullSettings {
+                    securitySection
+                    advancedSecuritySection
+                    lockBehaviorSection
+                    infoSection
+                    
+                    #if DEBUG
+                    developerSection
+                    #endif
+                }
                 
                 aboutSection
             }
@@ -60,18 +67,73 @@ struct SettingsView: View {
             ChangeAuthenticationView(
                 currentAuthType: currentAuthType,
                 onAuthChanged: {
-                    showChangeAuthConfirmation = true
                     showChangeAuthSheet = false
+                    
+                    // If fake password is set, remove it and show alert
+                    if KeychainManager.shared.isFakePasswordSet() {
+                        // Remove fake password in background
+                        do {
+                            try KeychainManager.shared.deleteFakePassword()
+                            isFakePasswordSet = false
+                            print("DEBUG: Fake password automatically removed due to auth method change")
+                        } catch {
+                            print("DEBUG: Failed to remove fake password: \(error)")
+                        }
+                        
+                        // Show alert to inform user
+                        showAuthChangeAlert = true
+                    }
                 }
             )
         }
-        .alert("Authentication Changed", isPresented: $showChangeAuthConfirmation) {
+        .alert("Fake Password Removed", isPresented: $showAuthChangeAlert) {
+            Button("Set New Fake Password") {
+                showFakePasswordSheet = true
+            }
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Your authentication method has changed. The fake password has been automatically removed for security. You can set a new fake password matching the new authentication format if needed.")
+        }
+        .alert("Fake Password", isPresented: $showFakePasswordAlert) {
             Button("OK") { }
         } message: {
-            Text("Your authentication method has been updated successfully.")
+            Text(fakePasswordAlertMessage)
+        }
+        .sheet(isPresented: $showFakePasswordSheet) {
+            NavigationView {
+                if currentAuthType.isPasscode {
+                    PasscodeSetupView(
+                        authType: currentAuthType,
+                        onPasscodeSet: {
+                            showFakePasswordSheet = false
+                            isFakePasswordSet = true
+                            fakePasswordAlertMessage = "Fake passcode set successfully."
+                            showFakePasswordAlert = true
+                        },
+                        onCancel: {
+                            showFakePasswordSheet = false
+                        },
+                        isFakePasswordSetup: true
+                    )
+                } else {
+                    PasswordSetupView(
+                                                    onPasswordSet: {
+                                showFakePasswordSheet = false
+                                isFakePasswordSet = true
+                                fakePasswordAlertMessage = "Fake password set successfully."
+                                showFakePasswordAlert = true
+                            },
+                        onCancel: {
+                            showFakePasswordSheet = false
+                        },
+                        isFakePasswordSetup: true
+                    )
+                }
+            }
         }
         .onAppear {
             loadStorageInfo()
+            isFakePasswordSet = KeychainManager.shared.isFakePasswordSet()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
             loadStorageInfo()
@@ -84,6 +146,42 @@ struct SettingsView: View {
         Section("Security") {
             authenticationInfoView
             changeAuthButton
+            
+            // Fake Password Settings
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Fake Password")
+                    Spacer()
+                    Text(isFakePasswordSet ? "Set" : "Not Set")
+                        .foregroundColor(isFakePasswordSet ? .green : .secondary)
+                        .font(.caption)
+                }
+                
+                Text("Create a decoy password that shows an empty vault when used")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            
+            Button(action: { showFakePasswordSheet = true }) {
+                HStack {
+                    Text(isFakePasswordSet ? "Change Fake Password" : "Set Fake Password")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
+            }
+            .foregroundColor(.primary)
+            
+            if isFakePasswordSet {
+                Button(action: { 
+                    removeFakePassword()
+                }) {
+                    Text("Remove Fake Password")
+                        .foregroundColor(.red)
+                }
+            }
+            
             lockTimeoutPicker
             biometricToggle
             biometricStatusView
@@ -385,6 +483,18 @@ struct SettingsView: View {
             DispatchQueue.main.async {
                 self.storageInfo = info
             }
+        }
+    }
+    
+    private func removeFakePassword() {
+        do {
+            try KeychainManager.shared.deleteFakePassword()
+            isFakePasswordSet = false
+            fakePasswordAlertMessage = "Fake password removed successfully."
+            showFakePasswordAlert = true
+        } catch {
+            fakePasswordAlertMessage = "Failed to remove fake password."
+            showFakePasswordAlert = true
         }
     }
     

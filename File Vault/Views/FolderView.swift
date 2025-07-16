@@ -60,8 +60,13 @@ struct FolderView: View {
     @State private var itemsToDelete: [Any] = []
     
     @Environment(\.managedObjectContext) var context
+    @StateObject private var loginStateManager = LoginStateManager.shared
     
     var sortedFolders: [Folder] {
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        
         let sorted: [Folder]
         
         switch sortOption {
@@ -80,6 +85,10 @@ struct FolderView: View {
     }
     
     var sortedFiles: [VaultItem] {
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        
         let sorted: [VaultItem]
         
         switch sortOption {
@@ -109,7 +118,7 @@ struct FolderView: View {
                     }
                     
                     // Content
-                    if folders.isEmpty && files.isEmpty {
+                    if loginStateManager.shouldShowEmptyVault || (folders.isEmpty && files.isEmpty) {
                         VStack {
                             emptyStateView
                                 .padding(.top, 80)
@@ -158,15 +167,17 @@ struct FolderView: View {
                             exitSelectionMode()
                         }
                     } else {
-                        Button(action: { showAddActionSheet = true }) {
-                            Image(systemName: "plus")
+                        if loginStateManager.canAddFiles {
+                            Button(action: { showAddActionSheet = true }) {
+                                Image(systemName: "plus")
+                            }
                         }
                         
                         Button(action: { showSortActionSheet = true }) {
                             Image(systemName: "arrow.up.arrow.down")
                         }
                         
-                        if !folders.isEmpty || !files.isEmpty {
+                        if (!folders.isEmpty || !files.isEmpty) && loginStateManager.canAddFiles {
                             Button("Select") {
                                 enterSelectionMode()
                             }
@@ -346,27 +357,46 @@ struct FolderView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: currentFolder == nil ? "folder.badge.plus" : "folder")
-                .font(.system(size: 80))
-                .foregroundColor(.gray)
-            
-            Text(currentFolder == nil ? "No Folders Yet" : "Empty Folder")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text(currentFolder == nil ? "Create folders to organize your files" : "Add files or create subfolders to organize your content")
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Button(action: { showCreateFolder = true }) {
-                Text("Create Folder")
+            if loginStateManager.shouldShowEmptyVault {
+                // Fake login empty state
+                Image(systemName: "folder.badge.questionmark")
+                    .font(.system(size: 80))
+                    .foregroundColor(.gray)
+                
+                Text("No Content")
+                    .font(.title2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: 200)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(10)
+                
+                Text("This vault appears to be empty")
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else {
+                // Regular empty state
+                Image(systemName: currentFolder == nil ? "folder.badge.plus" : "folder")
+                    .font(.system(size: 80))
+                    .foregroundColor(.gray)
+                
+                Text(currentFolder == nil ? "No Folders Yet" : "Empty Folder")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                
+                Text(currentFolder == nil ? "Create folders to organize your files" : "Add files or create subfolders to organize your content")
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                if loginStateManager.canCreateFolders {
+                    Button(action: { showCreateFolder = true }) {
+                        Text("Create Folder")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: 200)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                }
             }
         }
     }

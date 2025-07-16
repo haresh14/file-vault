@@ -46,6 +46,7 @@ class KeychainManager {
     
     private let service = "com.filevault.app"
     private let passwordKey = "userPassword"
+    private let fakePasswordKey = "fakePassword"
     private let biometricEnabledKey = "biometricEnabled"
     private let authTypeKey = "authenticationType"
     
@@ -123,6 +124,106 @@ class KeychainManager {
             return true
         } catch {
             return false
+        }
+    }
+    
+    // MARK: - Fake Password Management
+    
+    func saveFakePassword(_ password: String) throws {
+        guard let passwordData = password.data(using: .utf8) else {
+            throw KeychainError.invalidData
+        }
+        
+        // Validate that fake password is different from main password
+        if let mainPassword = try? getPassword(), mainPassword == password {
+            throw KeychainError.duplicateEntry
+        }
+        
+        // Delete any existing fake password first
+        try? deleteFakePassword()
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: fakePasswordKey,
+            kSecValueData as String: passwordData,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        
+        let status = SecItemAdd(query as CFDictionary, nil)
+        
+        guard status == errSecSuccess else {
+            throw KeychainError.unknown(status)
+        }
+    }
+    
+    func getFakePassword() throws -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: fakePasswordKey,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnData as String: true
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        
+        guard status == errSecSuccess else {
+            if status == errSecItemNotFound {
+                throw KeychainError.noPassword
+            }
+            throw KeychainError.unknown(status)
+        }
+        
+        guard let data = result as? Data,
+              let password = String(data: data, encoding: .utf8) else {
+            throw KeychainError.invalidData
+        }
+        
+        return password
+    }
+    
+    func deleteFakePassword() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: fakePasswordKey
+        ]
+        
+        let status = SecItemDelete(query as CFDictionary)
+        
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unknown(status)
+        }
+    }
+    
+    func isFakePasswordSet() -> Bool {
+        do {
+            _ = try getFakePassword()
+            return true
+        } catch {
+            return false
+        }
+    }
+    
+    func validatePassword(_ inputPassword: String) -> (isValid: Bool, isFakeLogin: Bool) {
+        do {
+            let mainPassword = try getPassword()
+            if inputPassword == mainPassword {
+                return (true, false)
+            }
+            
+            if isFakePasswordSet() {
+                let fakePassword = try getFakePassword()
+                if inputPassword == fakePassword {
+                    return (true, true)
+                }
+            }
+            
+            return (false, false)
+        } catch {
+            return (false, false)
         }
     }
     
@@ -229,6 +330,9 @@ class KeychainManager {
         
         // Clear password from keychain
         try? deletePassword()
+        
+        // Clear fake password from keychain
+        try? deleteFakePassword()
         
         print("DEBUG: Keychain data cleared")
     }

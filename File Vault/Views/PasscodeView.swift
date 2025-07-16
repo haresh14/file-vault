@@ -326,19 +326,19 @@ struct PasscodeView: View {
     }
     
     private func handleAuthentication() {
-        do {
-            let savedPasscode = try KeychainManager.shared.getPassword()
-            if passcode == savedPasscode {
-                KeychainManager.shared.clearLastBackgroundTime()
-                onAuthenticated()
-            } else {
-                let type = isPasswordType ? "password" : "passcode"
-                showError(message: "Incorrect \(type)")
-                passcode = ""
-            }
-        } catch {
+        let validation = KeychainManager.shared.validatePassword(passcode)
+        
+        if validation.isValid {
+            KeychainManager.shared.clearLastBackgroundTime()
+            
+            // Set login state based on whether it's fake login or not
+            LoginStateManager.shared.setLoginState(isFakeLogin: validation.isFakeLogin)
+            
+            onAuthenticated()
+        } else {
             let type = isPasswordType ? "password" : "passcode"
-            showError(message: "No \(type) set")
+            showError(message: "Incorrect \(type)")
+            passcode = ""
         }
     }
     
@@ -346,6 +346,10 @@ struct PasscodeView: View {
         BiometricAuthManager.shared.authenticateWithBiometrics(reason: "Unlock your vault") { success, error in
             if success {
                 KeychainManager.shared.clearLastBackgroundTime()
+                
+                // Biometric authentication is always real login (not fake)
+                LoginStateManager.shared.setLoginState(isFakeLogin: false)
+                
                 onAuthenticated()
             } else if let error = error {
                 // User cancelled or biometric failed, show passcode field

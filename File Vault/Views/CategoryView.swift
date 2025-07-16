@@ -42,22 +42,36 @@ enum CategoryType: String, CaseIterable {
 
 struct CategoryView: View {
     @State private var allVaultItems: [VaultItem] = []
+    @StateObject private var loginStateManager = LoginStateManager.shared
 
     @Environment(\.managedObjectContext) var context
     
     var photoItems: [VaultItem] {
-        allVaultItems.filter { $0.isImage }
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        return allVaultItems.filter { $0.isImage }
     }
     
     var videoItems: [VaultItem] {
-        allVaultItems.filter { $0.isVideo }
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        return allVaultItems.filter { $0.isVideo }
     }
     
     var documentItems: [VaultItem] {
-        allVaultItems.filter { $0.isDocument }
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        return allVaultItems.filter { $0.isDocument }
     }
     
     private func getItemCount(for categoryType: CategoryType) -> Int {
+        if loginStateManager.shouldShowEmptyVault {
+            return 0
+        }
+        
         switch categoryType {
         case .photos:
             return photoItems.count
@@ -71,6 +85,10 @@ struct CategoryView: View {
     }
     
     private func getItems(for categoryType: CategoryType) -> [VaultItem] {
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        
         switch categoryType {
         case .photos:
             return photoItems

@@ -55,6 +55,7 @@ struct VaultMainView: View {
     @State private var sortOption: SortOption = .userDefault
     @State private var sortAscending: Bool = true
     @StateObject private var webServer = WebServerManager.shared
+    @StateObject private var loginStateManager = LoginStateManager.shared
     
     @Environment(\.managedObjectContext) var context
     
@@ -63,6 +64,10 @@ struct VaultMainView: View {
     ]
     
     var filteredItems: [VaultItem] {
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
+        
         let items = searchText.isEmpty ? vaultItems : vaultItems.filter { item in
             item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
         }
@@ -90,6 +95,9 @@ struct VaultMainView: View {
     }
     
     var filteredImages: [VaultItem] {
+        if loginStateManager.shouldShowEmptyVault {
+            return []
+        }
         return filteredItems.filter { $0.isImage }
     }
     
@@ -166,15 +174,17 @@ struct VaultMainView: View {
                             hasTriggeredSelectionHaptic = false
                         }
                     } else {
-                        Button(action: { showAddActionSheet = true }) {
-                            Image(systemName: "plus")
+                        if loginStateManager.canAddFiles {
+                            Button(action: { showAddActionSheet = true }) {
+                                Image(systemName: "plus")
+                            }
                         }
                         
                         Button(action: { showSortActionSheet = true }) {
                             Image(systemName: "arrow.up.arrow.down")
                         }
                         
-                        if !vaultItems.isEmpty {
+                        if !vaultItems.isEmpty && loginStateManager.canAddFiles {
                             Button("Select") {
                                 isSelectionMode = true
                                 selectedVaultItems.removeAll()

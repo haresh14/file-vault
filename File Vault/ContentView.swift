@@ -144,6 +144,10 @@ struct ContentView: View {
             isAuthenticated = false
             isCheckingBiometric = false
             shouldShowPasscode = false
+            
+            // Reset login state when authentication is required
+            LoginStateManager.shared.resetLoginState()
+            
             print("DEBUG: App coming to foreground, requires authentication")
             
             // Check biometric when coming from background
@@ -186,6 +190,9 @@ struct ContentView: View {
                             isAuthenticated = true
                             isCheckingBiometric = false
                             // Biometric authentication successful
+                            
+                            // Biometric authentication is always real login (not fake)
+                            LoginStateManager.shared.setLoginState(isFakeLogin: false)
                             
                             // Setup encryption key for file storage
                             if let password = try? KeychainManager.shared.getPassword() {
@@ -274,6 +281,9 @@ struct ContentView: View {
         // Only lock if user is currently authenticated
         if isAuthenticated {
             isAuthenticated = false
+            
+            // Reset login state when app is locked
+            LoginStateManager.shared.resetLoginState()
             
             // Set background time to ensure authentication is required
             KeychainManager.shared.setLastBackgroundTime()

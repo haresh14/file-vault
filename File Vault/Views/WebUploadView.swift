@@ -10,6 +10,7 @@ import Network
 
 struct WebUploadView: View {
     @StateObject private var webServer = WebServerManager.shared
+    @StateObject private var loginStateManager = LoginStateManager.shared
     @State private var showQRCode = false
     @State private var showInstructions = false
     
@@ -84,17 +85,40 @@ struct WebUploadView: View {
                     
                     // Control Buttons
                     VStack(spacing: 12) {
-                        Button(action: toggleServer) {
-                            HStack {
-                                Image(systemName: webServer.isRunning ? "stop.circle" : "play.circle")
-                                Text(webServer.isRunning ? "Stop Server" : "Start Server")
+                        if loginStateManager.isFakeLogin {
+                            VStack(spacing: 8) {
+                                Button(action: {}) {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle")
+                                        Text("Server Disabled")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.gray)
+                                    .cornerRadius(12)
+                                }
+                                .disabled(true)
+                                
+                                Text("Web server is not available in this mode")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(webServer.isRunning ? Color.red : Color.green)
-                            .cornerRadius(12)
+                        } else {
+                            Button(action: toggleServer) {
+                                HStack {
+                                    Image(systemName: webServer.isRunning ? "stop.circle" : "play.circle")
+                                    Text(webServer.isRunning ? "Stop Server" : "Start Server")
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(webServer.isRunning ? Color.red : Color.green)
+                                .cornerRadius(12)
+                            }
                         }
                         
                         if webServer.isRunning {

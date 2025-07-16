@@ -11,6 +11,14 @@ struct PasscodeSetupView: View {
     let authType: AuthenticationType
     let onPasscodeSet: () -> Void
     let onCancel: (() -> Void)?
+    let isFakePasswordSetup: Bool
+    
+    init(authType: AuthenticationType, onPasscodeSet: @escaping () -> Void, onCancel: (() -> Void)? = nil, isFakePasswordSetup: Bool = false) {
+        self.authType = authType
+        self.onPasscodeSet = onPasscodeSet
+        self.onCancel = onCancel
+        self.isFakePasswordSetup = isFakePasswordSetup
+    }
     
     @State private var passcode: String = ""
     @State private var confirmPasscode: String = ""
@@ -87,7 +95,9 @@ struct PasscodeSetupView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.blue)
             
-            Text(isConfirming ? "Re-enter your \(digitCount)-digit passcode" : "Create a \(digitCount)-digit passcode to protect your vault")
+            Text(isConfirming ? 
+                 "Re-enter your \(digitCount)-digit \(isFakePasswordSetup ? "fake " : "")passcode" : 
+                 "Create a \(digitCount)-digit \(isFakePasswordSetup ? "fake " : "")passcode\(isFakePasswordSetup ? " that shows an empty vault when used" : " to protect your vault")")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -154,14 +164,38 @@ struct PasscodeSetupView: View {
             return
         }
         
-        // Save passcode and auth type
-        do {
-            try KeychainManager.shared.savePassword(passcode)
-            KeychainManager.shared.setAuthenticationType(authType)
-            onPasscodeSet()
-        } catch {
-            print("ERROR: Failed to save passcode: \(error)")
-            showError(message: "Failed to save passcode")
+        if isFakePasswordSetup {
+            // Save fake passcode
+            do {
+                // Validate fake passcode is different from main passcode
+                let mainPassword = try KeychainManager.shared.getPassword()
+                if passcode == mainPassword {
+                    showError(message: "Fake passcode must be different from your main passcode")
+                    passcode = ""
+                    confirmPasscode = ""
+                    return
+                }
+                
+                try KeychainManager.shared.saveFakePassword(passcode)
+                onPasscodeSet()
+            } catch KeychainError.duplicateEntry {
+                showError(message: "Fake passcode must be different from your main passcode")
+                passcode = ""
+                confirmPasscode = ""
+            } catch {
+                print("ERROR: Failed to save fake passcode: \(error)")
+                showError(message: "Failed to save fake passcode")
+            }
+        } else {
+            // Save regular passcode and auth type
+            do {
+                try KeychainManager.shared.savePassword(passcode)
+                KeychainManager.shared.setAuthenticationType(authType)
+                onPasscodeSet()
+            } catch {
+                print("ERROR: Failed to save passcode: \(error)")
+                showError(message: "Failed to save passcode")
+            }
         }
     }
     
