@@ -33,11 +33,29 @@ enum FolderSortOption: String, CaseIterable {
 }
 
 struct FolderView: View {
+    @State private var navigationPath = NavigationPath()
+    @StateObject private var loginStateManager = LoginStateManager.shared
+    @Environment(\.managedObjectContext) var context
+
+    var body: some View {
+        NavigationStack(path: $navigationPath) {
+            FolderContentView(
+                folder: nil,
+                navigationPath: $navigationPath
+            )
+            .navigationTitle("Folders")
+            .navigationBarTitleDisplayMode(.large)
+        }
+    }
+}
+
+struct FolderContentView: View {
+    let folder: Folder?
+    @Binding var navigationPath: NavigationPath
     @State private var folders: [Folder] = []
     @State private var files: [VaultItem] = []
     @State private var showCreateFolder = false
     @State private var newFolderName = ""
-    @State private var currentFolder: Folder? = nil
     @State private var showRenameFolder = false
     @State private var folderToRename: Folder? = nil
     @State private var renameText = ""
@@ -49,7 +67,6 @@ struct FolderView: View {
     @State private var importProgress: Double = 0
     @State private var showSortActionSheet = false
     @State private var showAddActionSheet = false
-
     @State private var sortOption: FolderSortOption = .name
     @State private var sortAscending: Bool = true
     @State private var isSelectionMode = false
@@ -59,17 +76,14 @@ struct FolderView: View {
     @State private var showSwipeDeleteAlert = false
     @State private var showMoveSheet = false
     @State private var itemsToDelete: [Any] = []
-    
-    @Environment(\.managedObjectContext) var context
     @StateObject private var loginStateManager = LoginStateManager.shared
-    
+    @Environment(\.managedObjectContext) var context
+
     var sortedFolders: [Folder] {
         if loginStateManager.shouldShowEmptyVault {
             return []
         }
-        
         let sorted: [Folder]
-        
         switch sortOption {
         case .name:
             sorted = folders.sorted { ($0.name ?? "") < ($1.name ?? "") }
@@ -78,20 +92,16 @@ struct FolderView: View {
         case .size:
             sorted = folders.sorted { $0.totalItemCount < $1.totalItemCount }
         case .kind:
-            // For folders, kind sorting is same as name since they're all folders
             sorted = folders.sorted { ($0.name ?? "") < ($1.name ?? "") }
         }
-        
         return sortAscending ? sorted : sorted.reversed()
     }
-    
+
     var sortedFiles: [VaultItem] {
         if loginStateManager.shouldShowEmptyVault {
             return []
         }
-        
         let sorted: [VaultItem]
-        
         switch sortOption {
         case .name:
             sorted = files.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
@@ -102,224 +112,199 @@ struct FolderView: View {
         case .kind:
             sorted = files.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
-        
         return sortAscending ? sorted : sorted.reversed()
     }
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                VStack(spacing: 0) {
-                    // Breadcrumb navigation
-                    if currentFolder != nil {
-                        breadcrumbView
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                            .background(Color(.systemGray6))
-                    }
-                    
-                    // Content
-                    if loginStateManager.shouldShowEmptyVault || (folders.isEmpty && files.isEmpty) {
-                        VStack {
-                            emptyStateView
-                                .padding(.top, 80)
-                            Spacer()
-                        }
-                    } else {
-                        folderContentView
-                    }
-                }
-                
 
-            }
-            .navigationTitle(currentFolder?.displayName ?? "Folders")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if isSelectionMode {
-                        Button("Select All") {
-                            selectAllItems()
-                        }
-                    } else if currentFolder != nil {
-                        Button(action: { navigateBack() }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                Text("Back")
-                            }
-                        }
-                    }
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                if folder != nil {
+                    breadcrumbView
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray6))
                 }
-                
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if isSelectionMode {
-                        if !selectedFolders.isEmpty || !selectedFiles.isEmpty {
-                            Button(action: { showMoveSheet = true }) {
-                                Image(systemName: "arrow.up.doc.on.clipboard")
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            Button(action: { showDeleteAlert = true }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        
-                        Button("Cancel") {
-                            exitSelectionMode()
-                        }
-                    } else {
-                        if loginStateManager.canAddFiles {
-                            Button(action: { showAddActionSheet = true }) {
-                                Image(systemName: "plus")
-                            }
-                        }
-                        
-                        Button(action: { showSortActionSheet = true }) {
-                            Image(systemName: "arrow.up.arrow.down")
-                        }
-                        
-                        if (!folders.isEmpty || !files.isEmpty) && loginStateManager.canAddFiles {
-                            Button("Select") {
-                                enterSelectionMode()
-                            }
-                        }
+                if loginStateManager.shouldShowEmptyVault || (folders.isEmpty && files.isEmpty) {
+                    VStack {
+                        emptyStateView
+                            .padding(.top, 80)
+                        Spacer()
                     }
+                } else {
+                    folderContentView
                 }
             }
-            .onAppear {
+        }
+        .navigationTitle(folder?.displayName ?? "Folders")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                if isSelectionMode {
+                    Button("Select All") {
+                        selectAllItems()
+                    }
+                } else {
+                    EmptyView()
+                }
+            }
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if isSelectionMode {
+                    if !selectedFolders.isEmpty || !selectedFiles.isEmpty {
+                        Button(action: { showMoveSheet = true }) {
+                            Image(systemName: "arrow.up.doc.on.clipboard")
+                                .foregroundColor(.blue)
+                        }
+                        Button(action: { showDeleteAlert = true }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    Button("Cancel") {
+                        exitSelectionMode()
+                    }
+                } else {
+                    if loginStateManager.canAddFiles {
+                        Button(action: { showAddActionSheet = true }) {
+                            Image(systemName: "plus")
+                        }
+                    }
+                    Button(action: { showSortActionSheet = true }) {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    // Always show the Select button, but disable it if there are no items
+                    Button("Select") {
+                        enterSelectionMode()
+                    }
+                    .disabled(folders.isEmpty && files.isEmpty)
+                }
+            }
+        }
+        .onAppear {
+            loadFolders()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+            DispatchQueue.main.async {
                 loadFolders()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
-                DispatchQueue.main.async {
-                    loadFolders()
-                }
+        }
+        .alert("Create Folder", isPresented: $showCreateFolder) {
+            TextField("Folder Name", text: $newFolderName)
+            Button("Cancel", role: .cancel) {
+                newFolderName = ""
             }
-            .alert("Create Folder", isPresented: $showCreateFolder) {
-                TextField("Folder Name", text: $newFolderName)
-                Button("Cancel", role: .cancel) {
-                    newFolderName = ""
-                }
-                Button("Create") {
-                    createFolder()
-                }
-            } message: {
-                Text("Enter a name for the new folder")
+            Button("Create") {
+                createFolder()
             }
-            .alert("Rename Folder", isPresented: $showRenameFolder) {
-                TextField("Folder Name", text: $renameText)
-                Button("Cancel", role: .cancel) {
-                    renameText = ""
-                    folderToRename = nil
-                }
-                Button("Rename") {
-                    renameFolder()
-                }
-            } message: {
-                Text("Enter a new name for the folder")
+        } message: {
+            Text("Enter a name for the new folder")
+        }
+        .alert("Rename Folder", isPresented: $showRenameFolder) {
+            TextField("Folder Name", text: $renameText)
+            Button("Cancel", role: .cancel) {
+                renameText = ""
+                folderToRename = nil
             }
-            .alert("Delete Items", isPresented: $showDeleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
-                    deleteSelectedItems()
-                }
-            } message: {
-                let totalItems = selectedFolders.count + selectedFiles.count
-                return Text("Are you sure you want to delete \(totalItems) item(s)? This action cannot be undone.")
+            Button("Rename") {
+                renameFolder()
             }
-            .alert("Delete Items", isPresented: $showSwipeDeleteAlert) {
-                Button("Cancel", role: .cancel) {
-                    itemsToDelete.removeAll()
-                }
-                Button("Delete", role: .destructive) {
-                    performSwipeDelete()
-                }
-            } message: {
-                Text("Are you sure you want to delete \(itemsToDelete.count) item(s)? This action cannot be undone.")
+        } message: {
+            Text("Enter a new name for the folder")
+        }
+        .alert("Delete Items", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteSelectedItems()
             }
-            .sheet(isPresented: $showPhotoPicker) {
-                PhotoPickerView { results in
-                    importAssets(results)
-                }
+        } message: {
+            let totalItems = selectedFolders.count + selectedFiles.count
+            return Text("Are you sure you want to delete \(totalItems) item(s)? This action cannot be undone.")
+        }
+        .alert("Delete Items", isPresented: $showSwipeDeleteAlert) {
+            Button("Cancel", role: .cancel) {
+                itemsToDelete.removeAll()
             }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPickerView { dataArray in
-                    importDocuments(dataArray)
-                }
+            Button("Delete", role: .destructive) {
+                performSwipeDelete()
             }
-            .sheet(isPresented: $showSortActionSheet) {
-                FolderSortPopupView(
-                    currentSortOption: sortOption,
-                    sortAscending: sortAscending,
-                    onSortSelected: { option in
-                        if option == sortOption {
-                            // Toggle sort direction if same option is selected
-                            sortAscending.toggle()
-                        } else {
-                            // Set new sort option and default to ascending
-                            sortOption = option
-                            sortAscending = true
-                        }
-                        showSortActionSheet = false
+        } message: {
+            Text("Are you sure you want to delete \(itemsToDelete.count) item(s)? This action cannot be undone.")
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            PhotoPickerView { results in
+                importAssets(results)
+            }
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPickerView { dataArray in
+                importDocuments(dataArray)
+            }
+        }
+        .sheet(isPresented: $showSortActionSheet) {
+            FolderSortPopupView(
+                currentSortOption: sortOption,
+                sortAscending: sortAscending,
+                onSortSelected: { option in
+                    if option == sortOption {
+                        sortAscending.toggle()
+                    } else {
+                        sortOption = option
+                        sortAscending = true
                     }
-                )
-                .presentationDetents([.fraction(0.5)])
-                .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $showAddActionSheet) {
-                FolderAddActionSheet(
-                    onAddPhotos: {
-                        showAddActionSheet = false
-                        showPhotoPicker = true
-                    },
-                    onAddFiles: {
-                        showAddActionSheet = false
-                        showDocumentPicker = true
-                    },
-                    onCreateFolder: {
-                        showAddActionSheet = false
-                        showCreateFolder = true
-                    }
-                )
-                .presentationDetents([.fraction(0.4)])
-                .presentationDragIndicator(.visible)
-            }
-
-            .sheet(isPresented: $showMoveSheet) {
-                FolderPickerView(
-                    selectedFolders: selectedFolders,
-                    selectedFiles: selectedFiles,
-                    currentFolder: currentFolder,
-                    onMove: { destinationFolder in
-                        moveSelectedItems(to: destinationFolder)
-                        showMoveSheet = false
-                    }
-                )
-            }
-            .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
-                UnifiedMediaViewerView(
-                    mediaItems: sortedFiles,
-                    initialIndex: mediaViewerIndex
-                )
-            }
-            .overlay(
-                Group {
-                    if isImporting {
-                        ImportProgressView(progress: importProgress)
-                    }
+                    showSortActionSheet = false
+                }
+            )
+            .presentationDetents([.fraction(0.5)])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showAddActionSheet) {
+            FolderAddActionSheet(
+                onAddPhotos: {
+                    showAddActionSheet = false
+                    showPhotoPicker = true
+                },
+                onAddFiles: {
+                    showAddActionSheet = false
+                    showDocumentPicker = true
+                },
+                onCreateFolder: {
+                    showAddActionSheet = false
+                    showCreateFolder = true
+                }
+            )
+            .presentationDetents([.fraction(0.4)])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showMoveSheet) {
+            FolderPickerView(
+                selectedFolders: selectedFolders,
+                selectedFiles: selectedFiles,
+                currentFolder: folder,
+                onMove: { destinationFolder in
+                    moveSelectedItems(to: destinationFolder)
+                    showMoveSheet = false
                 }
             )
         }
+        .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+            UnifiedMediaViewerView(
+                mediaItems: sortedFiles,
+                initialIndex: mediaViewerIndex
+            )
+        }
+        .overlay(
+            Group {
+                if isImporting {
+                    ImportProgressView(progress: importProgress)
+                }
+            }
+        )
     }
-    
-    // MARK: - Views
-    
+
     private var breadcrumbView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // Home button
                 Button(action: {
-                    currentFolder = nil
-                    loadFolders()
+                    navigationPath.removeLast(navigationPath.count)
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "house.fill")
@@ -329,18 +314,16 @@ struct FolderView: View {
                     }
                     .foregroundColor(.blue)
                 }
-                
-                if let currentFolder = currentFolder {
-                    let breadcrumbs = currentFolder.breadcrumbPath
-                    
+                if let folder = folder {
+                    let breadcrumbs = folder.breadcrumbPath
                     ForEach(Array(breadcrumbs.enumerated()), id: \.offset) { index, folder in
                         HStack(spacing: 8) {
                             Image(systemName: "chevron.right")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
                             Button(action: {
-                                navigateToFolder(folder, fromBreadcrumb: true)
+                                let countToRemove = breadcrumbs.count - (index + 1)
+                                navigationPath.removeLast(countToRemove)
                             }) {
                                 Text(folder.displayName)
                                     .font(.caption)
@@ -355,38 +338,31 @@ struct FolderView: View {
             .padding(.horizontal, 4)
         }
     }
-    
+
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             if loginStateManager.shouldShowEmptyVault {
-                // Fake login empty state
                 Image(systemName: "folder.badge.questionmark")
                     .font(.system(size: 80))
                     .foregroundColor(.gray)
-                
                 Text("No Content")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
                 Text("This vault appears to be empty")
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             } else {
-                // Regular empty state
-                Image(systemName: currentFolder == nil ? "folder.badge.plus" : "folder")
+                Image(systemName: folder == nil ? "folder.badge.plus" : "folder")
                     .font(.system(size: 80))
                     .foregroundColor(.gray)
-                
-                Text(currentFolder == nil ? "No Folders Yet" : "Empty Folder")
+                Text(folder == nil ? "No Folders Yet" : "Empty Folder")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
-                Text(currentFolder == nil ? "Create folders to organize your files" : "Add files or create subfolders to organize your content")
+                Text(folder == nil ? "Create folders to organize your files" : "Add files or create subfolders to organize your content")
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
-                
                 if loginStateManager.canCreateFolders {
                     Button(action: { showCreateFolder = true }) {
                         Text("Create Folder")
@@ -401,10 +377,9 @@ struct FolderView: View {
             }
         }
     }
-    
+
     private var folderContentView: some View {
         List {
-            // Folders section
             if !folders.isEmpty {
                 Section("Folders") {
                     ForEach(sortedFolders) { folder in
@@ -416,19 +391,21 @@ struct FolderView: View {
                                 if isSelectionMode {
                                     toggleFolderSelection(folder)
                                 } else {
-                                    navigateToFolder(folder)
+                                    navigationPath.append(folder)
                                 }
                             },
                             onRename: {
                                 startRenaming(folder)
                             }
                         )
+                        .background(
+                            NavigationLink(value: folder, label: { EmptyView() })
+                                .opacity(0)
+                        )
                     }
                     .onDelete(perform: isSelectionMode ? nil : deleteFolders)
                 }
             }
-            
-            // Files section
             if !files.isEmpty {
                 Section("Files") {
                     ForEach(sortedFiles) { file in
@@ -449,27 +426,28 @@ struct FolderView: View {
                 }
             }
         }
+        .navigationDestination(for: Folder.self) { folder in
+            FolderContentView(folder: folder, navigationPath: $navigationPath)
+        }
     }
-    
-    // MARK: - Functions
-    
+
     private func loadFolders() {
-        if let currentFolder = currentFolder {
-            folders = currentFolder.subfoldersArray
-            files = currentFolder.itemsArray
+        if let folder = folder {
+            folders = folder.subfoldersArray
+            files = folder.itemsArray
         } else {
             folders = CoreDataManager.shared.fetchRootFolders()
             files = CoreDataManager.shared.fetchVaultItems(in: nil)
         }
     }
-    
+
     private func createFolder() {
         guard !newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             newFolderName = ""
             return
         }
         
-        let _ = CoreDataManager.shared.createFolder(name: newFolderName, parent: currentFolder)
+        let _ = CoreDataManager.shared.createFolder(name: newFolderName, parent: folder)
         newFolderName = ""
         loadFolders()
     }
@@ -477,15 +455,15 @@ struct FolderView: View {
     private func navigateToFolder(_ folder: Folder, fromBreadcrumb: Bool = false) {
         if fromBreadcrumb {
             // For breadcrumb navigation, always navigate to the clicked folder
-            currentFolder = folder
+            navigationPath.append(folder)
         } else {
-            currentFolder = folder
+            navigationPath.append(folder)
         }
         loadFolders()
     }
     
     private func navigateBack() {
-        currentFolder = currentFolder?.parent
+        navigationPath.removeLast()
         loadFolders()
     }
     
@@ -676,7 +654,7 @@ struct FolderView: View {
                             data: imageData,
                             fileName: fileName,
                             fileType: fileType,
-                            targetFolder: self.currentFolder
+                            targetFolder: self.folder
                         )
                         
                         DispatchQueue.main.async {
@@ -726,7 +704,7 @@ struct FolderView: View {
                             data: data,
                             fileName: fileName,
                             fileType: fileType,
-                            targetFolder: self.currentFolder
+                            targetFolder: self.folder
                         )
                         
                         DispatchQueue.main.async {
@@ -784,7 +762,7 @@ struct FolderView: View {
                     data: data,
                     fileName: fileName,
                     fileType: fileType,
-                    targetFolder: currentFolder
+                    targetFolder: folder
                 )
                 
                 print("Successfully imported file: \(fileName)")
