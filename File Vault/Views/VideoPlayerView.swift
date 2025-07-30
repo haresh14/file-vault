@@ -5,12 +5,17 @@ import AVFoundation
 struct UnifiedMediaViewerView: View {
     let mediaItems: [VaultItem]
     let initialIndex: Int
-    @State private var currentIndex: Int
+    
+    // The currentIndex needs to be optional for .scrollPosition
+    @State private var currentIndex: Int?
+    // Whether horizontal scrolling should be disabled (when zoomed)
+    @State private var isScrollDisabled: Bool = false
     @Environment(\.dismiss) private var dismiss
     
     init(mediaItems: [VaultItem], initialIndex: Int) {
         self.mediaItems = mediaItems
         self.initialIndex = initialIndex
+        // We set the initial value in onAppear
         self._currentIndex = State(initialValue: initialIndex)
     }
     
@@ -19,35 +24,58 @@ struct UnifiedMediaViewerView: View {
             Color.black.ignoresSafeArea()
             
             if !mediaItems.isEmpty {
-                TabView(selection: $currentIndex) {
-                    ForEach(Array(mediaItems.enumerated()), id: \.element.id) { index, item in
-                        Group {
-                            if item.isVideo {
-                                AutoPlayVideoView(vaultItem: item, isActive: currentIndex == index)
-                                    .tag(index)
-                            } else {
-                                ZoomablePhotoView(vaultItem: item)
-                                    .tag(index)
+                // 1. Use a horizontal ScrollView
+                ScrollView(.horizontal, showsIndicators: false) {
+                    // 2. Use a LazyHStack for performance
+                    LazyHStack(spacing: 0) {
+                        ForEach(mediaItems.indices, id: \.self) { index in
+                            let item = mediaItems[index]
+                            let isActive = currentIndex == index
+                            
+                            Group {
+                                if item.isVideo {
+                                    AutoPlayVideoView(
+                                        vaultItem: item,
+                                        isActive: isActive,
+                                        scrollDisabled: $isScrollDisabled
+                                    )
+                                } else {
+                                    ZoomablePhotoView(
+                                        vaultItem: item,
+                                        isActive: isActive,
+                                        scrollDisabled: $isScrollDisabled
+                                    )
+                                }
                             }
+                            // 3. Make each item take the full container width
+                            .containerRelativeFrame(.horizontal)
+                            .id(index) // Set an ID for scrollPosition to track
+                            // Allow horizontal scroll gesture to co-exist with item gestures
                         }
-                        .clipped()
                     }
+                    // 4. This is needed for the scroll target behavior to work correctly
+                    .scrollTargetLayout()
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                // 5. This modifier enables the paging behavior
+                .scrollTargetBehavior(.paging)
+                // 6. This binds the scroll position to your state variable
+                .scrollPosition(id: $currentIndex)
+                // Disable scroll when an item is zoomed in
+                .scrollDisabled(isScrollDisabled)
                 .ignoresSafeArea()
-                .onChange(of: currentIndex) { oldValue, newValue in
-                    // Media index changed
-                }
             }
         }
         .statusBarHidden()
         .onAppear {
+            // Set the initial page
             currentIndex = initialIndex
         }
         .gesture(
-            // Swipe down to close
+            // Swipe-down-to-close should only work when gestures are enabled (not zoomed)
             DragGesture()
                 .onEnded { value in
+                    guard !isScrollDisabled else { return } // Disable when zoomed
+                    // Only trigger dismiss on vertical swipes
                     if value.translation.height > 100 && abs(value.translation.height) > abs(value.translation.width) {
                         dismiss()
                     }
@@ -60,6 +88,7 @@ struct UnifiedMediaViewerView: View {
 struct AutoPlayVideoView: View {
     let vaultItem: VaultItem
     let isActive: Bool
+    @Binding var scrollDisabled: Bool
     @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -83,12 +112,16 @@ struct AutoPlayVideoView: View {
                         CustomVideoPlayerView(player: player)
                             .scaleEffect(scale)
                             .offset(offset)
-                            .gesture(
+                            .simultaneousGesture(
                                 SimultaneousGesture(
                                     MagnificationGesture()
                                         .onChanged { value in
                                             let newScale = lastScale * value
                                             scale = max(newScale, 0.5)
+                                            // Disable paging when zoomed in
+                                            if isActive {
+                                                scrollDisabled = scale > 1.0
+                                            }
                                         }
                                         .onEnded { _ in
                                             lastScale = scale
@@ -121,6 +154,10 @@ struct AutoPlayVideoView: View {
                                         .onEnded { _ in
                                             if scale > 1.0 {
                                                 lastOffset = offset
+                                            }
+                                            if isActive {
+                                                // Re-evaluate scroll disable
+                                                scrollDisabled = scale > 1.0
                                             }
                                         }
                                 )
@@ -173,6 +210,10 @@ struct AutoPlayVideoView: View {
                         } else {
                             player.pause()
                             isPlaying = false
+                            if oldValue {
+                                // Reset when leaving
+                                scrollDisabled = false
+                            }
                         }
                     }
                 } else if isLoading {
@@ -504,6 +545,8 @@ struct PlayerControlsView: View {
 // Zoomable photo component
 struct ZoomablePhotoView: View {
     let vaultItem: VaultItem
+    let isActive: Bool
+    @Binding var scrollDisabled: Bool
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
@@ -511,6 +554,9 @@ struct ZoomablePhotoView: View {
     @State private var image: UIImage?
     @State private var isLoading = true
     @Environment(\.dismiss) private var dismiss
+
+    // Reset zoom when the photo is no longer active
+    @State private var lastIsActive: Bool = true
     
     var body: some View {
         GeometryReader { geometry in
@@ -523,13 +569,16 @@ struct ZoomablePhotoView: View {
                         .aspectRatio(contentMode: .fit)
                         .scaleEffect(scale)
                         .offset(offset)
-                        .gesture(
+                        .simultaneousGesture(
                             SimultaneousGesture(
                                 // Pinch to zoom
                                 MagnificationGesture()
                                     .onChanged { value in
                                         let newScale = lastScale * value
                                         scale = max(newScale, 0.5) // Allow zoom out to 0.5x, no upper limit
+                                        if isActive {
+                                            scrollDisabled = scale > 1.0
+                                        }
                                     }
                                     .onEnded { _ in
                                         lastScale = scale
@@ -540,6 +589,9 @@ struct ZoomablePhotoView: View {
                                                 lastScale = 1.0
                                                 lastOffset = .zero
                                             }
+                                        }
+                                        if isActive {
+                                            scrollDisabled = scale > 1.0
                                         }
                                     },
                                 
@@ -567,6 +619,9 @@ struct ZoomablePhotoView: View {
                                         if scale > 1.0 {
                                             lastOffset = offset
                                         }
+                                        if isActive {
+                                            scrollDisabled = scale > 1.0
+                                        }
                                     }
                             )
                         )
@@ -578,9 +633,11 @@ struct ZoomablePhotoView: View {
                                     offset = .zero
                                     lastScale = 1.0
                                     lastOffset = .zero
+                                    if isActive { scrollDisabled = false }
                                 } else {
                                     scale = 2.0
                                     lastScale = 2.0
+                                    if isActive { scrollDisabled = true }
                                 }
                             }
                         }
@@ -609,6 +666,21 @@ struct ZoomablePhotoView: View {
         }
         .onAppear {
             loadImage()
+            lastIsActive = isActive
+            if isActive { scrollDisabled = false }
+        }
+        .onChange(of: isActive) { oldValue, newValue in
+            if !newValue {
+                // Reset zoom when switching away
+                withAnimation(.spring()) {
+                    scale = 1.0
+                    lastScale = 1.0
+                    offset = .zero
+                    lastOffset = .zero
+                }
+                scrollDisabled = false
+            }
+            lastIsActive = newValue
         }
     }
     
