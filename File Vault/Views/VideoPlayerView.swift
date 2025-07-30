@@ -67,17 +67,95 @@ struct AutoPlayVideoView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
-    
+    @State private var showControls = false
+    @State private var isPlaying = false
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    @State private var playbackRate: Float = 1.0
+
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            if let player = player {
-                VideoPlayer(player: player)
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                if let player = player {
+                    ZStack {
+                        CustomVideoPlayerView(player: player)
+                            .scaleEffect(scale)
+                            .offset(offset)
+                            .gesture(
+                                SimultaneousGesture(
+                                    MagnificationGesture()
+                                        .onChanged { value in
+                                            let newScale = lastScale * value
+                                            scale = max(newScale, 0.5)
+                                        }
+                                        .onEnded { _ in
+                                            lastScale = scale
+                                            if scale <= 1.0 {
+                                                withAnimation(.spring()) {
+                                                    scale = 1.0
+                                                    offset = .zero
+                                                    lastScale = 1.0
+                                                    lastOffset = .zero
+                                                }
+                                            }
+                                        },
+                                    DragGesture()
+                                        .onChanged { value in
+                                            if scale > 1.0 {
+                                                let newOffset = CGSize(
+                                                    width: lastOffset.width + value.translation.width,
+                                                    height: lastOffset.height + value.translation.height
+                                                )
+                                                
+                                                let maxOffsetX = (geometry.size.width * (scale - 1)) / 2
+                                                let maxOffsetY = (geometry.size.height * (scale - 1)) / 2
+                                                
+                                                offset = CGSize(
+                                                    width: min(max(newOffset.width, -maxOffsetX), maxOffsetX),
+                                                    height: min(max(newOffset.height, -maxOffsetY), maxOffsetY)
+                                                )
+                                            }
+                                        }
+                                        .onEnded { _ in
+                                            if scale > 1.0 {
+                                                lastOffset = offset
+                                            }
+                                        }
+                                )
+                            )
+                            .onTapGesture(count: 2) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    if scale > 1.0 {
+                                        scale = 1.0
+                                        offset = .zero
+                                        lastScale = 1.0
+                                        lastOffset = .zero
+                                    } else {
+                                        scale = 2.0
+                                        lastScale = 2.0
+                                    }
+                                }
+                            }
+                        
+                        PlayerControlsView(
+                            player: player,
+                            isPlaying: $isPlaying,
+                            showControls: $showControls,
+                            playbackRate: $playbackRate
+                        )
+                    }
+                    .onTapGesture {
+                        withAnimation {
+                            showControls.toggle()
+                        }
+                    }
                     .ignoresSafeArea()
                     .onAppear {
                         if isActive && !hasLoadedOnce {
-                            player.play()
+                            player.rate = playbackRate
+                            isPlaying = true
                             hasLoadedOnce = true
                         }
                     }
@@ -86,69 +164,43 @@ struct AutoPlayVideoView: View {
                             // Only play if we haven't played before or if the video ended
                             if !hasLoadedOnce || player.currentTime() >= player.currentItem?.duration ?? CMTime.zero {
                                 player.seek(to: .zero)
-                                player.play()
+                                player.rate = playbackRate
                                 hasLoadedOnce = true
                             } else {
-                                player.play()
+                                player.rate = playbackRate
                             }
+                            isPlaying = true
                         } else {
                             player.pause()
+                            isPlaying = false
                         }
                     }
-                    .scaleEffect(scale)
-                    .gesture(
-                        TapGesture(count: 2)
-                            .onEnded {
-                                withAnimation(.spring()) {
-                                    if scale > 1.0 {
-                                        scale = 1.0
-                                    } else {
-                                        scale = 2.0
-                                    }
-                                }
-                            }
-                    )
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { value in
-                                let newScale = lastScale * value
-                                scale = max(newScale, 0.5) // Allow zoom out to 0.5x, no upper limit
-                            }
-                            .onEnded { _ in
-                                lastScale = scale
-                                if scale <= 1.0 {
-                                    withAnimation(.spring()) {
-                                        scale = 1.0
-                                        lastScale = 1.0
-                                    }
-                                }
-                            },
-                    )
-            } else if isLoading {
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-                    
-                    Text("Loading video...")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-            } else if let errorMessage = errorMessage {
-                VStack(spacing: 20) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 50))
-                        .foregroundColor(.red)
-                    
-                    Text("Error loading video")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    Text(errorMessage)
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                } else if isLoading {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                        
+                        Text("Loading video...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                } else if let errorMessage = errorMessage {
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.red)
+                        
+                        Text("Error loading video")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
                 }
             }
         }
@@ -180,12 +232,6 @@ struct AutoPlayVideoView: View {
                     // Configure player item according to Apple best practices
                     playerItem.preferredForwardBufferDuration = 2.0
                     
-                    // Add metadata
-                    let metadata = AVMutableMetadataItem()
-                    metadata.identifier = .commonIdentifierTitle
-                    metadata.value = (vaultItem.fileName ?? "Video") as NSString
-                    playerItem.externalMetadata = [metadata]
-                    
                     // Create player
                     let newPlayer = AVPlayer(playerItem: playerItem)
                     newPlayer.volume = 1.0
@@ -195,7 +241,8 @@ struct AutoPlayVideoView: View {
                     
                     // Auto-play if active
                     if isActive {
-                        newPlayer.play()
+                        newPlayer.rate = playbackRate
+                        isPlaying = true
                         hasLoadedOnce = true
                     }
                     
@@ -238,6 +285,218 @@ struct AutoPlayVideoView: View {
             return "3gp"
         default:
             return "mp4"
+        }
+    }
+}
+
+struct CustomScrubberView: View {
+    @Binding var progress: Double
+    @Binding var isScrubbing: Bool
+    var onScrub: (Double) -> Void
+    
+    @State private var scrubberHeight: CGFloat = 7
+    private let activeScrubberHeight: CGFloat = 14
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let totalWidth = geometry.size.width
+            let progressWidth = totalWidth * CGFloat(progress)
+            
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(height: scrubberHeight)
+                
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: progressWidth, height: scrubberHeight)
+            }
+            .frame(height: 44)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !isScrubbing {
+                            isScrubbing = true
+                        }
+                        let newProgress = min(max(0, value.location.x / totalWidth), 1)
+                        progress = newProgress
+                        onScrub(newProgress)
+                    }
+                    .onEnded { value in
+                        isScrubbing = false
+                    }
+            )
+            .onChange(of: isScrubbing) { oldValue, newValue in
+                withAnimation(.spring()) {
+                    scrubberHeight = newValue ? activeScrubberHeight : 8
+                }
+            }
+        }
+        .frame(height: 44)
+    }
+}
+
+// Player controls view
+struct PlayerControlsView: View {
+    let player: AVPlayer
+    @Binding var isPlaying: Bool
+    @Binding var showControls: Bool
+    @Binding var playbackRate: Float
+    @State private var hideControlsTimer: Timer?
+    @State private var progress: Double = 0
+    @State private var isScrubbing = false
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    private let availableRates: [Float] = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+
+    var body: some View {
+        ZStack {
+            if showControls {
+                // Centered controls
+                HStack(spacing: 40) {
+                    Button(action: {
+                        seek(by: -15)
+                        resetTimer()
+                    }) {
+                        Image(systemName: "gobackward.15")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+
+                    Button(action: {
+                        if isPlaying {
+                            player.pause()
+                        } else {
+                            player.rate = playbackRate
+                        }
+                        isPlaying.toggle()
+                        resetTimer()
+                    }) {
+                        Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 60, weight: .thin))
+                            .foregroundColor(.white)
+                    }
+
+                    Button(action: {
+                        seek(by: 15)
+                        resetTimer()
+                    }) {
+                        Image(systemName: "goforward.15")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .transition(.opacity)
+            }
+
+            // Scrubber at the bottom
+            VStack {
+                Spacer()
+                if showControls {
+                    HStack(spacing: 16) {
+                        Text(formatTime(player.currentTime().seconds))
+                            .foregroundColor(.white)
+                            .font(.caption)
+                        
+                        CustomScrubberView(
+                            progress: $progress,
+                            isScrubbing: $isScrubbing
+                        ) { newProgress in
+                            seek(to: newProgress)
+                            resetTimer()
+                        }
+                        
+                        Text(formatTime(player.currentItem?.duration.seconds ?? 0))
+                            .foregroundColor(.white)
+                            .font(.caption)
+
+                        Menu {
+                            ForEach(availableRates, id: \.self) { rate in
+                                Button(action: {
+                                    playbackRate = rate
+                                    if isPlaying {
+                                        player.rate = rate
+                                    }
+                                    resetTimer()
+                                }) {
+                                    HStack {
+                                        if playbackRate == rate {
+                                            Image(systemName: "checkmark")
+                                        }
+                                        Text("\(String(format: "%.2g", rate))x")
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "speedometer")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                    }
+                    .padding()
+                    .transition(.opacity)
+                }
+            }
+            .padding(.bottom, verticalSizeClass == .compact ? 0 : 20)
+        }
+        .padding(.horizontal)
+        .onAppear {
+            setupTimer()
+            addProgressObserver()
+        }
+        .onChange(of: showControls) { oldValue, newValue in
+            if newValue {
+                resetTimer()
+            }
+        }
+    }
+    
+    private func addProgressObserver() {
+        player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { time in
+            guard !isScrubbing else { return }
+            let duration = player.currentItem?.duration.seconds ?? 1
+            progress = time.seconds / duration
+        }
+    }
+
+    private func seek(to progress: Double) {
+        let duration = player.currentItem?.duration ?? .zero
+        let newTime = CMTime(seconds: duration.seconds * progress, preferredTimescale: 600)
+        player.seek(to: newTime)
+    }
+
+    private func seek(by seconds: Double) {
+        let currentTime = player.currentTime()
+        let newTime = CMTime(seconds: currentTime.seconds + seconds, preferredTimescale: 600)
+        player.seek(to: newTime)
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        let date = Date(timeIntervalSince1970: seconds)
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        if seconds >= 3600 {
+            formatter.dateFormat = "H:mm:ss"
+        } else {
+            formatter.dateFormat = "m:ss"
+        }
+        return formatter.string(from: date)
+    }
+
+    private func setupTimer() {
+        if showControls {
+            resetTimer()
+        }
+    }
+
+    private func resetTimer() {
+        hideControlsTimer?.invalidate()
+        hideControlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            withAnimation {
+                showControls = false
+            }
         }
     }
 }
@@ -367,6 +626,39 @@ struct ZoomablePhotoView: View {
                 }
             }
         }
+    }
+}
+
+// Custom video player using UIViewRepresentable to have more control over the view
+struct CustomVideoPlayerView: UIViewRepresentable {
+    var player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerUIView {
+        return PlayerUIView(player: player)
+    }
+
+    func updateUIView(_ uiView: PlayerUIView, context: Context) {
+        uiView.playerLayer.player = player
+    }
+}
+
+class PlayerUIView: UIView {
+    let playerLayer = AVPlayerLayer()
+
+    init(player: AVPlayer) {
+        super.init(frame: .zero)
+        playerLayer.player = player
+        playerLayer.videoGravity = .resizeAspect
+        layer.addSublayer(playerLayer)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
     }
 }
 
