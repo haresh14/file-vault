@@ -65,6 +65,8 @@ struct AutoPlayVideoView: View {
     @State private var errorMessage: String?
     @State private var hasLoadedOnce = false
     @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
     
     var body: some View {
         ZStack {
@@ -93,6 +95,35 @@ struct AutoPlayVideoView: View {
                             player.pause()
                         }
                     }
+                    .scaleEffect(scale)
+                    .gesture(
+                        TapGesture(count: 2)
+                            .onEnded {
+                                withAnimation(.spring()) {
+                                    if scale > 1.0 {
+                                        scale = 1.0
+                                    } else {
+                                        scale = 2.0
+                                    }
+                                }
+                            }
+                    )
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let newScale = lastScale * value
+                                scale = max(newScale, 0.5) // Allow zoom out to 0.5x, no upper limit
+                            }
+                            .onEnded { _ in
+                                lastScale = scale
+                                if scale <= 1.0 {
+                                    withAnimation(.spring()) {
+                                        scale = 1.0
+                                        lastScale = 1.0
+                                    }
+                                }
+                            },
+                    )
             } else if isLoading {
                 VStack(spacing: 20) {
                     ProgressView()
