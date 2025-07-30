@@ -48,7 +48,7 @@ struct VaultMainView: View {
     @State private var hasTriggeredSelectionHaptic = false
     @State private var searchText = ""
     @State private var showUnifiedMediaViewer = false
-    @State private var mediaViewerIndex = 0
+    @State private var mediaViewerIndex = -1
     @State private var showWebUpload = false
     @State private var showSortActionSheet = false
     @State private var showAddActionSheet = false
@@ -58,6 +58,18 @@ struct VaultMainView: View {
     @StateObject private var loginStateManager = LoginStateManager.shared
     
     @Environment(\.managedObjectContext) var context
+    
+    private var isMediaViewerPresented: Binding<Bool> {
+        Binding(
+            get: { showUnifiedMediaViewer && mediaViewerIndex > -1 },
+            set: { newValue in
+                if !newValue {
+                    showUnifiedMediaViewer = false
+                    mediaViewerIndex = -1
+                }
+            }
+        )
+    }
     
     let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
@@ -259,7 +271,7 @@ struct VaultMainView: View {
             } message: {
                 Text("Are you sure you want to delete \(selectedVaultItems.count) item(s)? This action cannot be undone.")
             }
-            .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+            .fullScreenCover(isPresented: isMediaViewerPresented) {
                 UnifiedMediaViewerView(
                     mediaItems: filteredItems,
                     initialIndex: mediaViewerIndex
@@ -334,7 +346,9 @@ struct VaultMainView: View {
             // Show unified viewer for images and videos
             if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
                 mediaViewerIndex = index
-                showUnifiedMediaViewer = true
+                DispatchQueue.main.async {
+                    showUnifiedMediaViewer = true
+                }
             }
         } else {
             // For now, just show an alert for non-media files

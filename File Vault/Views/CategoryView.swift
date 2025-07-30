@@ -175,7 +175,7 @@ struct CategoryFilesView: View {
     let categoryType: CategoryType
     @State private var items: [VaultItem] = []
     @State private var showUnifiedMediaViewer = false
-    @State private var mediaViewerIndex = 0
+    @State private var mediaViewerIndex = -1
     @State private var sortOption: SortOption = .date
     @State private var sortAscending: Bool = false
     @State private var showSortActionSheet = false
@@ -183,6 +183,18 @@ struct CategoryFilesView: View {
     @State private var selectedItems: Set<VaultItem> = []
     @State private var showDeleteAlert = false
     @State private var showMoveSheet = false
+    
+    private var isMediaViewerPresented: Binding<Bool> {
+        Binding(
+            get: { showUnifiedMediaViewer && mediaViewerIndex > -1 },
+            set: { newValue in
+                if !newValue {
+                    showUnifiedMediaViewer = false
+                    mediaViewerIndex = -1
+                }
+            }
+        )
+    }
     
     // Remove the items parameter and make it reactive
     init(categoryType: CategoryType) {
@@ -323,7 +335,7 @@ struct CategoryFilesView: View {
             .presentationDetents([.fraction(0.5)])
             .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+        .fullScreenCover(isPresented: isMediaViewerPresented) {
             UnifiedMediaViewerView(
                 mediaItems: sortedItems,
                 initialIndex: mediaViewerIndex

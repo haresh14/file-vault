@@ -60,7 +60,7 @@ struct FolderContentView: View {
     @State private var folderToRename: Folder? = nil
     @State private var renameText = ""
     @State private var showUnifiedMediaViewer = false
-    @State private var mediaViewerIndex = 0
+    @State private var mediaViewerIndex = -1
     @State private var showPhotoPicker = false
     @State private var showDocumentPicker = false
     @State private var isImporting = false
@@ -78,6 +78,18 @@ struct FolderContentView: View {
     @State private var itemsToDelete: [Any] = []
     @StateObject private var loginStateManager = LoginStateManager.shared
     @Environment(\.managedObjectContext) var context
+
+    private var isMediaViewerPresented: Binding<Bool> {
+        Binding(
+            get: { showUnifiedMediaViewer && mediaViewerIndex > -1 },
+            set: { newValue in
+                if !newValue {
+                    showUnifiedMediaViewer = false
+                    mediaViewerIndex = -1
+                }
+            }
+        )
+    }
 
     var sortedFolders: [Folder] {
         if loginStateManager.shouldShowEmptyVault {
@@ -285,7 +297,7 @@ struct FolderContentView: View {
                 }
             )
         }
-        .fullScreenCover(isPresented: $showUnifiedMediaViewer) {
+        .fullScreenCover(isPresented: isMediaViewerPresented) {
             UnifiedMediaViewerView(
                 mediaItems: sortedFiles,
                 initialIndex: mediaViewerIndex
