@@ -30,6 +30,7 @@ struct FolderView: View {
     }
 }
 
+#if false
 struct FolderContentView: View {
     let folder: Folder?
     @Binding var navigationPath: NavigationPath
@@ -778,7 +779,9 @@ struct FolderContentView: View {
     
 
 }
+#endif
 
+#if false
 // MARK: - Supporting Views
 
 struct FolderRowView: View {
@@ -1039,6 +1042,10 @@ struct SelectableFileRowView: View {
     }
 }
 
+#endif
+
+#if false
+
 // MARK: - Folder Add Action Sheet
 
 struct FolderAddActionSheet: View {
@@ -1189,6 +1196,8 @@ struct FolderSortPopupView: View {
         }
     }
 }
+
+#endif
 
 // MARK: - Folder Picker View
 

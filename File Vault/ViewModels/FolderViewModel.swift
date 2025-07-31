@@ -132,7 +132,45 @@ final class FolderViewModel: ObservableObject {
         loadContent()
     }
 
-    // photos/videos import simplified (no progressive progress per asset for brevity)
+    func importAssets(_ results: [PHPickerResult]) {
+        guard !results.isEmpty else { return }
+        isImporting = true
+        importProgress = 0
+        let total = Double(results.count)
+        var processed = 0.0
+        for result in results {
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { image, _ in
+                    guard let uiImage = image as? UIImage else { updateProgress(); return }
+                    guard let data = uiImage.jpegData(compressionQuality: 1.0) ?? uiImage.pngData() else { updateProgress(); return }
+                    let fileName = "IMG_\(Date().timeIntervalSince1970).jpg"
+                    do {
+                        _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: "image/jpeg", targetFolder: self.folder)
+                    } catch { print("Error saving image: \(error)") }
+                    updateProgress()
+                }
+            } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, _ in
+                    guard let url = url else { updateProgress(); return }
+                    do {
+                        let data = try Data(contentsOf: url)
+                        let fileName = "VID_\(Date().timeIntervalSince1970).mov"
+                        _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: "video/quicktime", targetFolder: self.folder)
+                    } catch { print("Error saving video: \(error)") }
+                    updateProgress()
+                }
+            } else { updateProgress() }
+        }
+        func updateProgress() {
+            DispatchQueue.main.async {
+                processed += 1
+                self.importProgress = processed / total
+                if processed == total { self.isImporting = false; self.loadContent() }
+            }
+        }
+    }
+
+    // Remove or adjust finishImportingAssets if no longer needed
     func finishImportingAssets() {
         isImporting = false
         loadContent()
