@@ -1,0 +1,18 @@
+
+- Screen protrection not working
+- Upload 2 GB file breaks app
+
+Functionality
+- Redesign the setting security screen
+- Code refactoring
+- Share files to other apps (native IOS feature)
+- Reconvery option
+
+Low Priority:
+- Delete everything on uninstallation
+- Trash
+- Panic mode
+- Preview for files
+
+Import from instagram
+Create a website to download the profile/reels/feeds from instagram

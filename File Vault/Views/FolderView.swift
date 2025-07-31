@@ -12,26 +12,7 @@ import UniformTypeIdentifiers
 
 
 
-enum FolderSortOption: String, CaseIterable {
-    case name = "Name"
-    case date = "Date"
-    case size = "Size"
-    case kind = "Kind"
-    
-    var systemImage: String {
-        switch self {
-        case .name:
-            return "textformat.abc"
-        case .date:
-            return "calendar"
-        case .size:
-            return "arrow.up.arrow.down"
-        case .kind:
-            return "folder"
-        }
-    }
-}
-
+// `FolderSortOption` moved to Models/FolderSortOption.swift
 struct FolderView: View {
     @State private var navigationPath = NavigationPath()
     @StateObject private var loginStateManager = LoginStateManager.shared
