@@ -13,7 +13,7 @@ import Photos
 import UniformTypeIdentifiers
 import CoreData
 
-class FileStorageManager {
+class FileStorageManager: FileStorageManaging {
     static let shared = FileStorageManager()
     
     private let fileManager = FileManager.default
@@ -563,7 +563,7 @@ class FileStorageManager {
         }
     }
     
-    func loadThumbnail(for vaultItem: VaultItem) -> UIImage? {
+    func loadThumbnail(for vaultItem: VaultItem) -> Data? {
         guard let thumbnailFileName = vaultItem.thumbnailFileName else { 
             print("DEBUG: No thumbnail filename for item \(vaultItem.fileName ?? "")")
             return nil 
@@ -578,20 +578,15 @@ class FileStorageManager {
             return nil 
         }
         
-        let image = UIImage(data: data)
-        print("DEBUG: Thumbnail loaded: \(image != nil)")
-        return image
+        print("DEBUG: Thumbnail data loaded: \(data.count) bytes")
+        return data
     }
     
-    func loadImage(for vaultItem: VaultItem) async throws -> UIImage {
+    func loadImage(for vaultItem: VaultItem) async throws -> Data {
         return try await withCheckedThrowingContinuation { continuation in
             do {
                 let fileData = try loadFile(vaultItem: vaultItem)
-                guard let image = UIImage(data: fileData) else {
-                    continuation.resume(throwing: FileStorageError.decryptionFailed)
-                    return
-                }
-                continuation.resume(returning: image)
+                continuation.resume(returning: fileData)
             } catch {
                 continuation.resume(throwing: error)
             }

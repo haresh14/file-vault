@@ -24,8 +24,8 @@ struct CoreDataManagerTests {
     @Test func testPersistentContainer() async throws {
         let manager = CoreDataManager.shared
         
-        #expect(manager.persistentContainer.name == "File_Vault", "Persistent container should be initialized with correct name")
-        #expect(manager.persistentContainer.name == "File_Vault", "Container should have correct name")
+        #expect(manager.persistentContainer.name == "FileVault", "Persistent container should be initialized with correct name")
+        #expect(manager.persistentContainer.name == "FileVault", "Container should have correct name")
     }
     
     @Test func testManagedObjectContext() async throws {

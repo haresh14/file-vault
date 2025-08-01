@@ -14,7 +14,7 @@ enum BiometricType {
     case faceID
 }
 
-class BiometricAuthManager {
+class BiometricAuthManager: BiometricAuthManaging {
     static let shared = BiometricAuthManager()
     
     private let maxFailureAttempts = 3

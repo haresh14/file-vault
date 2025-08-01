@@ -125,7 +125,6 @@ struct ContentView: View {
         if isPasswordSet {
             shouldShowPrivacyOverlay = true
             KeychainManager.shared.setLastBackgroundTime()
-            print("DEBUG: App going to background, showing enhanced privacy overlay")
         }
         isInBackground = true
     }
@@ -133,7 +132,6 @@ struct ContentView: View {
     private func handleDidBecomeActive() {
         shouldShowPrivacyOverlay = false
         isInBackground = false
-        print("DEBUG: App became active, hiding privacy overlay")
     }
     
     private func handleWillEnterForeground() {
@@ -147,14 +145,10 @@ struct ContentView: View {
             // Reset login state when authentication is required
             LoginStateManager.shared.resetLoginState()
             
-            print("DEBUG: App coming to foreground, requires authentication")
-            
             // Check biometric when coming from background
             if isPasswordSet && !isAuthenticated {
                 checkBiometricAuthentication()
             }
-        } else {
-            print("DEBUG: App coming to foreground, within timeout period - no auth needed")
         }
     }
     
@@ -252,8 +246,6 @@ struct ContentView: View {
     }
     
     private func handleSecurityLockTrigger() {
-        print("DEBUG: Security lock triggered - locking app")
-        
         // Only lock if user is currently authenticated
         if isAuthenticated {
             isAuthenticated = false

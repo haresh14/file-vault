@@ -8,7 +8,7 @@
 import Foundation
 import CoreData
 
-class CoreDataManager {
+class CoreDataManager: CoreDataManaging {
     static let shared = CoreDataManager()
     
     private init() {}
@@ -75,6 +75,21 @@ class CoreDataManager {
     }
     
     // MARK: - VaultItem Operations
+    
+    // MARK: - CoreDataManaging Protocol
+    func createVaultItem(fileType: String, fileName: String, folder: Folder?) -> VaultItem? {
+        let item = VaultItem(context: context)
+        item.id = UUID()
+        item.fileName = fileName
+        item.fileType = fileType
+        item.fileSize = 0 // Will be updated when file is saved
+        item.createdAt = Date()
+        item.updatedAt = Date()
+        item.folder = folder
+        
+        save()
+        return item
+    }
     
     func createVaultItem(fileName: String, fileType: String, fileSize: Int64, thumbnailFileName: String? = nil, in folder: Folder? = nil) -> VaultItem {
         let item = VaultItem(context: context)
@@ -160,7 +175,7 @@ class CoreDataManager {
     
     // MARK: - Folder Operations
     
-    func createFolder(name: String, parent: Folder? = nil) -> Folder {
+    func createFolder(name: String, parent: Folder?) -> Folder? {
         let folder = Folder(context: context)
         folder.id = UUID()
         folder.name = name
@@ -170,6 +185,19 @@ class CoreDataManager {
         
         save()
         return folder
+    }
+    
+    func fetchFolders(in parent: Folder?) -> [Folder] {
+        let request: NSFetchRequest<Folder> = Folder.fetchRequest()
+        request.predicate = NSPredicate(format: "parent == %@", parent ?? NSNull())
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Folder.name, ascending: true)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching folders: \(error)")
+            return []
+        }
     }
     
     func deleteFolder(_ folder: Folder) {

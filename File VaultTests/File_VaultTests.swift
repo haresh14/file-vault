@@ -1,5 +1,5 @@
 //
-//  File_VaultTests.swift
+//  FileVaultTests.swift
 //  File VaultTests
 //
 //  Created by Thor on 10/07/25.
@@ -11,7 +11,7 @@ import UIKit
 import CoreData
 @testable import File_Vault
 
-struct File_VaultTests {
+struct FileVaultTests {
 
     // MARK: - Test Suite Overview
     

@@ -3,1218 +3,175 @@
 //  File Vault
 //
 //  Created on 10/07/25.
+//  Refactored to use MVVM architecture and reusable components
 //
 
 import SwiftUI
 import PhotosUI
-import Photos
-import AVFoundation
-import UniformTypeIdentifiers
 
-enum SortOption: String, CaseIterable {
-    case userDefault = "User Default"
-    case name = "Name"
-    case size = "Size"
-    case date = "Date"
-    case kind = "Kind"
-    
-    var systemImage: String {
-        switch self {
-        case .userDefault:
-            return "person"
-        case .name:
-            return "textformat.abc"
-        case .size:
-            return "arrow.up.arrow.down"
-        case .date:
-            return "calendar"
-        case .kind:
-            return "folder"
-        }
-    }
-}
-
+/// Main gallery view displaying vault items with MVVM architecture
 struct VaultMainView: View {
-
-    @State private var showPhotoPicker = false
-    @State private var showDocumentPicker = false
-    @State private var isImporting = false
-    @State private var importProgress: Double = 0
-    @State private var vaultItems: [VaultItem] = []
-    @State private var selectedVaultItems: Set<VaultItem> = []
-    @State private var isSelectionMode = false
-    @State private var showDeleteAlert = false
-    @State private var showMoveSheet = false
-    @State private var hasTriggeredSelectionHaptic = false
-    @State private var searchText = ""
-    @State private var showUnifiedMediaViewer = false
-    @State private var mediaViewerIndex = -1
-    @State private var showWebUpload = false
-    @State private var showSortActionSheet = false
-    @State private var showAddActionSheet = false
-    @State private var sortOption: SortOption = .userDefault
-    @State private var sortAscending: Bool = true
-    @StateObject private var webServer = WebServerManager.shared
+    // MARK: - ViewModels
+    
+    @StateObject private var viewModel = VaultMainViewModel()
+    @StateObject private var importProgressViewModel = ImportProgressViewModel()
     @StateObject private var loginStateManager = LoginStateManager.shared
+    
+    // MARK: - Environment
     
     @Environment(\.managedObjectContext) var context
     
-    private var isMediaViewerPresented: Binding<Bool> {
-        Binding(
-            get: { showUnifiedMediaViewer && mediaViewerIndex > -1 },
-            set: { newValue in
-                if !newValue {
-                    showUnifiedMediaViewer = false
-                    mediaViewerIndex = -1
-                }
-            }
-        )
-    }
-    
-    let columns = [
-        GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
-    ]
-    
-    var filteredItems: [VaultItem] {
-        if loginStateManager.shouldShowEmptyVault {
-            return []
-        }
-        
-        let items = searchText.isEmpty ? vaultItems : vaultItems.filter { item in
-            item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
-        }
-        
-        return sortItems(items)
-    }
-    
-    private func sortItems(_ items: [VaultItem]) -> [VaultItem] {
-        let sorted: [VaultItem]
-        
-        switch sortOption {
-        case .userDefault:
-            sorted = items.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
-        case .name:
-            sorted = items.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
-        case .size:
-            sorted = items.sorted { $0.fileSize < $1.fileSize }
-        case .date:
-            sorted = items.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
-        case .kind:
-            sorted = items.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
-        }
-        
-        return sortAscending ? sorted : sorted.reversed()
-    }
-    
-    var filteredImages: [VaultItem] {
-        if loginStateManager.shouldShowEmptyVault {
-            return []
-        }
-        return filteredItems.filter { $0.isImage }
-    }
+    // MARK: - Body
     
     var body: some View {
         NavigationView {
-            ZStack {
-                if vaultItems.isEmpty && !isImporting {
-                    emptyStateView
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 2) {
-                            ForEach(filteredItems) { item in
-                                VaultItemCell(
-                                    item: item,
-                                    isSelected: selectedVaultItems.contains(item),
-                                    isSelectionMode: isSelectionMode,
-                                    onTap: {
-                                        if isSelectionMode {
-                                            toggleSelection(for: item)
-                                        } else {
-                                            viewItem(item)
-                                        }
-                                    },
-                                    onLongPress: {
-                                        if !isSelectionMode {
-                                            // Trigger haptic feedback only when entering selection mode
-                                            if !hasTriggeredSelectionHaptic {
-                                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                                impactFeedback.impactOccurred()
-                                                hasTriggeredSelectionHaptic = true
-                                            }
-                                            isSelectionMode = true
-                                            selectedVaultItems.insert(item)
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 2)
-                        .searchable(text: $searchText, prompt: "Search files")
+            mainContent
+                .vaultNavigationTitle(
+                    isSelectionMode: viewModel.isSelectionMode,
+                    selectedCount: viewModel.selectionCount,
+                    defaultTitle: "Gallery"
+                )
+                .toolbar {
+                    VaultToolbarView(
+                        isSelectionMode: viewModel.isSelectionMode,
+                        selectedItemCount: viewModel.selectionCount,
+                        totalItemCount: viewModel.vaultItems.count,
+                        hasSelectedItems: viewModel.hasSelection,
+                        canAddFiles: loginStateManager.canAddFiles,
+                        isEmpty: viewModel.vaultItems.isEmpty,
+                        onSelectAll: { viewModel.selectAll(from: viewModel.vaultItems) },
+                        onMove: { viewModel.showMoveSheet = true },
+                        onDelete: { viewModel.showDeleteAlert = true },
+                        onCancel: { viewModel.exitSelectionMode() },
+                        onAdd: { viewModel.showAddActions() },
+                        onSort: { viewModel.showSortActionSheet = true },
+                        onEnterSelection: { viewModel.enterSelectionMode() }
+                    )
+                }
+                .searchable(text: $viewModel.searchText, prompt: "Search files")
+                .sheet(isPresented: $viewModel.showPhotoPicker) {
+                    PhotoPickerView { results in
+                        viewModel.importAssets(results)
                     }
                 }
-                
-
-            }
-            .navigationTitle(isSelectionMode ? "\(selectedVaultItems.count) selected" : "Gallery")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if isSelectionMode {
-                        Button("Select All") {
-                            selectedVaultItems = Set(vaultItems)
-                        }
+                .sheet(isPresented: $viewModel.showDocumentPicker) {
+                    DocumentPickerView { dataArray in
+                        viewModel.importDocuments(dataArray)
                     }
                 }
-                
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if isSelectionMode {
-                        if !selectedVaultItems.isEmpty {
-                            Button(action: { showMoveSheet = true }) {
-                                Image(systemName: "arrow.up.doc.on.clipboard")
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            Button(action: { showDeleteAlert = true }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        
-                        Button("Cancel") {
-                            isSelectionMode = false
-                            selectedVaultItems.removeAll()
-                            hasTriggeredSelectionHaptic = false
-                        }
-                    } else {
-                        if loginStateManager.canAddFiles {
-                            Button(action: { showAddActionSheet = true }) {
-                                Image(systemName: "plus")
-                            }
-                        }
-                        
-                        Button(action: { showSortActionSheet = true }) {
-                            Image(systemName: "arrow.up.arrow.down")
-                        }
-                        
-                        if !vaultItems.isEmpty && loginStateManager.canAddFiles {
-                            Button("Select") {
-                                isSelectionMode = true
-                                selectedVaultItems.removeAll()
-                            }
-                        }
-                    }
+                .sheet(isPresented: $viewModel.showWebUpload) {
+                    WebUploadView()
                 }
-            }
-
-            .sheet(isPresented: $showPhotoPicker) {
-                PhotoPickerView { results in
-                    importAssets(results)
-                }
-            }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPickerView { dataArray in
-                    importDocuments(dataArray)
-                }
-            }
-            .sheet(isPresented: $showWebUpload) {
-                WebUploadView()
-            }
-            .sheet(isPresented: $showSortActionSheet) {
-                SortPopupView(
-                    currentSortOption: sortOption,
-                    sortAscending: sortAscending,
-                    onSortSelected: { option in
-                        if option == sortOption {
-                            // Toggle sort direction if same option is selected
-                            sortAscending.toggle()
-                        } else {
-                            // Set new sort option and default to ascending
-                            sortOption = option
-                            sortAscending = true
-                        }
-                        showSortActionSheet = false
-                    }
+                .sheet(isPresented: $viewModel.showSortActionSheet) {
+                GallerySortPopupView(
+                        currentSortOption: viewModel.sortOption,
+                        sortAscending: viewModel.sortAscending,
+                        onSortSelected: viewModel.handleSortSelection
                 )
                 .presentationDetents([.fraction(0.5)])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showAddActionSheet) {
-                AddActionSheet(
-                    onAddPhotos: {
-                        showAddActionSheet = false
-                        showPhotoPicker = true
-                    },
-                    onAddFiles: {
-                        showAddActionSheet = false
-                        showDocumentPicker = true
-                    },
-                    onWebUpload: {
-                        showAddActionSheet = false
-                        showWebUpload = true
-                    }
+                .sheet(isPresented: $viewModel.showAddActionSheet) {
+                UniversalAddContentView.forGallery(
+                        onAddPhotos: viewModel.handleAddPhotos,
+                        onAddFiles: viewModel.handleAddFiles,
+                        onWebUpload: viewModel.handleWebUpload
                 )
                 .presentationDetents([.fraction(0.4)])
                 .presentationDragIndicator(.visible)
             }
-            .overlay(
-                Group {
-                    if isImporting {
-                        ImportProgressView(progress: importProgress)
-                    }
+                .fullScreenCover(isPresented: viewModel.isMediaViewerPresented) {
+                    UnifiedMediaViewerView(
+                        mediaItems: viewModel.filteredItems,
+                        initialIndex: viewModel.mediaViewerIndex
+                    )
                 }
-            )
-            .alert("Delete Items", isPresented: $showDeleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
-                    deleteSelectedItems()
-                }
-            } message: {
-                Text("Are you sure you want to delete \(selectedVaultItems.count) item(s)? This action cannot be undone.")
-            }
-            .fullScreenCover(isPresented: isMediaViewerPresented) {
-                UnifiedMediaViewerView(
-                    mediaItems: filteredItems,
-                    initialIndex: mediaViewerIndex
-                )
-            }
-            .sheet(isPresented: $showMoveSheet) {
+                .sheet(isPresented: $viewModel.showMoveSheet) {
                 GalleryFolderPickerView(
-                    selectedFiles: selectedVaultItems,
+                        selectedFiles: viewModel.selectedItems,
                     onMove: { destinationFolder in
-                        moveSelectedItems(to: destinationFolder)
-                        showMoveSheet = false
+                            viewModel.moveSelectedItems(to: destinationFolder)
+                            viewModel.showMoveSheet = false
+                        }
+                    )
+                }
+                .alert("Delete Items", isPresented: $viewModel.showDeleteAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        viewModel.deleteSelectedItems()
                     }
+                } message: {
+                    Text("Are you sure you want to delete \(viewModel.selectionCount) item(s)? This action cannot be undone.")
+                }
+                .importProgressOverlay(
+                    isImporting: viewModel.isImporting,
+                    progress: viewModel.importProgress,
+                    message: "Importing media files..."
                 )
-            }
-        }
-        .onAppear {
-            loadVaultItems()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
-            // Refreshing vault items
-            DispatchQueue.main.async {
-                loadVaultItems()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
-            // Core Data context saved, refresh items
-            DispatchQueue.main.async {
-                loadVaultItems()
-            }
+                .onAppear {
+                    viewModel.loadVaultItems()
+                }
         }
     }
     
-    // MARK: - Views
+    // MARK: - Content Views
     
-    private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 80))
-                .foregroundColor(.gray)
-            
-            Text("No Media Files")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Add photos and videos to see them here in your gallery")
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
+    @ViewBuilder
+    private var mainContent: some View {
+        VaultGridView(
+            items: viewModel.filteredItems,
+            searchText: viewModel.searchText,
+            isSelectionMode: viewModel.isSelectionMode,
+            selectedItems: viewModel.selectedItems,
+            isImporting: viewModel.isImporting,
+            emptyStateConfig: emptyStateConfiguration,
+            onItemTap: handleItemTap,
+            onItemLongPress: handleItemLongPress
+        )
     }
     
-    // MARK: - Functions
-    
-    private func loadVaultItems() {
-        let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
-        // Filter to only show photos and videos in the Gallery
-        vaultItems = allItems.filter { $0.isImage || $0.isVideo }
-        
-        // Items loaded successfully from all folders (photos and videos only)
-    }
-    
-    private func toggleSelection(for item: VaultItem) {
-        if selectedVaultItems.contains(item) {
-            selectedVaultItems.remove(item)
+    /// Empty state configuration that respects fake login state
+    private var emptyStateConfiguration: EmptyStateConfiguration {
+        if loginStateManager.canAddFiles {
+            return .noPhotos(onAddPhotos: { viewModel.showPhotoPicker = true })
         } else {
-            selectedVaultItems.insert(item)
+            // During fake login, show empty state without any actions
+            return EmptyStateConfiguration(
+                iconName: "photo.on.rectangle.angled",
+                title: "No Photos or Videos", 
+                subtitle: "Your photo gallery appears to be empty",
+                primaryAction: nil,
+                style: .default
+            )
         }
     }
     
-    private func viewItem(_ item: VaultItem) {
-        if item.isImage || item.isVideo {
-            // Show unified viewer for images and videos
-            if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
-                mediaViewerIndex = index
-                DispatchQueue.main.async {
-                    showUnifiedMediaViewer = true
-                }
-            }
+    // MARK: - Action Handlers
+    
+    private func handleItemTap(_ item: VaultItem) {
+        if viewModel.isSelectionMode {
+            viewModel.toggleSelection(for: item)
         } else {
-            // For now, just show an alert for non-media files
-            // TODO: Add document viewer in future update
-            print("Document file tapped: \(item.fileName ?? "unknown") - Preview will be added in future update")
+            viewModel.viewItem(item)
         }
     }
     
-    private func getFileIcon(for item: VaultItem) -> String {
-        if item.isImage {
-            return "photo.fill"
-        } else if item.isVideo {
-            return "video.fill"
-        } else if item.isAudio {
-            return "music.note"
-        } else if item.isDocument {
-            // More specific document icons based on file type
-            guard let fileType = item.fileType?.lowercased() else { return "doc.fill" }
-            
-            if fileType.contains("pdf") {
-                return "doc.richtext.fill"
-            } else if fileType.contains("word") || fileType.contains("doc") {
-                return "doc.text.fill"
-            } else if fileType.contains("excel") || fileType.contains("sheet") {
-                return "tablecells.fill"
-            } else if fileType.contains("powerpoint") || fileType.contains("presentation") {
-                return "rectangle.on.rectangle.angled.fill"
-            } else if fileType.contains("zip") || fileType.contains("rar") || fileType.contains("7z") {
-                return "archivebox.fill"
-            } else if fileType.contains("text") || fileType.contains("txt") {
-                return "doc.plaintext.fill"
-            } else {
-                return "doc.fill"
-            }
-        } else {
-            return "questionmark.circle.fill"
+    private func handleItemLongPress(_ item: VaultItem) {
+        if !viewModel.isSelectionMode {
+            viewModel.triggerSelectionHaptic()
+            viewModel.enterSelectionMode()
+            viewModel.selectedItems.insert(item)
         }
-    }
-    
-    private func getFileIconColor(for item: VaultItem) -> Color {
-        if item.isImage {
-            return .blue
-        } else if item.isVideo {
-            return .purple
-        } else if item.isAudio {
-            return .green
-        } else if item.isDocument {
-            return .orange
-        } else {
-            return .gray
-        }
-    }
-    
-    private func importAssets(_ results: [PHPickerResult]) {
-        guard !results.isEmpty else { return }
-        
-        showPhotoPicker = false
-        isImporting = true
-        importProgress = 0
-        
-        let totalItems = Double(results.count)
-        var processedItems = 0.0
-        
-        for result in results {
-            // Handle images
-            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
-                result.itemProvider.loadObject(ofClass: UIImage.self) { image, error in
-                    guard let uiImage = image as? UIImage else {
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                        return
-                    }
-                    
-                    // Convert UIImage to Data
-                    guard let imageData = uiImage.jpegData(compressionQuality: 1.0) ?? uiImage.pngData() else {
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                        return
-                    }
-                    
-                    let fileName = "IMG_\(Date().timeIntervalSince1970).jpg"
-                    let fileType = "image/jpeg"
-                    
-                    do {
-                        _ = try FileStorageManager.shared.saveFile(
-                            data: imageData,
-                            fileName: fileName,
-                            fileType: fileType
-                        )
-                        
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                    } catch {
-                        print("Error saving image: \(error)")
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                    }
-                }
-            }
-            // Handle videos
-            else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, error in
-                    guard let url = url else {
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                        return
-                    }
-                    
-                    do {
-                        let data = try Data(contentsOf: url)
-                        let fileName = "VID_\(Date().timeIntervalSince1970).mov"
-                        let fileType = "video/quicktime"
-                        
-                        _ = try FileStorageManager.shared.saveFile(
-                            data: data,
-                            fileName: fileName,
-                            fileType: fileType
-                        )
-                        
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                    } catch {
-                        print("Error saving video: \(error)")
-                        DispatchQueue.main.async {
-                            processedItems += 1
-                            self.importProgress = processedItems / totalItems
-                            
-                            if processedItems == totalItems {
-                                self.isImporting = false
-                                self.loadVaultItems()
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Unknown type
-                DispatchQueue.main.async {
-                    processedItems += 1
-                    self.importProgress = processedItems / totalItems
-                    
-                    if processedItems == totalItems {
-                        self.isImporting = false
-                        self.loadVaultItems()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func importDocuments(_ dataArray: [(Data, String)]) {
-        guard !dataArray.isEmpty else { return }
-        
-        showDocumentPicker = false
-        isImporting = true
-        importProgress = 0
-        
-        let totalItems = Double(dataArray.count)
-        var processedItems = 0.0
-        
-        for (data, fileName) in dataArray {
-            do {
-                let fileType = FileStorageManager.shared.determineFileType(from: fileName)
-                
-                _ = try FileStorageManager.shared.saveFile(
-                    data: data,
-                    fileName: fileName,
-                    fileType: fileType
-                )
-                
-                print("Successfully imported file: \(fileName)")
-                
-            } catch {
-                print("Error importing file \(fileName): \(error)")
-            }
-            
-            DispatchQueue.main.async {
-                processedItems += 1
-                importProgress = processedItems / totalItems
-                
-                if processedItems == totalItems {
-                    isImporting = false
-                    loadVaultItems()
-                }
-            }
-        }
-    }
-    
-
-    
-    private func moveSelectedItems(to destinationFolder: Folder?) {
-        for item in selectedVaultItems {
-            CoreDataManager.shared.moveVaultItem(item, to: destinationFolder)
-        }
-        
-        selectedVaultItems.removeAll()
-        isSelectionMode = false
-        hasTriggeredSelectionHaptic = false
-        
-        // Post notification to refresh other views
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
-        
-        loadVaultItems()
-    }
-    
-    private func deleteSelectedItems() {
-        for item in selectedVaultItems {
-            do {
-                try FileStorageManager.shared.deleteFile(vaultItem: item)
-            } catch {
-                print("Error deleting item: \(error)")
-            }
-        }
-        
-        selectedVaultItems.removeAll()
-        isSelectionMode = false
-        hasTriggeredSelectionHaptic = false
-        
-        // Post notification to refresh other views
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
-        
-        loadVaultItems()
     }
 }
 
 // MARK: - Supporting Views
 
-struct VaultItemCell: View {
-    let item: VaultItem
-    let isSelected: Bool
-    let isSelectionMode: Bool
-    let onTap: () -> Void
-    let onLongPress: () -> Void
-    
-    @State private var thumbnail: UIImage?
-    @State private var isLoadingThumbnail = true
-    @State private var isPressed = false
-    
-    private func getFileIcon(for item: VaultItem) -> String {
-        if item.isImage {
-            return "photo.fill"
-        } else if item.isVideo {
-            return "video.fill"
-        } else if item.isAudio {
-            return "music.note"
-        } else if item.isDocument {
-            // More specific document icons based on file type
-            guard let fileType = item.fileType?.lowercased() else { return "doc.fill" }
-            
-            if fileType.contains("pdf") {
-                return "doc.richtext.fill"
-            } else if fileType.contains("word") || fileType.contains("doc") {
-                return "doc.text.fill"
-            } else if fileType.contains("excel") || fileType.contains("sheet") {
-                return "tablecells.fill"
-            } else if fileType.contains("powerpoint") || fileType.contains("presentation") {
-                return "rectangle.on.rectangle.angled.fill"
-            } else if fileType.contains("zip") || fileType.contains("rar") || fileType.contains("7z") {
-                return "archivebox.fill"
-            } else if fileType.contains("text") || fileType.contains("txt") {
-                return "doc.plaintext.fill"
-            } else {
-                return "doc.fill"
-            }
-        } else {
-            return "questionmark.circle.fill"
-        }
-    }
-    
-    private func getFileIconColor(for item: VaultItem) -> Color {
-        if item.isImage {
-            return .blue
-        } else if item.isVideo {
-            return .purple
-        } else if item.isAudio {
-            return .green
-        } else if item.isDocument {
-            return .orange
-        } else {
-            return .gray
-        }
-    }
-    
-    var body: some View {
-        GeometryReader { geometry in
-            let size = min(geometry.size.width, geometry.size.height)
-            
-            ZStack {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: size, height: size)
-                
-                if let thumbnail = thumbnail {
-                    Image(uiImage: thumbnail)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: size, height: size)
-                        .clipped()
-                } else if isLoadingThumbnail {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    // Show appropriate icon based on file type
-                    Image(systemName: getFileIcon(for: item))
-                        .font(.largeTitle)
-                        .foregroundColor(getFileIconColor(for: item))
-                }
-                
-                // File type indicator
-                if item.isVideo {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Image(systemName: "video.fill")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                                .padding(4)
-                                .background(Color.black.opacity(0.6))
-                                .cornerRadius(4)
-                            Spacer()
-                        }
-                        .padding(4)
-                    }
-                } else if item.isDocument || item.isAudio {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Image(systemName: item.isDocument ? "doc.fill" : "music.note")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                                .padding(4)
-                                .background(Color.black.opacity(0.6))
-                                .cornerRadius(4)
-                            Spacer()
-                        }
-                        .padding(4)
-                    }
-                }
-                
-                // Selection indicator
-                if isSelectionMode {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.9))
-                                    .frame(width: 24, height: 24)
-                                
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.body)
-                                    .foregroundColor(isSelected ? .blue : .gray)
-                            }
-                            .padding(2)
-                        }
-                    }
-                }
-            }
-            .cornerRadius(4)
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: isPressed)
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onTap()
-        }
-        .onLongPressGesture(minimumDuration: 0.5, perform: onLongPress)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressed {
-                        isPressed = true
-                    }
-                }
-                .onEnded { _ in
-                    isPressed = false
-                }
-        )
-        .onAppear {
-            loadThumbnail()
-        }
-    }
-    
-    private func loadThumbnail() {
-        // Loading thumbnail for item
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: item)
-            
-            DispatchQueue.main.async {
-                self.thumbnail = loadedThumbnail
-                self.isLoadingThumbnail = false
-                
-                if loadedThumbnail == nil {
-                    // Try to regenerate thumbnail if it's missing
-                    if item.thumbnailFileName == nil || item.thumbnailFileName?.isEmpty == true {
-                        self.regenerateThumbnail()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func regenerateThumbnail() {
-        DispatchQueue.global(qos: .utility).async {
-            do {
-                let fileData = try FileStorageManager.shared.loadFile(vaultItem: item)
-                
-                if item.isImage {
-                    // Generate image thumbnail
-                    if let image = UIImage(data: fileData) {
-                        let thumbnailSize = CGSize(width: 200, height: 200)
-                        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
-                        
-                        let thumbnail = renderer.image { context in
-                            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-                        }
-                        
-                        DispatchQueue.main.async {
-                            self.thumbnail = thumbnail
-                        }
-                    }
-                } else if item.isVideo {
-                    // Generate video thumbnail
-                    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
-                        .appendingPathComponent(UUID().uuidString + ".mov")
-                    
-                    try fileData.write(to: tempURL)
-                    defer { try? FileManager.default.removeItem(at: tempURL) }
-                    
-                    let asset = AVURLAsset(url: tempURL)
-                    let generator = AVAssetImageGenerator(asset: asset)
-                    generator.appliesPreferredTrackTransform = true
-                    
-                    let time = CMTime(seconds: 1, preferredTimescale: 60)
-                    
-                    if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
-                        let thumbnail = UIImage(cgImage: cgImage)
-                        
-                        DispatchQueue.main.async {
-                            self.thumbnail = thumbnail
-                        }
-                    }
-                }
-            } catch {
-                print("Error regenerating thumbnail: \(error)")
-            }
-        }
-    }
-}
 
-struct ImportProgressView: View {
-    let progress: Double
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                ProgressView(value: progress)
-                    .progressViewStyle(CircularProgressViewStyle())
-                    .scaleEffect(2)
-                
-                Text("Importing...")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("\(Int(progress * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.white)
-            }
-            .padding(40)
-            .background(Color.black.opacity(0.8))
-            .cornerRadius(20)
-        }
-    }
-}
 
-// MARK: - Gallery Folder Picker View
-
-struct GalleryFolderPickerView: View {
-    let selectedFiles: Set<VaultItem>
-    let onMove: (Folder?) -> Void
-    
-    @State private var navigationPath: [Folder] = []
-    @State private var currentLevelFolders: [Folder] = []
-    @Environment(\.dismiss) private var dismiss
-    
-    var currentNavigationFolder: Folder? {
-        navigationPath.last
-    }
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Breadcrumb navigation
-                if !navigationPath.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            Button("Root") {
-                                navigationPath.removeAll()
-                                loadCurrentLevelFolders()
-                            }
-                            .foregroundColor(.blue)
-                            
-                            ForEach(Array(navigationPath.enumerated()), id: \.element.objectID) { index, folder in
-                                HStack(spacing: 4) {
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Button(folder.displayName) {
-                                        navigationPath = Array(navigationPath.prefix(index + 1))
-                                        loadCurrentLevelFolders()
-                                    }
-                                    .foregroundColor(.blue)
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
-                }
-                
-                List {
-                    // Move here button
-                    Button(action: {
-                        onMove(currentNavigationFolder)
-                        dismiss()
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.down.doc.fill")
-                                .foregroundColor(.white)
-                                .font(.title3)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Move Here")
-                                    .foregroundColor(.white)
-                                    .fontWeight(.semibold)
-                                    .font(.body)
-                                
-                                Text(currentNavigationFolder?.displayName ?? "Root Folder")
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .font(.caption)
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(Color.green)
-                        .cornerRadius(12)
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    
-                    // Folders in current level
-                    ForEach(currentLevelFolders, id: \.objectID) { folder in
-                        Button(action: {
-                            // Always navigate into folder, never move directly
-                            navigationPath.append(folder)
-                            loadCurrentLevelFolders()
-                        }) {
-                            HStack {
-                                Image(systemName: "folder.fill")
-                                    .foregroundColor(.blue)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(folder.displayName)
-                                        .foregroundColor(.primary)
-                                        .font(.body)
-                                    
-                                    Text("\(folder.totalItemCount) items")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .contextMenu {
-                            Button("Move Here") {
-                                onMove(folder)
-                                dismiss()
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Move to Folder")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                loadCurrentLevelFolders()
-            }
-        }
-    }
-    
-    private func loadCurrentLevelFolders() {
-        if let currentNavFolder = currentNavigationFolder {
-            currentLevelFolders = currentNavFolder.subfoldersArray.sorted { $0.displayName < $1.displayName }
-        } else {
-            currentLevelFolders = CoreDataManager.shared.fetchRootFolders().sorted { $0.displayName < $1.displayName }
-        }
-    }
-}
+// MARK: - Preview Support
 
 #Preview {
     VaultMainView()
         .environment(\.managedObjectContext, CoreDataManager.shared.context)
 }
-
-// MARK: - Photo Picker
-
-struct PhotoPickerView: UIViewControllerRepresentable {
-    let completion: ([PHPickerResult]) -> Void
-    @Environment(\.presentationMode) var presentationMode
-    
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        var configuration = PHPickerConfiguration(photoLibrary: .shared())
-        configuration.filter = .any(of: [.images, .videos])
-        configuration.selectionLimit = 50
-        configuration.preferredAssetRepresentationMode = .current
-        
-        let picker = PHPickerViewController(configuration: configuration)
-        picker.delegate = context.coordinator
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: PHPickerViewControllerDelegate {
-        let parent: PhotoPickerView
-        
-        init(_ parent: PhotoPickerView) {
-            self.parent = parent
-        }
-        
-        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            parent.presentationMode.wrappedValue.dismiss()
-            
-            guard !results.isEmpty else { return }
-            
-            // Instead of trying to fetch PHAssets, pass the results directly
-            parent.completion(results)
-        }
-    }
-}
-
-// MARK: - Add Action Sheet
-
-struct AddActionSheet: View {
-    let onAddPhotos: () -> Void
-    let onAddFiles: () -> Void
-    let onWebUpload: () -> Void
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var webServer = WebServerManager.shared
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    Button(action: onAddPhotos) {
-                        HStack(spacing: 16) {
-                            Image(systemName: "photo.badge.plus")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .frame(width: 20)
-                            
-                            Text("Add from Photos")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                        .background(Color.clear)
-                        .contentShape(Rectangle())
-                    }
-                    
-                    Divider()
-                        .padding(.leading, 60)
-                    
-                    Button(action: onAddFiles) {
-                        HStack(spacing: 16) {
-                            Image(systemName: "folder.badge.plus")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .frame(width: 20)
-                            
-                            Text("Add from Files")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                        .background(Color.clear)
-                        .contentShape(Rectangle())
-                    }
-                    
-                    Divider()
-                        .padding(.leading, 60)
-                    
-                    Button(action: onWebUpload) {
-                        HStack(spacing: 16) {
-                            ZStack {
-                                Image(systemName: "globe")
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                
-                                if webServer.isRunning {
-                                    Circle()
-                                        .fill(Color.green)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 8, y: -8)
-                                }
-                            }
-                            .frame(width: 20)
-                            
-                            Text("Web Upload")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                        .background(Color.clear)
-                        .contentShape(Rectangle())
-                    }
-                }
-                .padding(.top, 4)
-            }
-            .navigationTitle("Add Content")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Sort Popup View
-
-struct SortPopupView: View {
-    let currentSortOption: SortOption
-    let sortAscending: Bool
-    let onSortSelected: (SortOption) -> Void
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Sort options
-                VStack(spacing: 0) {
-                    ForEach(SortOption.allCases, id: \.self) { option in
-                        HStack(spacing: 16) {
-                            Image(systemName: option.systemImage)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .frame(width: 20)
-                            
-                            Text(option.rawValue)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            if option == currentSortOption {
-                                Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
-                                    .font(.body)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                        .background(Color.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            onSortSelected(option)
-                        }
-                        
-                        if option != SortOption.allCases.last {
-                            Divider()
-                                .padding(.leading, 60)
-                        }
-                    }
-                }
-                .padding(.top, 4)
-            }
-            .navigationTitle("Sort by")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-

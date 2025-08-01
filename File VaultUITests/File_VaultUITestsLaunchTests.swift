@@ -1,5 +1,5 @@
 //
-//  File_VaultUITestsLaunchTests.swift
+//  FileVaultUITestsLaunchTests.swift
 //  File VaultUITests
 //
 //  Created by Thor on 10/07/25.
@@ -7,7 +7,7 @@
 
 import XCTest
 
-final class File_VaultUITestsLaunchTests: XCTestCase {
+final class FileVaultUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

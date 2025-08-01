@@ -1,5 +1,5 @@
 //
-//  File_VaultUITests.swift
+//  FileVaultUITests.swift
 //  File VaultUITests
 //
 //  Created by Thor on 10/07/25.
@@ -7,7 +7,7 @@
 
 import XCTest
 
-final class File_VaultUITests: XCTestCase {
+final class FileVaultUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

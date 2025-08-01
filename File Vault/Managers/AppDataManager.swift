@@ -8,7 +8,7 @@
 import Foundation
 import Photos
 
-class AppDataManager {
+class AppDataManager: AppDataManaging {
     static let shared = AppDataManager()
     
     private let hasLaunchedBeforeKey = "hasLaunchedBefore"

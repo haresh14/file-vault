@@ -10,7 +10,7 @@ import UIKit
 import SwiftUI
 import CoreMotion
 
-class SecurityManager: ObservableObject {
+class SecurityManager: ObservableObject, SecurityManaging {
     static let shared = SecurityManager()
     
     @Published var isScreenshotProtectionEnabled = true
@@ -215,11 +215,40 @@ class SecurityManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "SecurityLogs")
     }
     
+    // MARK: - Protocol Required Methods
+    
+    func activateScreenProtection() {
+        if isScreenshotProtectionEnabled {
+            showScreenshotProtection()
+        }
+        if isRecordingProtectionEnabled {
+            showRecordingProtection()
+        }
+    }
+    
+    func deactivateScreenProtection() {
+        hideScreenshotProtection()
+        hideRecordingProtection()
+    }
+    
+    func lockApp() {
+        triggerSecurityLock(reason: "Manual lock")
+    }
+    
+    func saveSettings() {
+        UserDefaults.standard.set(isShakeToLockEnabled, forKey: "shakeToLockEnabled")
+        UserDefaults.standard.set(isFlipToLockEnabled, forKey: "flipToLockEnabled")
+        UserDefaults.standard.set(isScreenshotProtectionEnabled, forKey: "screenshotProtectionEnabled")
+        UserDefaults.standard.set(isRecordingProtectionEnabled, forKey: "recordingProtectionEnabled")
+    }
+    
     // MARK: - Settings Management
     
-    private func loadSettings() {
+    func loadSettings() {
         isShakeToLockEnabled = UserDefaults.standard.bool(forKey: "shakeToLockEnabled")
         isFlipToLockEnabled = UserDefaults.standard.bool(forKey: "flipToLockEnabled")
+        isScreenshotProtectionEnabled = UserDefaults.standard.object(forKey: "screenshotProtectionEnabled") as? Bool ?? true
+        isRecordingProtectionEnabled = UserDefaults.standard.object(forKey: "recordingProtectionEnabled") as? Bool ?? true
     }
     
     func enableShakeToLock(_ enabled: Bool) {
