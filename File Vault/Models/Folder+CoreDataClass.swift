@@ -48,4 +48,15 @@ public class Folder: NSManagedObject {
     var displayName: String {
         return name ?? "Untitled Folder"
     }
+    
+    func isDescendant(of folder: Folder) -> Bool {
+        var current = self.parent
+        while let currentFolder = current {
+            if currentFolder.objectID == folder.objectID {
+                return true
+            }
+            current = currentFolder.parent
+        }
+        return false
+    }
 } 

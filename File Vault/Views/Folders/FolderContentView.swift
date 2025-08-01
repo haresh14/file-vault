@@ -1,16 +1,12 @@
 //  FolderContentView.swift
 //  File Vault
-//  Extracted as part of refactor
+//  Refactored folder content view with MVVM separation
 
 import SwiftUI
 import UIKit
 import Photos
 import PhotosUI
 import UniformTypeIdentifiers
-
-// NOTE: This is a verbatim copy of the original FolderContentView implementation.
-// No functional changes have been made. Next refactor cycle will migrate the
-// logic to FolderViewModel.
 
 struct FolderContentView: View {
     let folder: Folder?
