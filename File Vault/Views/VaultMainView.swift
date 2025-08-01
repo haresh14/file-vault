@@ -124,10 +124,26 @@ struct VaultMainView: View {
             isSelectionMode: viewModel.isSelectionMode,
             selectedItems: viewModel.selectedItems,
             isImporting: viewModel.isImporting,
-            emptyStateConfig: .noPhotos(onAddPhotos: { viewModel.showPhotoPicker = true }),
+            emptyStateConfig: emptyStateConfiguration,
             onItemTap: handleItemTap,
             onItemLongPress: handleItemLongPress
         )
+    }
+    
+    /// Empty state configuration that respects fake login state
+    private var emptyStateConfiguration: EmptyStateConfiguration {
+        if loginStateManager.canAddFiles {
+            return .noPhotos(onAddPhotos: { viewModel.showPhotoPicker = true })
+        } else {
+            // During fake login, show empty state without any actions
+            return EmptyStateConfiguration(
+                iconName: "photo.on.rectangle.angled",
+                title: "No Photos or Videos", 
+                subtitle: "Your photo gallery appears to be empty",
+                primaryAction: nil,
+                style: .default
+            )
+        }
     }
     
     // MARK: - Action Handlers

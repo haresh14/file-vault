@@ -54,6 +54,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
 
     // MARK: - Dependencies
     private let folder: Folder?
+    private let loginStateManager: any LoginStateManaging
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
@@ -85,8 +86,9 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         )
     }
 
-    init(folder: Folder?) {
+    init(folder: Folder?, loginStateManager: any LoginStateManaging = LoginStateManager.shared) {
         self.folder = folder
+        self.loginStateManager = loginStateManager
         loadContent()
 
         // reload when Core Data saves
@@ -275,6 +277,13 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     }
 
     private func loadContent() {
+        // Show empty folder content during fake login for security
+        guard !loginStateManager.shouldShowEmptyVault else {
+            folders = []
+            files = []
+            return
+        }
+        
         if let folder = folder {
             folders = folder.subfoldersArray
             files = folder.itemsArray

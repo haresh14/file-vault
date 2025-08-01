@@ -131,6 +131,12 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     
     /// Load vault items from Core Data
     func loadVaultItems() {
+        // Show empty gallery during fake login for security
+        guard !loginStateManager.shouldShowEmptyVault else {
+            vaultItems = []
+            return
+        }
+        
         let allItems = coreDataManager.fetchVaultItemsFromAllFolders()
         // Filter to only show photos and videos in the Gallery
         vaultItems = allItems.filter { $0.isImage || $0.isVideo }
