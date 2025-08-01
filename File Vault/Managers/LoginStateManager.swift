@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-class LoginStateManager: ObservableObject {
+class LoginStateManager: ObservableObject, LoginStateManaging {
     static let shared = LoginStateManager()
     
     @Published var isFakeLogin: Bool = false

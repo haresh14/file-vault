@@ -12,7 +12,7 @@ import SwiftUI
 import BackgroundTasks
 import UIKit
 
-class WebServerManager: ObservableObject {
+class WebServerManager: ObservableObject, WebServerManaging {
     static let shared = WebServerManager()
     
     @Published var isRunning = false
@@ -712,7 +712,11 @@ class WebServerManager: ObservableObject {
             
             let newFolder = CoreDataManager.shared.createFolder(name: folderName.trimmingCharacters(in: .whitespacesAndNewlines), parent: parentFolder)
             
-            print("DEBUG: ✅ Created folder: \(newFolder.displayName)")
+            if let folder = newFolder {
+                print("DEBUG: ✅ Created folder: \(folder.displayName)")
+            } else {
+                print("DEBUG: ❌ Failed to create folder")
+            }
             sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder created successfully")
             
             // Notify UI to refresh

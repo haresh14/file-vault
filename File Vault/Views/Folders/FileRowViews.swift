@@ -73,7 +73,11 @@ struct FileRowView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: file)
             DispatchQueue.main.async {
-                self.thumbnail = loadedThumbnail
+                if let data = loadedThumbnail {
+                    self.thumbnail = UIImage(data: data)
+                } else {
+                    self.thumbnail = nil
+                }
             }
         }
     }
@@ -157,7 +161,11 @@ struct SelectableFileRowView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let loadedThumbnail = FileStorageManager.shared.loadThumbnail(for: file)
             DispatchQueue.main.async {
-                self.thumbnail = loadedThumbnail
+                if let data = loadedThumbnail {
+                    self.thumbnail = UIImage(data: data)
+                } else {
+                    self.thumbnail = nil
+                }
             }
         }
     }

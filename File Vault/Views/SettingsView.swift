@@ -14,6 +14,13 @@ struct SettingsView: View {
     @State private var showResetConfirmation = false
     @State private var showDeleteFilesAlert = false
     @State private var lockTimeout = KeychainManager.shared.getLockTimeout()
+    
+    private var lockTimeoutDisplayName: String {
+        guard let lockTimeoutEnum = KeychainManager.LockTimeout(rawValue: lockTimeout) else {
+            return "Unknown"
+        }
+        return lockTimeoutEnum.displayName
+    }
     @State private var showBiometricAlert = false
     @State private var showChangeAuthSheet = false
     @State private var showFakePasswordSheet = false
@@ -221,7 +228,7 @@ struct SettingsView: View {
     private var lockBehaviorSection: some View {
         Section("Lock Behavior") {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Current Setting: \(lockTimeout.displayName)")
+                Text("Current Setting: \(lockTimeoutDisplayName)")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
@@ -327,7 +334,7 @@ struct SettingsView: View {
     private var lockTimeoutPicker: some View {
         Picker("Auto-Lock", selection: $lockTimeout) {
             ForEach(KeychainManager.LockTimeout.allCases, id: \.self) { timeout in
-                Text(timeout.displayName).tag(timeout)
+                Text(timeout.displayName).tag(timeout.rawValue)
             }
         }
         .onChange(of: lockTimeout) { _, newValue in
@@ -375,22 +382,24 @@ struct SettingsView: View {
     
     private var lockBehaviorDescription: String {
         switch lockTimeout {
-        case .immediate:
+        case 0: // immediate
             return "App will lock immediately when backgrounded"
-        case .fiveSeconds:
+        case 5: // fiveSeconds
             return "App will lock after 5 seconds in background"
-        case .tenSeconds:
+        case 10: // tenSeconds
             return "App will lock after 10 seconds in background"
-        case .fifteenSeconds:
+        case 15: // fifteenSeconds
             return "App will lock after 15 seconds in background"
-        case .thirtySeconds:
+        case 30: // thirtySeconds
             return "App will lock after 30 seconds in background"
-        case .oneMinute:
+        case 60: // oneMinute
             return "App will lock after 1 minute in background"
-        case .fiveMinutes:
+        case 300: // fiveMinutes
             return "App will lock after 5 minutes in background"
-        case .never:
+        case -1: // never
             return "App will never lock automatically (not recommended)"
+        default:
+            return "App will lock after \(lockTimeout) seconds in background"
         }
     }
     

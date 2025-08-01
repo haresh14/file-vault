@@ -769,7 +769,7 @@ struct ZoomablePhotoView: View {
             do {
                 let image = try await FileStorageManager.shared.loadImage(for: vaultItem)
                 await MainActor.run {
-                    self.image = image
+                    self.image = UIImage(data: image)
                     self.isLoading = false
                 }
             } catch {

@@ -41,7 +41,7 @@ enum AuthenticationType: String, CaseIterable {
     }
 }
 
-class KeychainManager {
+class KeychainManager: KeychainManaging {
     static let shared = KeychainManager()
     
     private let service = "com.filevault.app"
@@ -207,6 +207,10 @@ class KeychainManager {
         }
     }
     
+    func setFakePassword(_ password: String) throws {
+        try saveFakePassword(password)
+    }
+    
     func validatePassword(_ inputPassword: String) -> (isValid: Bool, isFakeLogin: Bool) {
         do {
             let mainPassword = try getPassword()
@@ -284,14 +288,17 @@ class KeychainManager {
         }
     }
     
-    func setLockTimeout(_ timeout: LockTimeout) {
-        UserDefaults.standard.set(timeout.rawValue, forKey: lockTimeoutKey)
+    func setLockTimeout(_ timeout: Int) {
+        UserDefaults.standard.set(timeout, forKey: lockTimeoutKey)
     }
     
-    func getLockTimeout() -> LockTimeout {
+    func getLockTimeout() -> Int {
         let rawValue = UserDefaults.standard.integer(forKey: lockTimeoutKey)
-        // Default to 30 seconds if not set
-        return LockTimeout(rawValue: rawValue) ?? .thirtySeconds
+        // Check if key exists in UserDefaults - if not, default to 30 seconds
+        if UserDefaults.standard.object(forKey: lockTimeoutKey) == nil {
+            return LockTimeout.thirtySeconds.rawValue
+        }
+        return rawValue
     }
     
     func setLastBackgroundTime() {
@@ -302,12 +309,12 @@ class KeychainManager {
         let timeout = getLockTimeout()
         
         // If set to never, don't require authentication
-        if timeout == .never {
+        if timeout == LockTimeout.never.rawValue {
             return false
         }
         
         // If set to immediate, always require authentication
-        if timeout == .immediate {
+        if timeout == LockTimeout.immediate.rawValue {
             return true
         }
         
@@ -316,7 +323,7 @@ class KeychainManager {
         }
         
         let timeInterval = Date().timeIntervalSince(lastBackgroundTime)
-        return timeInterval > Double(timeout.rawValue)
+        return timeInterval > Double(timeout)
     }
     
     func clearLastBackgroundTime() {

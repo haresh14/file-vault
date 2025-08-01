@@ -144,7 +144,7 @@ struct KeychainManagerTests {
         
         // Test default timeout
         let defaultTimeout = manager.getLockTimeout()
-        #expect(defaultTimeout == .thirtySeconds, "Default lock timeout should be 30 seconds")
+        #expect(defaultTimeout == KeychainManager.LockTimeout.thirtySeconds.rawValue, "Default lock timeout should be 30 seconds")
         
         // Test setting different timeouts
         let testTimeouts: [KeychainManager.LockTimeout] = [
@@ -153,9 +153,9 @@ struct KeychainManagerTests {
         ]
         
         for timeout in testTimeouts {
-            manager.setLockTimeout(timeout)
+            manager.setLockTimeout(timeout.rawValue)
             let retrievedTimeout = manager.getLockTimeout()
-            #expect(retrievedTimeout == timeout, "Lock timeout should be set correctly for \(timeout)")
+            #expect(retrievedTimeout == timeout.rawValue, "Lock timeout should be set correctly for \(timeout)")
         }
         
         // Restore default
@@ -194,23 +194,23 @@ struct KeychainManagerTests {
         manager.setLastBackgroundTime()
         
         // Test immediate timeout
-        manager.setLockTimeout(.immediate)
+        manager.setLockTimeout(KeychainManager.LockTimeout.immediate.rawValue)
         #expect(manager.shouldRequireAuthentication() == true, "Should always require authentication with immediate timeout")
         
         // Test never timeout
-        manager.setLockTimeout(.never)
+        manager.setLockTimeout(KeychainManager.LockTimeout.never.rawValue)
         #expect(manager.shouldRequireAuthentication() == false, "Should never require authentication with never timeout")
         
         // Cleanup
         manager.clearLastBackgroundTime()
-        manager.setLockTimeout(.thirtySeconds)
+        manager.setLockTimeout(KeychainManager.LockTimeout.thirtySeconds.rawValue)
     }
     
     @Test func testBackgroundTimeoutLogic() async throws {
         let manager = KeychainManager.shared
         
         // Test with 5 second timeout
-        manager.setLockTimeout(.fiveSeconds)
+        manager.setLockTimeout(KeychainManager.LockTimeout.fiveSeconds.rawValue)
         manager.setLastBackgroundTime()
         
         // Immediately check - should not require auth
@@ -227,7 +227,42 @@ struct KeychainManagerTests {
         
         // Cleanup
         manager.clearLastBackgroundTime()
-        manager.setLockTimeout(.thirtySeconds)
+        manager.setLockTimeout(KeychainManager.LockTimeout.thirtySeconds.rawValue)
+    }
+    
+    @Test func testImmediateLockTimeoutBugFix() async throws {
+        let manager = KeychainManager.shared
+        
+        // This test specifically validates the fix for the "Immediately" timeout bug
+        // where getLockTimeout() was incorrectly returning 30 instead of 0
+        
+        // Set timeout to "Immediately" (raw value 0)
+        manager.setLockTimeout(KeychainManager.LockTimeout.immediate.rawValue)
+        
+        // Verify it correctly returns 0, not a default value
+        let retrievedTimeout = manager.getLockTimeout()
+        #expect(retrievedTimeout == 0, "Immediate timeout should return 0, not default value")
+        #expect(retrievedTimeout == KeychainManager.LockTimeout.immediate.rawValue, "Retrieved timeout should match immediate raw value")
+        
+        // Verify shouldRequireAuthentication works correctly with immediate timeout
+        manager.setLastBackgroundTime()
+        #expect(manager.shouldRequireAuthentication() == true, "Should always require authentication with immediate timeout, regardless of background time")
+        
+        // Test all timeout values to ensure they're stored and retrieved correctly
+        let allTimeouts: [KeychainManager.LockTimeout] = [
+            .immediate, .fiveSeconds, .tenSeconds, .fifteenSeconds,
+            .thirtySeconds, .oneMinute, .fiveMinutes, .never
+        ]
+        
+        for timeout in allTimeouts {
+            manager.setLockTimeout(timeout.rawValue)
+            let retrieved = manager.getLockTimeout()
+            #expect(retrieved == timeout.rawValue, "Timeout \(timeout) (raw: \(timeout.rawValue)) should be stored and retrieved correctly")
+        }
+        
+        // Cleanup
+        manager.clearLastBackgroundTime()
+        manager.setLockTimeout(KeychainManager.LockTimeout.thirtySeconds.rawValue)
     }
     
     // MARK: - Error Handling Tests
@@ -269,18 +304,18 @@ struct KeychainManagerTests {
         // Store password and settings
         try manager.savePassword(testPassword)
         manager.setBiometricEnabled(true)
-        manager.setLockTimeout(.oneMinute)
+        manager.setLockTimeout(KeychainManager.LockTimeout.oneMinute.rawValue)
         
         // Verify persistence (simulate app restart by creating new manager instance)
         // Note: Since it's a singleton, we test the persistence through the same instance
         #expect(manager.isPasswordSet() == true, "Password should persist")
         #expect(manager.isBiometricEnabled() == true, "Biometric setting should persist")
-        #expect(manager.getLockTimeout() == .oneMinute, "Lock timeout should persist")
+        #expect(manager.getLockTimeout() == KeychainManager.LockTimeout.oneMinute.rawValue, "Lock timeout should persist")
         
         // Cleanup
         try manager.deletePassword()
         manager.setBiometricEnabled(false)
-        manager.setLockTimeout(.thirtySeconds)
+        manager.setLockTimeout(KeychainManager.LockTimeout.thirtySeconds.rawValue)
     }
     
     // MARK: - Performance Tests

@@ -12,29 +12,6 @@ struct FolderContentView: View {
     let folder: Folder?
     @Binding var navigationPath: NavigationPath
     @StateObject private var viewModel: FolderViewModel
-
-    @State private var showCreateFolder = false
-    @State private var newFolderName = ""
-    @State private var showRenameFolder = false
-    @State private var folderToRename: Folder? = nil
-    @State private var renameText = ""
-    @State private var showUnifiedMediaViewer = false
-    @State private var mediaViewerIndex = -1
-    @State private var showPhotoPicker = false
-    @State private var showDocumentPicker = false
-    @State private var isImporting = false
-    @State private var importProgress: Double = 0
-    @State private var showSortActionSheet = false
-    @State private var showAddActionSheet = false
-    @State private var sortOption: FolderSortOption = .name
-    @State private var sortAscending: Bool = true
-    @State private var isSelectionMode = false
-    @State private var selectedFolders: Set<Folder> = []
-    @State private var selectedFiles: Set<VaultItem> = []
-    @State private var showDeleteAlert = false
-    @State private var showSwipeDeleteAlert = false
-    @State private var showMoveSheet = false
-    @State private var itemsToDelete: [Any] = []
     @StateObject private var loginStateManager = LoginStateManager.shared
     @Environment(\.managedObjectContext) var context
 
@@ -45,13 +22,13 @@ struct FolderContentView: View {
         _viewModel = StateObject(wrappedValue: FolderViewModel(folder: folder))
     }
 
-    private var isMediaViewerPresented: Binding<Bool> {
+    private     var isMediaViewerPresented: Binding<Bool> {
         Binding(
-            get: { showUnifiedMediaViewer && mediaViewerIndex > -1 },
+            get: { viewModel.showUnifiedMediaViewer && viewModel.mediaViewerIndex > -1 },
             set: { newValue in
                 if !newValue {
-                    showUnifiedMediaViewer = false
-                    mediaViewerIndex = -1
+                    viewModel.showUnifiedMediaViewer = false
+                    viewModel.mediaViewerIndex = -1
                 }
             }
         )
@@ -70,7 +47,7 @@ struct FolderContentView: View {
             return []
         }
         let sorted: [VaultItem]
-        switch sortOption {
+        switch viewModel.sortOption {
         case .name:
             sorted = files.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
         case .date:
@@ -80,7 +57,7 @@ struct FolderContentView: View {
         case .kind:
             sorted = files.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
-        return sortAscending ? sorted : sorted.reversed()
+        return viewModel.sortAscending ? sorted : sorted.reversed()
     }
 
     var body: some View {
@@ -107,7 +84,7 @@ struct FolderContentView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                if isSelectionMode {
+                if viewModel.isSelectionMode {
                     Button("Select All") {
                         selectAllItems()
                     }
@@ -116,13 +93,13 @@ struct FolderContentView: View {
                 }
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if isSelectionMode {
-                    if !selectedFolders.isEmpty || !selectedFiles.isEmpty {
-                        Button(action: { showMoveSheet = true }) {
+                if viewModel.isSelectionMode {
+                    if !viewModel.selectedFolders.isEmpty || !viewModel.selectedFiles.isEmpty {
+                        Button(action: { viewModel.showMoveSheet = true }) {
                             Image(systemName: "arrow.up.doc.on.clipboard")
                                 .foregroundColor(.blue)
                         }
-                        Button(action: { showDeleteAlert = true }) {
+                        Button(action: { viewModel.showDeleteAlert = true }) {
                             Image(systemName: "trash")
                                 .foregroundColor(.red)
                         }
@@ -132,11 +109,11 @@ struct FolderContentView: View {
                     }
                 } else {
                     if loginStateManager.canAddFiles {
-                        Button(action: { showAddActionSheet = true }) {
+                        Button(action: { viewModel.showAddActionSheet = true }) {
                             Image(systemName: "plus")
                         }
                     }
-                    Button(action: { showSortActionSheet = true }) {
+                    Button(action: { viewModel.showSortActionSheet = true }) {
                         Image(systemName: "arrow.up.arrow.down")
                     }
                     Button("Select") {
@@ -148,10 +125,10 @@ struct FolderContentView: View {
         }
 
 
-        .alert("Create Folder", isPresented: $showCreateFolder) {
-            TextField("Folder Name", text: $newFolderName)
+        .alert("Create Folder", isPresented: $viewModel.showCreateFolder) {
+            TextField("Folder Name", text: $viewModel.newFolderName)
             Button("Cancel", role: .cancel) {
-                newFolderName = ""
+                viewModel.newFolderName = ""
             }
             Button("Create") {
                 createFolder()
@@ -159,11 +136,11 @@ struct FolderContentView: View {
         } message: {
             Text("Enter a name for the new folder")
         }
-        .alert("Rename Folder", isPresented: $showRenameFolder) {
-            TextField("Folder Name", text: $renameText)
+        .alert("Rename Folder", isPresented: $viewModel.showRenameFolder) {
+            TextField("Folder Name", text: $viewModel.renameText)
             Button("Cancel", role: .cancel) {
-                renameText = ""
-                folderToRename = nil
+                viewModel.renameText = ""
+                viewModel.folderToRename = nil
             }
             Button("Rename") {
                 renameFolder()
@@ -171,91 +148,91 @@ struct FolderContentView: View {
         } message: {
             Text("Enter a new name for the folder")
         }
-        .alert("Delete Items", isPresented: $showDeleteAlert) {
+        .alert("Delete Items", isPresented: $viewModel.showDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 deleteSelectedItems()
             }
         } message: {
-            let totalItems = selectedFolders.count + selectedFiles.count
+            let totalItems = viewModel.selectedFolders.count + viewModel.selectedFiles.count
             return Text("Are you sure you want to delete \(totalItems) item(s)? This action cannot be undone.")
         }
-        .alert("Delete Items", isPresented: $showSwipeDeleteAlert) {
+        .alert("Delete Items", isPresented: $viewModel.showSwipeDeleteAlert) {
             Button("Cancel", role: .cancel) {
-                itemsToDelete.removeAll()
+                viewModel.itemsToDelete.removeAll()
             }
             Button("Delete", role: .destructive) {
                 performSwipeDelete()
             }
         } message: {
-            Text("Are you sure you want to delete \(itemsToDelete.count) item(s)? This action cannot be undone.")
+            Text("Are you sure you want to delete \(viewModel.itemsToDelete.count) item(s)? This action cannot be undone.")
         }
-        .sheet(isPresented: $showPhotoPicker) {
+        .sheet(isPresented: $viewModel.showPhotoPicker) {
             PhotoPickerView { results in
                 importAssets(results)
             }
         }
-        .sheet(isPresented: $showDocumentPicker) {
+        .sheet(isPresented: $viewModel.showDocumentPicker) {
             DocumentPickerView { dataArray in
                 importDocuments(dataArray)
             }
         }
-        .sheet(isPresented: $showSortActionSheet) {
+        .sheet(isPresented: $viewModel.showSortActionSheet) {
             FolderSortPopupView(
-                currentSortOption: sortOption,
-                sortAscending: sortAscending,
+                currentSortOption: viewModel.sortOption,
+                sortAscending: viewModel.sortAscending,
                 onSortSelected: { option in
-                    if option == sortOption {
-                        sortAscending.toggle()
+                    if option == viewModel.sortOption {
+                        viewModel.sortAscending.toggle()
                     } else {
-                        sortOption = option
-                        sortAscending = true
+                        viewModel.sortOption = option
+                        viewModel.sortAscending = true
                     }
-                    showSortActionSheet = false
+                    viewModel.showSortActionSheet = false
                 }
             )
             .presentationDetents([.fraction(0.5)])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showAddActionSheet) {
+        .sheet(isPresented: $viewModel.showAddActionSheet) {
             FolderAddActionSheet(
                 onAddPhotos: {
-                    showAddActionSheet = false
-                    showPhotoPicker = true
+                    viewModel.showAddActionSheet = false
+                    viewModel.showPhotoPicker = true
                 },
                 onAddFiles: {
-                    showAddActionSheet = false
-                    showDocumentPicker = true
+                    viewModel.showAddActionSheet = false
+                    viewModel.showDocumentPicker = true
                 },
                 onCreateFolder: {
-                    showAddActionSheet = false
-                    showCreateFolder = true
+                    viewModel.showAddActionSheet = false
+                    viewModel.showCreateFolder = true
                 }
             )
             .presentationDetents([.fraction(0.4)])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showMoveSheet) {
+        .sheet(isPresented: $viewModel.showMoveSheet) {
             FolderPickerView(
-                selectedFolders: selectedFolders,
-                selectedFiles: selectedFiles,
+                selectedFolders: viewModel.selectedFolders,
+                selectedFiles: viewModel.selectedFiles,
                 currentFolder: folder,
                 onMove: { destinationFolder in
                     moveSelectedItems(to: destinationFolder)
-                    showMoveSheet = false
+                    viewModel.showMoveSheet = false
                 }
             )
         }
         .fullScreenCover(isPresented: isMediaViewerPresented) {
             UnifiedMediaViewerView(
                 mediaItems: sortedFiles,
-                initialIndex: mediaViewerIndex
+                initialIndex: viewModel.mediaViewerIndex
             )
         }
         .overlay(
             Group {
-                if isImporting {
-                    ImportProgressView(progress: importProgress)
+                if viewModel.isImporting {
+                    ImportProgressView(progress: viewModel.importProgress)
                 }
             }
         )
@@ -302,41 +279,21 @@ struct FolderContentView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            if loginStateManager.shouldShowEmptyVault {
-                Image(systemName: "folder.badge.questionmark")
-                    .font(.system(size: 80))
-                    .foregroundColor(.gray)
-                Text("No Content")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Text("This vault appears to be empty")
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else {
-                Image(systemName: folder == nil ? "folder.badge.plus" : "folder")
-                    .font(.system(size: 80))
-                    .foregroundColor(.gray)
-                Text(folder == nil ? "No Folders Yet" : "Empty Folder")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Text(folder == nil ? "Create folders to organize your files" : "Add files or create subfolders to organize your content")
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                if loginStateManager.canCreateFolders {
-                    Button(action: { showCreateFolder = true }) {
-                        Text("Create Folder")
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 200)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
-                }
-            }
+        EmptyStateView(emptyStateConfiguration)
+    }
+    
+    private var emptyStateConfiguration: EmptyStateConfiguration {
+        if loginStateManager.shouldShowEmptyVault {
+            return .noContent
+        } else if folder == nil {
+            return .noFolders(onCreateFolder: { viewModel.showCreateFolder = true })
+        } else {
+            return .emptyFolder(
+                canCreateFolders: loginStateManager.canCreateFolders,
+                canAddFiles: loginStateManager.canAddFiles,
+                onCreateFolder: { viewModel.showCreateFolder = true },
+                onAddFiles: { viewModel.showAddActionSheet = true }
+            )
         }
     }
 
@@ -347,10 +304,10 @@ struct FolderContentView: View {
                     ForEach(sortedFolders) { folder in
                         SelectableFolderRowView(
                             folder: folder,
-                            isSelected: selectedFolders.contains(folder),
-                            isSelectionMode: isSelectionMode,
+                            isSelected: viewModel.selectedFolders.contains(folder),
+                            isSelectionMode: viewModel.isSelectionMode,
                             onTap: {
-                                if isSelectionMode {
+                                if viewModel.isSelectionMode {
                                     toggleFolderSelection(folder)
                                 } else {
                                     navigationPath.append(folder)
@@ -365,7 +322,7 @@ struct FolderContentView: View {
                                 .opacity(0)
                         )
                     }
-                    .onDelete(perform: isSelectionMode ? nil : deleteFolders)
+                    .onDelete(perform: viewModel.isSelectionMode ? nil : deleteFolders)
                 }
             }
             if !files.isEmpty {
@@ -373,10 +330,10 @@ struct FolderContentView: View {
                     ForEach(sortedFiles) { file in
                         SelectableFileRowView(
                             file: file,
-                            isSelected: selectedFiles.contains(file),
-                            isSelectionMode: isSelectionMode,
+                            isSelected: viewModel.selectedFiles.contains(file),
+                            isSelectionMode: viewModel.isSelectionMode,
                             onTap: {
-                                if isSelectionMode {
+                                if viewModel.isSelectionMode {
                                     toggleFileSelection(file)
                                 } else {
                                     viewFile(file)
@@ -384,7 +341,7 @@ struct FolderContentView: View {
                             }
                         )
                     }
-                    .onDelete(perform: isSelectionMode ? nil : deleteFiles)
+                    .onDelete(perform: viewModel.isSelectionMode ? nil : deleteFiles)
                 }
             }
         }
@@ -394,66 +351,66 @@ struct FolderContentView: View {
     }
 
     private func createFolder() {
-        guard !newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            newFolderName = ""; return }
-        viewModel.createFolder(named: newFolderName)
-        newFolderName = ""
+        guard !viewModel.newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            viewModel.newFolderName = ""; return }
+        viewModel.createFolder(named: viewModel.newFolderName)
+        viewModel.newFolderName = ""
     }
     private func startRenaming(_ folder: Folder) {
-        folderToRename = folder; renameText = folder.displayName; showRenameFolder = true
+        viewModel.folderToRename = folder; viewModel.renameText = folder.displayName; viewModel.showRenameFolder = true
     }
     private func renameFolder() {
-        guard let folder = folderToRename,
-              !renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { renameText = ""; folderToRename = nil; return }
-        viewModel.renameFolder(folder, to: renameText)
-        renameText = ""; folderToRename = nil
+        guard let folder = viewModel.folderToRename,
+              !viewModel.renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { viewModel.renameText = ""; viewModel.folderToRename = nil; return }
+        viewModel.renameFolder(folder, to: viewModel.renameText)
+        viewModel.renameText = ""; viewModel.folderToRename = nil
     }
     private func deleteFolders(offsets: IndexSet) {
-        itemsToDelete = offsets.map { sortedFolders[$0] }; showSwipeDeleteAlert = true
+        viewModel.itemsToDelete = offsets.map { sortedFolders[$0] }; viewModel.showSwipeDeleteAlert = true
     }
     private func deleteFiles(offsets: IndexSet) {
-        itemsToDelete = offsets.map { sortedFiles[$0] }; showSwipeDeleteAlert = true
+        viewModel.itemsToDelete = offsets.map { sortedFiles[$0] }; viewModel.showSwipeDeleteAlert = true
     }
     private func performSwipeDelete() {
-        viewModel.selectedFolders = Set(itemsToDelete.compactMap { $0 as? Folder })
-        viewModel.selectedFiles   = Set(itemsToDelete.compactMap { $0 as? VaultItem })
+        viewModel.selectedFolders = Set(viewModel.itemsToDelete.compactMap { $0 as? Folder })
+        viewModel.selectedFiles   = Set(viewModel.itemsToDelete.compactMap { $0 as? VaultItem })
         viewModel.deleteSelectedItems()
-        itemsToDelete.removeAll()
+        viewModel.itemsToDelete.removeAll()
     }
     private func enterSelectionMode() {
-        isSelectionMode = true
+        viewModel.isSelectionMode = true
         viewModel.enterSelectionMode()
-        selectedFolders.removeAll()
-        selectedFiles.removeAll()
+        viewModel.selectedFolders.removeAll()
+        viewModel.selectedFiles.removeAll()
     }
     private func exitSelectionMode() {
-        isSelectionMode = false
+        viewModel.isSelectionMode = false
         viewModel.exitSelectionMode()
-        selectedFolders.removeAll()
-        selectedFiles.removeAll()
+        viewModel.selectedFolders.removeAll()
+        viewModel.selectedFiles.removeAll()
     }
     private func toggleFolderSelection(_ folder: Folder) {
         viewModel.toggleFolderSelection(folder)
-        selectedFolders = viewModel.selectedFolders
+        viewModel.selectedFolders = viewModel.selectedFolders
     }
     private func toggleFileSelection(_ file: VaultItem) {
         viewModel.toggleFileSelection(file)
-        selectedFiles = viewModel.selectedFiles
+        viewModel.selectedFiles = viewModel.selectedFiles
     }
     private func selectAllItems() {
         viewModel.selectAll()
-        selectedFolders = viewModel.selectedFolders
-        selectedFiles = viewModel.selectedFiles
+        viewModel.selectedFolders = viewModel.selectedFolders
+        viewModel.selectedFiles = viewModel.selectedFiles
     }
     private func moveSelectedItems(to destinationFolder: Folder?) {
-        viewModel.selectedFolders = selectedFolders
-        viewModel.selectedFiles = selectedFiles
+        viewModel.selectedFolders = viewModel.selectedFolders
+        viewModel.selectedFiles = viewModel.selectedFiles
         viewModel.moveSelectedItems(to: destinationFolder)
         exitSelectionMode()
     }
     private func deleteSelectedItems() {
-        viewModel.selectedFolders = selectedFolders
-        viewModel.selectedFiles = selectedFiles
+        viewModel.selectedFolders = viewModel.selectedFolders
+        viewModel.selectedFiles = viewModel.selectedFiles
         viewModel.deleteSelectedItems()
         exitSelectionMode()
     }
@@ -461,14 +418,14 @@ struct FolderContentView: View {
     // MARK: - File viewing & imports (unchanged from original)
     private func viewFile(_ file: VaultItem) {
         if let index = sortedFiles.firstIndex(where: { $0.objectID == file.objectID }) {
-            mediaViewerIndex = index; showUnifiedMediaViewer = true
+            viewModel.mediaViewerIndex = index; viewModel.showUnifiedMediaViewer = true
         }
     }
     private func importAssets(_ results: [PHPickerResult]) {
         guard !results.isEmpty else { return }
-        showPhotoPicker = false
-        isImporting = true
-        importProgress = 0
+        viewModel.showPhotoPicker = false
+        viewModel.isImporting = true
+        viewModel.importProgress = 0
         let totalItems = Double(results.count)
         var processedItems = 0.0
         for result in results {
@@ -502,15 +459,15 @@ struct FolderContentView: View {
         }
         func updateProgress() {
             DispatchQueue.main.async {
-                processedItems += 1; importProgress = processedItems / totalItems
-                if processedItems == totalItems { self.isImporting = false; self.viewModel.finishImportingAssets() }
+                processedItems += 1; viewModel.importProgress = processedItems / totalItems
+                if processedItems == totalItems { self.viewModel.isImporting = false; self.viewModel.finishImportingAssets() }
             }
         }
     }
     private func importDocuments(_ dataArray: [(Data, String)]) {
         guard !dataArray.isEmpty else { return }
-        showDocumentPicker = false
-        isImporting = true; importProgress = 0
+        viewModel.showDocumentPicker = false
+        viewModel.isImporting = true; viewModel.importProgress = 0
         let totalItems = Double(dataArray.count)
         var processedItems = 0.0
         for (data, fileName) in dataArray {
@@ -518,9 +475,9 @@ struct FolderContentView: View {
                 let fileType = FileStorageManager.shared.determineFileType(from: fileName)
                 _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: fileType, targetFolder: folder)
             } catch { print("Error importing file \(fileName): \(error)") }
-            processedItems += 1; importProgress = processedItems / totalItems
+            processedItems += 1; viewModel.importProgress = processedItems / totalItems
         }
-        isImporting = false; viewModel.finishImportingAssets()
+        viewModel.isImporting = false; viewModel.finishImportingAssets()
     }
 }
 

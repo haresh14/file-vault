@@ -1,0 +1,158 @@
+//
+//  VaultToolbarView.swift
+//  File Vault
+//
+//  Created on 10/07/25.
+//
+
+import SwiftUI
+
+/// Reusable toolbar component for vault-style views with selection and action capabilities
+struct VaultToolbarView: ToolbarContent {
+    // MARK: - Properties
+    
+    let isSelectionMode: Bool
+    let selectedItemCount: Int
+    let totalItemCount: Int
+    let hasSelectedItems: Bool
+    let canAddFiles: Bool
+    let isEmpty: Bool
+    
+    // MARK: - Actions
+    
+    let onSelectAll: () -> Void
+    let onMove: () -> Void
+    let onDelete: () -> Void
+    let onCancel: () -> Void
+    let onAdd: () -> Void
+    let onSort: () -> Void
+    let onEnterSelection: () -> Void
+    
+    // MARK: - Initialization
+    
+    init(
+        isSelectionMode: Bool,
+        selectedItemCount: Int,
+        totalItemCount: Int,
+        hasSelectedItems: Bool,
+        canAddFiles: Bool,
+        isEmpty: Bool,
+        onSelectAll: @escaping () -> Void,
+        onMove: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        onCancel: @escaping () -> Void,
+        onAdd: @escaping () -> Void,
+        onSort: @escaping () -> Void,
+        onEnterSelection: @escaping () -> Void
+    ) {
+        self.isSelectionMode = isSelectionMode
+        self.selectedItemCount = selectedItemCount
+        self.totalItemCount = totalItemCount
+        self.hasSelectedItems = hasSelectedItems
+        self.canAddFiles = canAddFiles
+        self.isEmpty = isEmpty
+        self.onSelectAll = onSelectAll
+        self.onMove = onMove
+        self.onDelete = onDelete
+        self.onCancel = onCancel
+        self.onAdd = onAdd
+        self.onSort = onSort
+        self.onEnterSelection = onEnterSelection
+    }
+    
+    // MARK: - Toolbar Content
+    
+    var body: some ToolbarContent {
+        Group {
+            // Leading toolbar items
+            ToolbarItem(placement: .navigationBarLeading) {
+                leadingContent
+            }
+            
+            // Trailing toolbar items
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                trailingContent
+            }
+        }
+    }
+    
+    // MARK: - Content Builders
+    
+    @ViewBuilder
+    private var leadingContent: some View {
+        if isSelectionMode {
+            Button("Select All", action: onSelectAll)
+        }
+    }
+    
+    @ViewBuilder
+    private var trailingContent: some View {
+        if isSelectionMode {
+            selectionModeActions
+        } else {
+            normalModeActions
+        }
+    }
+    
+    @ViewBuilder
+    private var selectionModeActions: some View {
+        if hasSelectedItems {
+            Button(action: onMove) {
+                Image(systemName: "arrow.up.doc.on.clipboard")
+                    .foregroundColor(.blue)
+            }
+            
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+            }
+        }
+        
+        Button("Cancel", action: onCancel)
+    }
+    
+    @ViewBuilder
+    private var normalModeActions: some View {
+        if canAddFiles {
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+            }
+        }
+        
+        Button(action: onSort) {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        
+        if !isEmpty && canAddFiles {
+            Button("Select", action: onEnterSelection)
+        }
+    }
+}
+
+/// Helper view modifier for consistent navigation title in vault views
+struct VaultNavigationTitle: ViewModifier {
+    let isSelectionMode: Bool
+    let selectedCount: Int
+    let defaultTitle: String
+    
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(isSelectionMode ? "\(selectedCount) selected" : defaultTitle)
+            .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+extension View {
+    /// Apply vault-style navigation title
+    func vaultNavigationTitle(
+        isSelectionMode: Bool,
+        selectedCount: Int,
+        defaultTitle: String = "Gallery"
+    ) -> some View {
+        modifier(VaultNavigationTitle(
+            isSelectionMode: isSelectionMode,
+            selectedCount: selectedCount,
+            defaultTitle: defaultTitle
+        ))
+    }
+}
