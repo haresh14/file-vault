@@ -285,9 +285,8 @@ struct FolderContentView: View {
     private var emptyStateConfiguration: EmptyStateConfiguration {
         if loginStateManager.shouldShowEmptyVault {
             return .noContent
-        } else if folder == nil {
-            return .noFolders(onCreateFolder: { viewModel.showCreateFolder = true })
         } else {
+            // Both root folder and subfolders should have same capabilities
             return .emptyFolder(
                 canCreateFolders: loginStateManager.canCreateFolders,
                 canAddFiles: loginStateManager.canAddFiles,
