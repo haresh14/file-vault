@@ -195,7 +195,7 @@ struct FolderContentView: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $viewModel.showAddActionSheet) {
-            FolderAddActionSheet(
+            UniversalAddContentView.forFolder(
                 onAddPhotos: {
                     viewModel.showAddActionSheet = false
                     viewModel.showPhotoPicker = true

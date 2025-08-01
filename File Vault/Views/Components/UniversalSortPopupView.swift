@@ -1,11 +1,20 @@
+//
+//  UniversalSortPopupView.swift
+//  File Vault
+//
+//  Universal sorting popup component with polished UX
+//  Based on the superior FolderSortPopupView design
+//
+
 import SwiftUI
 
-// MARK: - Folder Sort Popup View (extracted)
-
-struct FolderSortPopupView: View {
-    let currentSortOption: FolderSortOption
+/// Universal sort popup that works with any sortable enum
+/// Features proper navigation interface and consistent design
+struct UniversalSortPopupView<SortType: RawRepresentable & CaseIterable & Hashable>: View 
+where SortType.RawValue == String, SortType: SortOptionProtocol {
+    let currentSortOption: SortType
     let sortAscending: Bool
-    let onSortSelected: (FolderSortOption) -> Void
+    let onSortSelected: (SortType) -> Void
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -13,7 +22,7 @@ struct FolderSortPopupView: View {
             VStack(spacing: 0) {
                 // Sort options
                 VStack(spacing: 0) {
-                    ForEach(FolderSortOption.allCases, id: \.self) { option in
+                    ForEach(Array(SortType.allCases), id: \.self) { option in
                         HStack(spacing: 16) {
                             Image(systemName: option.systemImage)
                                 .font(.body)
@@ -26,7 +35,7 @@ struct FolderSortPopupView: View {
 
                             Spacer()
 
-                            if option == currentSortOption {
+                            if option.hashValue == currentSortOption.hashValue {
                                 Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
                                     .font(.body)
                                     .foregroundColor(.blue)
@@ -40,7 +49,7 @@ struct FolderSortPopupView: View {
                             onSortSelected(option)
                         }
 
-                        if option != FolderSortOption.allCases.last {
+                        if option.hashValue != Array(SortType.allCases).last?.hashValue {
                             Divider()
                                 .padding(.leading, 60)
                         }
@@ -60,3 +69,19 @@ struct FolderSortPopupView: View {
         }
     }
 }
+
+/// Protocol that sort option enums must conform to
+protocol SortOptionProtocol {
+    var systemImage: String { get }
+}
+
+// MARK: - Conformances for existing enums
+
+extension SortOption: SortOptionProtocol {}
+extension FolderSortOption: SortOptionProtocol {}
+
+// MARK: - Convenience type aliases
+
+typealias GallerySortPopupView = UniversalSortPopupView<SortOption>
+typealias CategorySortPopupView = UniversalSortPopupView<SortOption>
+typealias FolderSortPopupView = UniversalSortPopupView<FolderSortOption>

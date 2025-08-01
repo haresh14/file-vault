@@ -63,7 +63,7 @@ struct VaultMainView: View {
                     WebUploadView()
                 }
                 .sheet(isPresented: $viewModel.showSortActionSheet) {
-                SortPopupView(
+                GallerySortPopupView(
                         currentSortOption: viewModel.sortOption,
                         sortAscending: viewModel.sortAscending,
                         onSortSelected: viewModel.handleSortSelection
@@ -72,7 +72,7 @@ struct VaultMainView: View {
                 .presentationDragIndicator(.visible)
             }
                 .sheet(isPresented: $viewModel.showAddActionSheet) {
-                AddActionSheet(
+                UniversalAddContentView.forGallery(
                         onAddPhotos: viewModel.handleAddPhotos,
                         onAddFiles: viewModel.handleAddFiles,
                         onWebUpload: viewModel.handleWebUpload
@@ -151,152 +151,7 @@ struct VaultMainView: View {
 
 // MARK: - Supporting Views
 
-/// Action sheet for adding different types of content
-struct AddActionSheet: View {
-    let onAddPhotos: () -> Void
-    let onAddFiles: () -> Void
-    let onWebUpload: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Add Content")
-                .font(.headline)
-                .padding(.top)
-            
-            VStack(spacing: 16) {
-                ActionButton(
-                    icon: "photo.on.rectangle.angled",
-                    title: "Photos & Videos",
-                    subtitle: "From photo library",
-                    color: .blue,
-                    action: onAddPhotos
-                )
-                
-                ActionButton(
-                    icon: "doc.on.doc",
-                    title: "Files",
-                    subtitle: "Documents and other files",
-                    color: .green,
-                    action: onAddFiles
-                )
-                
-                ActionButton(
-                    icon: "wifi",
-                    title: "Web Upload",
-                    subtitle: "Upload via web browser",
-                    color: .purple,
-                    action: onWebUpload
-                )
-            }
-            
-            Spacer()
-        }
-        .padding()
-    }
-}
 
-/// Reusable action button for action sheets
-struct ActionButton: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
-                    .frame(width: 30)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Text(subtitle)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-/// Sort popup view for selecting sort options
-struct SortPopupView: View {
-    let currentSortOption: SortOption
-    let sortAscending: Bool
-    let onSortSelected: (SortOption) -> Void
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Sort Options")
-                .font(.headline)
-                .padding(.top)
-            
-            VStack(spacing: 12) {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    SortOptionRow(
-                        option: option,
-                        isSelected: option == currentSortOption,
-                        sortAscending: sortAscending,
-                        onTap: { onSortSelected(option) }
-                    )
-                }
-            }
-            
-            Spacer()
-        }
-        .padding()
-    }
-}
-
-/// Row for displaying sort options
-struct SortOptionRow: View {
-    let option: SortOption
-    let isSelected: Bool
-    let sortAscending: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack {
-                            Image(systemName: option.systemImage)
-                    .foregroundColor(isSelected ? .blue : .secondary)
-                                .frame(width: 20)
-                            
-                            Text(option.rawValue)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                if isSelected {
-                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                    .foregroundColor(.blue)
-                }
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-            .cornerRadius(8)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
 
 // MARK: - Preview Support
 
