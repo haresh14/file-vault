@@ -75,8 +75,12 @@ extension VaultItem : Identifiable {
             "application/x-rar-compressed",
             "application/x-7z-compressed"
         ]
-        return documentTypes.contains(fileType.lowercased()) || 
-               (!isImage && !isVideo && !isAudio)
+        return documentTypes.contains(fileType.lowercased())
+    }
+    
+    /// Returns true for files that don't fit into photos, videos, audio, or documents categories
+    var isOther: Bool {
+        return !isImage && !isVideo && !isAudio && !isDocument
     }
     
     var isAudio: Bool {

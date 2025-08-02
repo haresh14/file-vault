@@ -7,7 +7,9 @@ import SwiftUI
 public enum CategoryType: String, CaseIterable {
     case photos = "Photos"
     case videos = "Videos"
+    case audio = "Audio"
     case documents = "Documents"
+    case other = "Other"
     case allFiles = "All Files"
 
     /// System SF Symbol associated with each category.
@@ -15,7 +17,9 @@ public enum CategoryType: String, CaseIterable {
         switch self {
         case .photos: return "photo"
         case .videos: return "video"
+        case .audio: return "music.note"
         case .documents: return "doc"
+        case .other: return "doc.questionmark"
         case .allFiles: return "folder"
         }
     }
@@ -25,7 +29,9 @@ public enum CategoryType: String, CaseIterable {
         switch self {
         case .photos: return .blue
         case .videos: return .purple
+        case .audio: return .green
         case .documents: return .orange
+        case .other: return .brown
         case .allFiles: return .gray
         }
     }

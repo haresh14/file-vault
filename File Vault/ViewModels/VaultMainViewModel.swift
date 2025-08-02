@@ -34,6 +34,10 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     @Published var showUnifiedMediaViewer: Bool = false
     @Published var mediaViewerIndex: Int = -1
     
+    // File Preview Management
+    @Published var showFilePreview: Bool = false
+    @Published var filePreviewItem: VaultItem?
+    
     // Sheet and Alert States
     @Published var showPhotoPicker: Bool = false
     @Published var showDocumentPicker: Bool = false
@@ -346,18 +350,36 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     
     // MARK: - Item Actions
     
-    /// View a specific item (show in media viewer or handle document)
+    /// View a specific item (show in media viewer or file preview)
     func viewItem(_ item: VaultItem) {
         if item.isImage || item.isVideo {
-            // Show unified viewer for images and videos
-            if let index = filteredItems.firstIndex(where: { $0.objectID == item.objectID }) {
-                showMediaViewer(at: index)
-            }
+            // Show unified viewer for images and videos only
+            showMediaViewerForItem(item)
         } else {
-            // For now, just log non-media files
-            // TODO: Add document viewer in future update
-            print("Document file tapped: \(item.fileName ?? "unknown") - Preview will be added in future update")
+            // Show file preview for documents, audio, and other files
+            showFilePreview(for: item)
         }
+    }
+    
+    /// Get media files (images and videos only) from filtered items
+    func getMediaFiles() -> [VaultItem] {
+        return filteredItems.filter { item in
+            item.isImage || item.isVideo
+        }
+    }
+    
+    /// Show media viewer for a specific media item
+    func showMediaViewerForItem(_ item: VaultItem) {
+        let mediaFiles = getMediaFiles()
+        if let index = mediaFiles.firstIndex(where: { $0.objectID == item.objectID }) {
+            showMediaViewer(at: index)
+        }
+    }
+    
+    /// Show file preview for non-media files
+    func showFilePreview(for item: VaultItem) {
+        filePreviewItem = item
+        showFilePreview = true
     }
     
     /// Move selected items to destination folder

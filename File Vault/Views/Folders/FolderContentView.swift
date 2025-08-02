@@ -225,9 +225,14 @@ struct FolderContentView: View {
         }
         .fullScreenCover(isPresented: isMediaViewerPresented) {
             UnifiedMediaViewerView(
-                mediaItems: sortedFiles,
+                mediaItems: viewModel.getMediaFiles(),
                 initialIndex: viewModel.mediaViewerIndex
             )
+        }
+        .fullScreenCover(isPresented: $viewModel.showFilePreview) {
+            if let filePreviewItem = viewModel.filePreviewItem {
+                FilePreviewView(vaultItem: filePreviewItem)
+            }
         }
         .overlay(
             Group {
@@ -416,9 +421,7 @@ struct FolderContentView: View {
 
     // MARK: - File viewing & imports (unchanged from original)
     private func viewFile(_ file: VaultItem) {
-        if let index = sortedFiles.firstIndex(where: { $0.objectID == file.objectID }) {
-            viewModel.mediaViewerIndex = index; viewModel.showUnifiedMediaViewer = true
-        }
+        viewModel.viewFile(file)
     }
     private func importAssets(_ results: [PHPickerResult]) {
         guard !results.isEmpty else { return }

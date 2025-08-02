@@ -6,19 +6,17 @@ struct CategoryFilesView: View {
     let categoryType: CategoryType
     @StateObject private var viewModel: CategoryFilesViewModel
 
-    @State private var showUnifiedMediaViewer = false
-    @State private var mediaViewerIndex = -1
     @State private var showSortActionSheet = false
     @State private var showDeleteAlert = false
     @State private var showMoveSheet = false
 
     private var isMediaViewerPresented: Binding<Bool> {
         Binding(
-            get: { showUnifiedMediaViewer && mediaViewerIndex > -1 },
+            get: { viewModel.showUnifiedMediaViewer && viewModel.mediaViewerIndex > -1 },
             set: { newValue in
                 if !newValue {
-                    showUnifiedMediaViewer = false
-                    mediaViewerIndex = -1
+                    viewModel.showUnifiedMediaViewer = false
+                    viewModel.mediaViewerIndex = -1
                 }
             }
         )
@@ -49,6 +47,11 @@ struct CategoryFilesView: View {
         .toolbar { toolbarContent }
         .sheet(isPresented: $showSortActionSheet) { sortSheet }
         .fullScreenCover(isPresented: isMediaViewerPresented) { mediaViewer }
+        .fullScreenCover(isPresented: $viewModel.showFilePreview) {
+            if let filePreviewItem = viewModel.filePreviewItem {
+                FilePreviewView(vaultItem: filePreviewItem)
+            }
+        }
         .sheet(isPresented: $showMoveSheet) { moveSheet }
         .alert("Delete Items", isPresented: $showDeleteAlert) {
             alertButtons
@@ -86,8 +89,7 @@ struct CategoryFilesView: View {
                             if viewModel.isSelectionMode {
                                 viewModel.toggleSelection(item)
                             } else {
-                                mediaViewerIndex = index
-                                showUnifiedMediaViewer = true
+                                viewModel.viewFile(item)
                             }
                         },
                         onLongPress: {
@@ -157,8 +159,8 @@ struct CategoryFilesView: View {
 
     private var mediaViewer: some View {
         UnifiedMediaViewerView(
-            mediaItems: sortedItems,
-            initialIndex: mediaViewerIndex
+            mediaItems: viewModel.getMediaFiles(),
+            initialIndex: viewModel.mediaViewerIndex
         )
     }
 

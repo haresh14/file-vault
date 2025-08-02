@@ -12,6 +12,14 @@ final class CategoryFilesViewModel: ObservableObject {
     @Published var sortAscending: Bool = false
     @Published var isSelectionMode: Bool = false
     @Published var selectedItems: Set<VaultItem> = []
+    
+    // Media Viewer Management
+    @Published var showUnifiedMediaViewer = false
+    @Published var mediaViewerIndex = -1
+    
+    // File Preview Management
+    @Published var showFilePreview = false
+    @Published var filePreviewItem: VaultItem?
 
     // MARK: - Computed
     /// Items sorted according to the currently chosen sort option and order.
@@ -93,6 +101,39 @@ final class CategoryFilesViewModel: ObservableObject {
         exitSelectionMode()
         notifyGlobalRefresh()
     }
+    
+    // MARK: - File Viewing
+    
+    /// View a file - show media viewer for images/videos, file preview for others
+    func viewFile(_ item: VaultItem) {
+        if item.isImage || item.isVideo {
+            showMediaViewer(for: item)
+        } else {
+            showFilePreview(for: item)
+        }
+    }
+    
+    /// Get media files (images and videos only) from sorted items
+    func getMediaFiles() -> [VaultItem] {
+        return sortedItems.filter { item in
+            item.isImage || item.isVideo
+        }
+    }
+    
+    /// Show media viewer for images and videos
+    func showMediaViewer(for item: VaultItem) {
+        let mediaFiles = getMediaFiles()
+        if let index = mediaFiles.firstIndex(where: { $0.objectID == item.objectID }) {
+            mediaViewerIndex = index
+            showUnifiedMediaViewer = true
+        }
+    }
+    
+    /// Show file preview for non-media files
+    func showFilePreview(for item: VaultItem) {
+        filePreviewItem = item
+        showFilePreview = true
+    }
 
     // MARK: - Private helpers
     private func notifyGlobalRefresh() {
@@ -106,8 +147,12 @@ final class CategoryFilesViewModel: ObservableObject {
             items = allItems.filter { $0.isImage }
         case .videos:
             items = allItems.filter { $0.isVideo }
+        case .audio:
+            items = allItems.filter { $0.isAudio }
         case .documents:
             items = allItems.filter { $0.isDocument }
+        case .other:
+            items = allItems.filter { $0.isOther }
         case .allFiles:
             items = allItems
         }

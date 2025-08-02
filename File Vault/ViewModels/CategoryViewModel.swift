@@ -57,8 +57,12 @@ final class CategoryViewModel: ObservableObject {
             return photoItems
         case .videos:
             return videoItems
+        case .audio:
+            return audioItems
         case .documents:
             return documentItems
+        case .other:
+            return otherItems
         case .allFiles:
             return allVaultItems
         }
@@ -74,8 +78,16 @@ final class CategoryViewModel: ObservableObject {
         allVaultItems.filter { $0.isVideo }
     }
 
+    private var audioItems: [VaultItem] {
+        allVaultItems.filter { $0.isAudio }
+    }
+
     private var documentItems: [VaultItem] {
         allVaultItems.filter { $0.isDocument }
+    }
+
+    private var otherItems: [VaultItem] {
+        allVaultItems.filter { $0.isOther }
     }
 
     private func loadVaultItems() {

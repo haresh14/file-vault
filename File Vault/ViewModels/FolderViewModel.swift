@@ -31,6 +31,10 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     @Published var showUnifiedMediaViewer = false
     @Published var mediaViewerIndex = -1
     
+    // File Preview Management
+    @Published var showFilePreview = false
+    @Published var filePreviewItem: VaultItem?
+    
     // Sheet/Alert Presentation
     @Published var showCreateFolder = false
     @Published var showRenameFolder = false
@@ -467,11 +471,10 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         sortAscending = true
     }
     
-    /// Get files suitable for media viewer
+    /// Get files suitable for media viewer (using sorted files to match UI order)
     func getMediaFiles() -> [VaultItem] {
-        files.filter { item in
-            let fileType = item.fileType?.lowercased() ?? ""
-            return fileType.hasPrefix("image/") || fileType.hasPrefix("video/")
+        sortedFiles.filter { item in
+            item.isImage || item.isVideo
         }
     }
     
@@ -481,6 +484,21 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         if let index = mediaFiles.firstIndex(where: { $0.objectID == file.objectID }) {
             showMediaViewer(at: index)
         }
+    }
+    
+    /// View a file - show media viewer for images/videos, file preview for others
+    func viewFile(_ file: VaultItem) {
+        if file.isImage || file.isVideo {
+            showMediaViewerForFile(file)
+        } else {
+            showFilePreview(for: file)
+        }
+    }
+    
+    /// Show file preview for non-media files
+    func showFilePreview(for item: VaultItem) {
+        filePreviewItem = item
+        showFilePreview = true
     }
     
     /// Get current folder path for navigation

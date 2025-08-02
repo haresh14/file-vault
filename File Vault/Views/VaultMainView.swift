@@ -82,9 +82,14 @@ struct VaultMainView: View {
             }
                 .fullScreenCover(isPresented: viewModel.isMediaViewerPresented) {
                     UnifiedMediaViewerView(
-                        mediaItems: viewModel.filteredItems,
+                        mediaItems: viewModel.getMediaFiles(),
                         initialIndex: viewModel.mediaViewerIndex
                     )
+                }
+                .fullScreenCover(isPresented: $viewModel.showFilePreview) {
+                    if let filePreviewItem = viewModel.filePreviewItem {
+                        FilePreviewView(vaultItem: filePreviewItem)
+                    }
                 }
                 .sheet(isPresented: $viewModel.showMoveSheet) {
                 GalleryFolderPickerView(
