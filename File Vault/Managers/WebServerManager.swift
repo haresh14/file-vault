@@ -626,6 +626,9 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     uploadedFiles.append(fileName)
                     print("DEBUG: Successfully uploaded file: \(fileName), saved with ID: \(savedItem.id?.uuidString ?? "unknown")")
                     
+                } catch FileStorageError.duplicateFile {
+                    print("DEBUG: Skipped duplicate file: \(fileName)")
+                    // Don't add to failed files - duplicates are expected and should be silently ignored
                 } catch {
                     print("DEBUG: Error saving uploaded file \(fileName): \(error)")
                     failedFiles.append(fileName)

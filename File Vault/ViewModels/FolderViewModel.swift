@@ -221,8 +221,15 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         let total = Double(dataArray.count)
         var processed = 0.0
         for (data, fileName) in dataArray {
-            let fileType = FileStorageManager.shared.determineFileType(from: fileName)
-            _ = try? FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: fileType, targetFolder: folder)
+            do {
+                let fileType = FileStorageManager.shared.determineFileType(from: fileName)
+                _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: fileType, targetFolder: folder)
+                print("Successfully imported file: \(fileName)")
+            } catch FileStorageError.duplicateFile {
+                print("Skipped duplicate file: \(fileName)")
+            } catch {
+                print("Error importing file \(fileName): \(error)")
+            }
             processed += 1
             importProgress = processed / total
         }
@@ -241,7 +248,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
                 result.itemProvider.loadObject(ofClass: UIImage.self) { image, _ in
                     guard let uiImage = image as? UIImage else { updateProgress(); return }
                     guard let data = uiImage.jpegData(compressionQuality: 1.0) ?? uiImage.pngData() else { updateProgress(); return }
-                    let fileName = "IMG_\(Date().timeIntervalSince1970).jpg"
+                    let fileName = "Photo.jpg" // Will be resolved to unique name by FileStorageManager
                     do {
                         _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: "image/jpeg", targetFolder: self.folder)
                     } catch { print("Error saving image: \(error)") }
@@ -252,7 +259,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
                     guard let url = url else { updateProgress(); return }
                     do {
                         let data = try Data(contentsOf: url)
-                        let fileName = "VID_\(Date().timeIntervalSince1970).mov"
+                        let fileName = "Video.mov" // Will be resolved to unique name by FileStorageManager
                         _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: "video/quicktime", targetFolder: self.folder)
                     } catch { print("Error saving video: \(error)") }
                     updateProgress()
@@ -515,4 +522,6 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     var breadcrumbs: [Folder] {
         folder?.breadcrumbPath ?? []
     }
+    
+    // MARK: - Helper Methods
 } 

@@ -179,6 +179,60 @@ class FileStorageManager: FileStorageManaging {
     
     // MARK: - File Operations
     
+    /// Check if a file with the same content (size and type) already exists
+    private func isDuplicateContent(fileSize: Int64, fileType: String, targetFolder: Folder?) -> Bool {
+        let coreDataManager = CoreDataManager.shared
+        let existingFiles: [VaultItem]
+        
+        if let folder = targetFolder {
+            existingFiles = folder.itemsArray
+        } else {
+            existingFiles = coreDataManager.fetchVaultItems(in: nil)
+        }
+        
+        // Check for exact match on size and type (content similarity)
+        return existingFiles.contains { item in
+            item.fileSize == fileSize &&
+            item.fileType == fileType
+        }
+    }
+    
+    /// Generate a unique filename if conflicts exist
+    private func resolveFilenameConflicts(fileName: String, targetFolder: Folder?) -> String {
+        let coreDataManager = CoreDataManager.shared
+        let existingFiles: [VaultItem]
+        
+        if let folder = targetFolder {
+            existingFiles = folder.itemsArray
+        } else {
+            existingFiles = coreDataManager.fetchVaultItems(in: nil)
+        }
+        
+        // If no conflict, return original name
+        let existingNames = Set(existingFiles.compactMap { $0.fileName })
+        if !existingNames.contains(fileName) {
+            return fileName
+        }
+        
+        // Generate unique name with suffix
+        let fileExtension = URL(fileURLWithPath: fileName).pathExtension
+        let baseName = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+        
+        var counter = 1
+        var uniqueName: String
+        
+        repeat {
+            if fileExtension.isEmpty {
+                uniqueName = "\(baseName) (\(counter))"
+            } else {
+                uniqueName = "\(baseName) (\(counter)).\(fileExtension)"
+            }
+            counter += 1
+        } while existingNames.contains(uniqueName)
+        
+        return uniqueName
+    }
+    
     func saveFile(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil) throws -> VaultItem {
         print("DEBUG: saveFile called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
         if let folder = targetFolder {
@@ -192,9 +246,18 @@ class FileStorageManager: FileStorageManaging {
             throw FileStorageError.noEncryptionKey
         }
         
-        // Generate unique filename
-        let uniqueFileName = "\(UUID().uuidString)_\(fileName)"
+        let fileSize = Int64(data.count)
+        
+        // Check for duplicate content first
+        if isDuplicateContent(fileSize: fileSize, fileType: fileType, targetFolder: targetFolder) {
+            print("DEBUG: Duplicate content detected - ignoring: \(fileName)")
+            throw FileStorageError.duplicateFile
+        }
+        
+        // Resolve filename conflicts (add suffix if needed)
+        let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
         let fileURL = vaultDirectory.appendingPathComponent(uniqueFileName)
+        print("DEBUG: Resolved filename: \(uniqueFileName)")
         print("DEBUG: Will save file to: \(fileURL.path)")
         
         // Encrypt data
@@ -259,9 +322,19 @@ class FileStorageManager: FileStorageManaging {
             return
         }
         
-        // Generate unique filename
-        let uniqueFileName = "\(UUID().uuidString)_\(fileName)"
+        let fileSize = Int64(data.count)
+        
+        // Check for duplicate content first
+        if isDuplicateContent(fileSize: fileSize, fileType: fileType, targetFolder: targetFolder) {
+            print("DEBUG: Duplicate content detected - ignoring: \(fileName)")
+            completion(.failure(FileStorageError.duplicateFile))
+            return
+        }
+        
+        // Resolve filename conflicts (add suffix if needed)
+        let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
         let fileURL = vaultDirectory.appendingPathComponent(uniqueFileName)
+        print("DEBUG: Resolved filename: \(uniqueFileName)")
         print("DEBUG: Will save file to: \(fileURL.path)")
         
         do {
@@ -342,20 +415,51 @@ class FileStorageManager: FileStorageManaging {
     }
     
     func deleteFile(vaultItem: VaultItem) throws {
-        // Delete main file
+        // Before deleting physical files, check if other VaultItems reference the same files
+        let shouldDeleteMainFile: Bool
+        let shouldDeleteThumbnail: Bool
+        
         if let fileName = vaultItem.fileName {
+            shouldDeleteMainFile = !hasOtherReferences(to: fileName, excluding: vaultItem)
+        } else {
+            shouldDeleteMainFile = false
+        }
+        
+        if let thumbnailFileName = vaultItem.thumbnailFileName {
+            shouldDeleteThumbnail = !hasOtherReferences(toThumbnail: thumbnailFileName, excluding: vaultItem)
+        } else {
+            shouldDeleteThumbnail = false
+        }
+        
+        // Delete Core Data entry first
+        CoreDataManager.shared.deleteVaultItem(vaultItem)
+        
+        // Then delete physical files only if no other references exist
+        if shouldDeleteMainFile, let fileName = vaultItem.fileName {
             let fileURL = vaultDirectory.appendingPathComponent(fileName)
             try? fileManager.removeItem(at: fileURL)
         }
         
-        // Delete thumbnail
-        if let thumbnailFileName = vaultItem.thumbnailFileName {
+        if shouldDeleteThumbnail, let thumbnailFileName = vaultItem.thumbnailFileName {
             let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
             try? fileManager.removeItem(at: thumbnailURL)
         }
-        
-        // Delete Core Data entry
-        CoreDataManager.shared.deleteVaultItem(vaultItem)
+    }
+    
+    /// Check if any other VaultItems reference the same filename (excluding the specified item)
+    private func hasOtherReferences(to fileName: String, excluding excludeItem: VaultItem) -> Bool {
+        let allItems = CoreDataManager.shared.fetchAllVaultItems()
+        return allItems.contains { item in
+            item.objectID != excludeItem.objectID && item.fileName == fileName
+        }
+    }
+    
+    /// Check if any other VaultItems reference the same thumbnail filename (excluding the specified item)
+    private func hasOtherReferences(toThumbnail thumbnailFileName: String, excluding excludeItem: VaultItem) -> Bool {
+        let allItems = CoreDataManager.shared.fetchAllVaultItems()
+        return allItems.contains { item in
+            item.objectID != excludeItem.objectID && item.thumbnailFileName == thumbnailFileName
+        }
     }
     
     func cleanupFileStorage(vaultItem: VaultItem) {
@@ -811,6 +915,7 @@ enum FileStorageError: LocalizedError {
     case decryptionFailed
     case invalidFileName
     case importFailed
+    case duplicateFile
     
     var errorDescription: String? {
         switch self {
@@ -824,6 +929,8 @@ enum FileStorageError: LocalizedError {
             return "Invalid file name."
         case .importFailed:
             return "Failed to import file from photo library."
+        case .duplicateFile:
+            return "File already exists in the target location."
         }
     }
 } 

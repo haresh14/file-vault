@@ -275,6 +275,8 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
                 )
                 
                 print("Successfully imported file: \(fileName)")
+            } catch FileStorageError.duplicateFile {
+                print("Skipped duplicate file: \(fileName)")
             } catch {
                 print("Error importing file \(fileName): \(error)")
             }
@@ -303,7 +305,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
             return
         }
         
-        let fileName = "IMG_\(Date().timeIntervalSince1970).jpg"
+        let fileName = "Photo.jpg" // Will be resolved to unique name by FileStorageManager
         let fileType = "image/jpeg"
         
         do {
@@ -314,6 +316,9 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
                 targetFolder: nil
             )
             completion(true)
+        } catch FileStorageError.duplicateFile {
+            print("Skipped duplicate image")
+            completion(true) // Count as successful since we're skipping duplicates
         } catch {
             print("Error saving image: \(error)")
             completion(false)
@@ -328,7 +333,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         
         do {
             let data = try Data(contentsOf: url)
-            let fileName = "VID_\(Date().timeIntervalSince1970).mov"
+            let fileName = "Video.mov" // Will be resolved to unique name by FileStorageManager
             
             _ = try fileStorageManager.saveFile(
                 data: data,
@@ -337,6 +342,9 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
                 targetFolder: nil
             )
             completion(true)
+        } catch FileStorageError.duplicateFile {
+            print("Skipped duplicate video")
+            completion(true) // Count as successful since we're skipping duplicates
         } catch {
             print("Error saving video: \(error)")
             completion(false)
@@ -463,4 +471,6 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     func matches(item: VaultItem, searchText: String) -> Bool {
         item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
     }
+    
+    // MARK: - Helper Methods
 }
