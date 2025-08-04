@@ -20,7 +20,8 @@ public class Folder: NSManagedObject {
     
     var itemsArray: [VaultItem] {
         let set = items as? Set<VaultItem> ?? []
-        return set.sorted { ($0.createdAt ?? Date()) > ($1.createdAt ?? Date()) }
+        let nonTrashedItems = set.filter { !$0.isTrashed }
+        return nonTrashedItems.sorted { ($0.createdAt ?? Date()) > ($1.createdAt ?? Date()) }
     }
     
     var totalItemCount: Int {

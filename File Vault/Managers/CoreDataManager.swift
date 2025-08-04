@@ -163,6 +163,7 @@ class CoreDataManager: CoreDataManaging {
     
     func fetchAllVaultItems() -> [VaultItem] {
         let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        // NOTE: This method is used for reference counting, so we fetch ALL items (including deleted ones)
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
         
         do {
@@ -206,18 +207,45 @@ class CoreDataManager: CoreDataManaging {
     }
     
     func deleteFolderCompletely(_ folder: Folder) {
-        // First, clean up file storage for all files in this folder and subfolders
-        cleanupFolderFileStorage(folder)
-        
-        // Then delete the folder (Core Data cascade deletion will handle VaultItems and subfolders)
-        context.delete(folder)
+        // Check if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            // When trash is enabled, move all files to trash (at root level) and delete folder structure
+            moveAllFolderFilesToTrash(folder)
+            // Delete the folder structure - files are moved to root and marked as trashed
+            context.delete(folder)
+        } else {
+            // When trash is disabled, permanently delete everything
+            cleanupFolderFileStorage(folder)
+            
+            // Then delete the folder (Core Data cascade deletion will handle VaultItems and subfolders)
+            context.delete(folder)
+        }
         save()
     }
     
+    private func moveAllFolderFilesToTrash(_ folder: Folder) {
+        // Get ALL items (including already trashed ones) to avoid filtering issues
+        let allItems = folder.items as? Set<VaultItem> ?? []
+        
+        // Mark all files as trashed and move to root level
+        for item in allItems {
+            if !item.isTrashed {
+                FileStorageManager.shared.moveToTrash(vaultItem: item)
+                // Move file to root level so when restored, it appears at root
+                item.folder = nil
+            }
+        }
+        
+        // Recursively move files in subfolders to trash
+        for subfolder in folder.subfoldersArray {
+            moveAllFolderFilesToTrash(subfolder)
+        }
+    }
+
     private func cleanupFolderFileStorage(_ folder: Folder) {
-        // Clean up file storage for all files in this folder
+        // Delete all files in this folder using proper deletion logic (respects trash settings)
         for item in folder.itemsArray {
-            FileStorageManager.shared.cleanupFileStorage(vaultItem: item)
+            try? FileStorageManager.shared.deleteFile(vaultItem: item)
         }
         
         // Recursively clean up storage for all subfolders
@@ -268,10 +296,10 @@ class CoreDataManager: CoreDataManaging {
         let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
         
         if let folder = folder {
-            request.predicate = NSPredicate(format: "folder == %@", folder)
+            request.predicate = NSPredicate(format: "folder == %@ AND isTrashed == false", folder)
         } else {
             // Fetch items not in any folder (root level)
-            request.predicate = NSPredicate(format: "folder == nil")
+            request.predicate = NSPredicate(format: "folder == nil AND isTrashed == false")
         }
         
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
@@ -286,6 +314,7 @@ class CoreDataManager: CoreDataManaging {
     
     func fetchVaultItemsFromAllFolders() -> [VaultItem] {
         let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        request.predicate = NSPredicate(format: "isTrashed == false")
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
         
         do {

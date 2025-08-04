@@ -121,7 +121,14 @@ struct CategoryFilesView: View {
                         Image(systemName: "arrow.up.doc.on.clipboard")
                             .foregroundColor(.blue)
                     }
-                    Button(action: { showDeleteAlert = true }) {
+                    Button(action: { 
+                        // Skip confirmation if trash is enabled
+                        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+                            viewModel.deleteSelectedItems()
+                        } else {
+                            showDeleteAlert = true
+                        }
+                    }) {
                         Image(systemName: "trash")
                             .foregroundColor(.red)
                     }

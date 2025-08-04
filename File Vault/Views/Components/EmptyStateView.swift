@@ -473,6 +473,15 @@ extension EmptyStateConfiguration {
         style: .default
     )
     
+    static func emptyTrash() -> EmptyStateConfiguration {
+        EmptyStateConfiguration(
+            iconName: "trash",
+            title: "Trash is Empty",
+            subtitle: "Deleted files will appear here",
+            style: .default
+        )
+    }
+    
     static let comingSoon = EmptyStateConfiguration(
         iconName: "clock",
         title: "Coming Soon",

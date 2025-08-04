@@ -177,6 +177,20 @@ class FileStorageManager: FileStorageManaging {
         encryptionKey = SymmetricKey(data: hashed)
     }
     
+    // MARK: - Trash Operations
+    
+    /// Check if trash is enabled in settings
+    private var isTrashEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "trashEnabled")
+    }
+    
+    /// Move item to trash instead of deleting permanently
+    func moveToTrash(vaultItem: VaultItem) {
+        vaultItem.isTrashed = true
+        vaultItem.trashedAt = Date()
+        CoreDataManager.shared.save()
+    }
+    
     // MARK: - File Operations
     
     /// Check if a file with the same content (size and type) already exists
@@ -415,6 +429,48 @@ class FileStorageManager: FileStorageManaging {
     }
     
     func deleteFile(vaultItem: VaultItem) throws {
+        // Check if trash is enabled
+        if isTrashEnabled {
+            // Move to trash instead of permanently deleting
+            moveToTrash(vaultItem: vaultItem)
+            return
+        }
+        
+        // Permanent delete logic (when trash is disabled)
+        // Before deleting physical files, check if other VaultItems reference the same files
+        let shouldDeleteMainFile: Bool
+        let shouldDeleteThumbnail: Bool
+        
+        if let fileName = vaultItem.fileName {
+            shouldDeleteMainFile = !hasOtherReferences(to: fileName, excluding: vaultItem)
+        } else {
+            shouldDeleteMainFile = false
+        }
+        
+        if let thumbnailFileName = vaultItem.thumbnailFileName {
+            shouldDeleteThumbnail = !hasOtherReferences(toThumbnail: thumbnailFileName, excluding: vaultItem)
+        } else {
+            shouldDeleteThumbnail = false
+        }
+        
+        // Delete Core Data entry first
+        CoreDataManager.shared.deleteVaultItem(vaultItem)
+        
+        // Then delete physical files only if no other references exist
+        if shouldDeleteMainFile, let fileName = vaultItem.fileName {
+            let fileURL = vaultDirectory.appendingPathComponent(fileName)
+            try? fileManager.removeItem(at: fileURL)
+        }
+        
+        if shouldDeleteThumbnail, let thumbnailFileName = vaultItem.thumbnailFileName {
+            let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
+            try? fileManager.removeItem(at: thumbnailURL)
+        }
+    }
+    
+    /// Permanently delete a vault item, bypassing trash settings
+    /// This is used for items that are already in trash and need to be permanently removed
+    func permanentlyDeleteFile(vaultItem: VaultItem) throws {
         // Before deleting physical files, check if other VaultItems reference the same files
         let shouldDeleteMainFile: Bool
         let shouldDeleteThumbnail: Bool

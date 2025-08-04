@@ -35,6 +35,9 @@ class AppDataManager: AppDataManaging {
         // Clear all data types
         clearAllAppData()
         
+        // Set default app preferences for new installations
+        setDefaultAppPreferences()
+        
         // Mark that we've done the cleanup
         markAppAsLaunched()
         
@@ -63,6 +66,18 @@ class AppDataManager: AppDataManaging {
         // The user will be re-prompted for permissions naturally
         
         print("DEBUG: ✅ Complete app data cleanup finished")
+    }
+    
+    // MARK: - Default Preferences
+    
+    private func setDefaultAppPreferences() {
+        print("DEBUG: Setting default app preferences...")
+        
+        // Enable trash by default for new installations
+        UserDefaults.standard.set(true, forKey: "trashEnabled")
+        UserDefaults.standard.synchronize()
+        
+        print("DEBUG: ✅ Default preferences set - trash enabled by default")
     }
     
     // MARK: - Nuclear Option - Complete Reset

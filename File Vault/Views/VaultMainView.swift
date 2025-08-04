@@ -41,7 +41,14 @@ struct VaultMainView: View {
                         isEmpty: viewModel.vaultItems.isEmpty,
                         onSelectAll: { viewModel.selectAll(from: viewModel.vaultItems) },
                         onMove: { viewModel.showMoveSheet = true },
-                        onDelete: { viewModel.showDeleteAlert = true },
+                        onDelete: { 
+                            // Skip confirmation if trash is enabled
+                            if UserDefaults.standard.bool(forKey: "trashEnabled") {
+                                viewModel.deleteSelectedItems()
+                            } else {
+                                viewModel.showDeleteAlert = true
+                            }
+                        },
                         onCancel: { viewModel.exitSelectionMode() },
                         onAdd: { viewModel.showAddActions() },
                         onSort: { viewModel.showSortActionSheet = true },

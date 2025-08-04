@@ -32,6 +32,7 @@ protocol FileStorageManaging {
     func saveFile(data: Data, fileName: String, fileType: String, targetFolder: Folder?) throws -> VaultItem
     func loadFile(vaultItem: VaultItem) throws -> Data
     func deleteFile(vaultItem: VaultItem) throws
+    func permanentlyDeleteFile(vaultItem: VaultItem) throws
     func loadThumbnail(for vaultItem: VaultItem) -> Data?
     func loadImage(for vaultItem: VaultItem) async throws -> Data
     func determineFileType(from fileName: String) -> String

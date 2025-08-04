@@ -13,7 +13,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     @Published private(set) var files: [VaultItem] = []
 
     // Sorting
-    @Published var sortOption: FolderSortOption = .name
+    @Published var sortOption: FolderSortOption = .userDefault
     @Published var sortAscending: Bool = true
     
     // Selection Management (SelectionManageable Implementation)
@@ -307,6 +307,8 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     private func sort(folders: [Folder]) -> [Folder] {
         let sorted: [Folder]
         switch sortOption {
+        case .userDefault:
+            sorted = folders.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         case .name:
             sorted = folders.sorted { ($0.name ?? "") < ($1.name ?? "") }
         case .date:
@@ -322,6 +324,8 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     private func sort(files: [VaultItem]) -> [VaultItem] {
         let sorted: [VaultItem]
         switch sortOption {
+        case .userDefault:
+            sorted = files.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         case .name:
             sorted = files.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
         case .date:
@@ -442,16 +446,15 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     /// Prepare swipe delete alert for specific items
     func prepareSwipeDeleteAlert(for items: [Any]) {
         itemsToDelete = items
-        let itemType = items.count == 1 ? 
-            (items.first is Folder ? "folder" : "file") : "items"
         
-        showDeleteConfirmation(
-            itemCount: items.count,
-            itemType: itemType,
-            onConfirm: { [weak self] in
-                self?.performSwipeDelete()
-            }
-        )
+        // Check if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            // If trash is enabled, delete directly without confirmation
+            performSwipeDelete()
+        } else {
+            // If trash is disabled, show confirmation alert
+            showSwipeDeleteAlert = true
+        }
     }
     
     /// Perform swipe delete operation

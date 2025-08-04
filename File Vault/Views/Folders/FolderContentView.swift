@@ -48,6 +48,8 @@ struct FolderContentView: View {
         }
         let sorted: [VaultItem]
         switch viewModel.sortOption {
+        case .userDefault:
+            sorted = files.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
         case .name:
             sorted = files.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
         case .date:
@@ -63,12 +65,10 @@ struct FolderContentView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                if folder != nil {
-                    breadcrumbView
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6))
-                }
+                breadcrumbView
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
                 if loginStateManager.shouldShowEmptyVault || (folders.isEmpty && files.isEmpty) {
                     VStack {
                         emptyStateView
@@ -99,7 +99,14 @@ struct FolderContentView: View {
                             Image(systemName: "arrow.up.doc.on.clipboard")
                                 .foregroundColor(.blue)
                         }
-                        Button(action: { viewModel.showDeleteAlert = true }) {
+                        Button(action: { 
+                            // Skip confirmation if trash is enabled
+                            if UserDefaults.standard.bool(forKey: "trashEnabled") {
+                                deleteSelectedItems()
+                            } else {
+                                viewModel.showDeleteAlert = true
+                            }
+                        }) {
                             Image(systemName: "trash")
                                 .foregroundColor(.red)
                         }
@@ -167,6 +174,7 @@ struct FolderContentView: View {
         } message: {
             Text("Are you sure you want to delete \(viewModel.itemsToDelete.count) item(s)? This action cannot be undone.")
         }
+
         .sheet(isPresented: $viewModel.showPhotoPicker) {
             PhotoPickerView { results in
                 importAssets(results)
@@ -325,8 +333,17 @@ struct FolderContentView: View {
                             NavigationLink(value: folder, label: { EmptyView() })
                                 .opacity(0)
                         )
+                        .swipeActions(edge: .trailing, allowsFullSwipe: !UserDefaults.standard.bool(forKey: "trashEnabled")) {
+                            if !viewModel.isSelectionMode {
+                                Button(role: .destructive) {
+                                    viewModel.prepareSwipeDeleteAlert(for: [folder])
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+
                     }
-                    .onDelete(perform: viewModel.isSelectionMode ? nil : deleteFolders)
                 }
             }
             if !files.isEmpty {
@@ -344,8 +361,16 @@ struct FolderContentView: View {
                                 }
                             }
                         )
+                        .swipeActions(edge: .trailing, allowsFullSwipe: !UserDefaults.standard.bool(forKey: "trashEnabled")) {
+                            if !viewModel.isSelectionMode {
+                                Button(role: .destructive) {
+                                    viewModel.prepareSwipeDeleteAlert(for: [file])
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
                     }
-                    .onDelete(perform: viewModel.isSelectionMode ? nil : deleteFiles)
                 }
             }
         }
@@ -370,17 +395,30 @@ struct FolderContentView: View {
         viewModel.renameText = ""; viewModel.folderToRename = nil
     }
     private func deleteFolders(offsets: IndexSet) {
-        viewModel.itemsToDelete = offsets.map { sortedFolders[$0] }; viewModel.showSwipeDeleteAlert = true
+        viewModel.itemsToDelete = offsets.map { sortedFolders[$0] }
+        
+        // Skip confirmation if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            performSwipeDelete()
+        } else {
+            viewModel.showSwipeDeleteAlert = true
+        }
     }
     private func deleteFiles(offsets: IndexSet) {
-        viewModel.itemsToDelete = offsets.map { sortedFiles[$0] }; viewModel.showSwipeDeleteAlert = true
+        viewModel.itemsToDelete = offsets.map { sortedFiles[$0] }
+        
+        // Skip confirmation if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            performSwipeDelete()
+        } else {
+            viewModel.showSwipeDeleteAlert = true
+        }
     }
     private func performSwipeDelete() {
-        viewModel.selectedFolders = Set(viewModel.itemsToDelete.compactMap { $0 as? Folder })
-        viewModel.selectedFiles   = Set(viewModel.itemsToDelete.compactMap { $0 as? VaultItem })
-        viewModel.deleteSelectedItems()
-        viewModel.itemsToDelete.removeAll()
+        viewModel.performSwipeDelete()
     }
+    
+
     private func enterSelectionMode() {
         viewModel.isSelectionMode = true
         viewModel.enterSelectionMode()

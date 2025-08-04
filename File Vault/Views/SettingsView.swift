@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
@@ -31,6 +32,10 @@ struct SettingsView: View {
     @StateObject private var securityManager = SecurityManager.shared
     @StateObject private var loginStateManager = LoginStateManager.shared
     @State private var storageInfo: (fileCount: Int, usedSpace: Int64) = (0, 0)
+    @State private var trashEnabled = UserDefaults.standard.bool(forKey: "trashEnabled")
+    @State private var showDisableTrashAlert = false
+
+    @State private var trashItemCount = 0
     
     private var currentAuthType: AuthenticationType {
         KeychainManager.shared.getAuthenticationType()
@@ -42,6 +47,7 @@ struct SettingsView: View {
                 if loginStateManager.canAccessFullSettings {
                     securitySection
                     advancedSecuritySection
+                    trashSection
                     lockBehaviorSection
                     infoSection
                     
@@ -134,12 +140,15 @@ struct SettingsView: View {
                 }
             }
         }
+
         .onAppear {
             loadStorageInfo()
             isFakePasswordSet = KeychainManager.shared.isFakePasswordSet()
+            loadTrashCount()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))) { _ in
             loadStorageInfo()
+            loadTrashCount()
         }
     }
     
@@ -222,6 +231,58 @@ struct SettingsView: View {
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
+        }
+    }
+    
+    private var trashSection: some View {
+        Section(header: Text("Trash")) {
+            Toggle("Enable Trash", isOn: $trashEnabled)
+                .onChange(of: trashEnabled) { _, newValue in
+                    if newValue {
+                        // Enabling trash - no confirmation needed
+                        UserDefaults.standard.set(newValue, forKey: "trashEnabled")
+                    } else {
+                        // Disabling trash - check if there are items in trash
+                        if trashItemCount > 0 {
+                            // Show confirmation alert
+                            showDisableTrashAlert = true
+                            // Revert the toggle until user confirms
+                            trashEnabled = true
+                        } else {
+                            // No items in trash - disable immediately
+                            UserDefaults.standard.set(newValue, forKey: "trashEnabled")
+                        }
+                    }
+                }
+            
+            if trashEnabled {
+                NavigationLink(destination: TrashView()) {
+                    HStack {
+                        Text("View Trash")
+                        Spacer()
+                        if trashItemCount > 0 {
+                            Text("\(trashItemCount)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .foregroundColor(.primary)
+                
+                Text("Deleted files are moved to trash instead of being permanently deleted.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .alert("Disable Trash", isPresented: $showDisableTrashAlert) {
+            Button("Cancel", role: .cancel) {
+                // Keep trash enabled (toggle is already reverted)
+            }
+            Button("Empty Trash & Disable", role: .destructive) {
+                // Empty trash and disable
+                emptyTrashAndDisable()
+            }
+        } message: {
+            Text("There are \(trashItemCount) item(s) in trash. Disabling trash will permanently delete all items. This action cannot be undone.")
         }
     }
     
@@ -488,6 +549,59 @@ struct SettingsView: View {
             DispatchQueue.main.async {
                 self.storageInfo = info
             }
+        }
+    }
+    
+    private func loadTrashCount() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+            request.predicate = NSPredicate(format: "isTrashed == true")
+            
+            do {
+                let count = try CoreDataManager.shared.context.count(for: request)
+                DispatchQueue.main.async {
+                    self.trashItemCount = count
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.trashItemCount = 0
+                }
+            }
+        }
+    }
+    
+    private func emptyTrashAndDisable() {
+        // Fetch all trashed items
+        let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        request.predicate = NSPredicate(format: "isTrashed == true")
+        
+        do {
+            let trashedItems = try CoreDataManager.shared.context.fetch(request)
+            
+            // Permanently delete each item
+            for item in trashedItems {
+                do {
+                    try FileStorageManager.shared.permanentlyDeleteFile(vaultItem: item)
+                } catch {
+                    print("Error permanently deleting trashed file: \(error)")
+                }
+            }
+            
+            // Save context to ensure changes are persisted
+            CoreDataManager.shared.save()
+            
+            // Disable trash
+            UserDefaults.standard.set(false, forKey: "trashEnabled")
+            trashEnabled = false
+            
+            // Refresh trash count
+            loadTrashCount()
+            
+            // Notify other views to refresh
+            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            
+        } catch {
+            print("Error fetching trashed items: \(error)")
         }
     }
     
