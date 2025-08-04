@@ -27,6 +27,7 @@ struct AutoPlayVideoView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var playbackRate: Float = 1.0
+    @State private var isFormatUnsupported = false
 
     // Keep panning within the visible bounds given current scale and video aspect
     private func boundOffset(_ raw: CGSize, in container: CGSize) -> CGSize {
@@ -179,7 +180,11 @@ struct AutoPlayVideoView: View {
                 } else if isLoading {
                     VideoLoadingView(fileName: vaultItem.fileName)
                 } else if let errorMessage = errorMessage {
-                    VideoErrorView(errorMessage: errorMessage)
+                    VideoErrorView(
+                        errorMessage: errorMessage,
+                        isFormatUnsupported: isFormatUnsupported,
+                        fileName: vaultItem.fileName
+                    )
                 }
             }
         }
@@ -207,14 +212,61 @@ struct AutoPlayVideoView: View {
                 
                 try fileData.write(to: tempURL)
                 
-                // Create AVURLAsset to inspect video dimensions
+                // Create AVURLAsset to inspect video compatibility and dimensions
                 let asset = AVURLAsset(url: tempURL)
-                if let track = asset.tracks(withMediaType: .video).first {
-                    var natural = track.naturalSize
-                    let transform = track.preferredTransform
-                    natural = natural.applying(transform)
-                    let corrected = CGSize(width: abs(natural.width), height: abs(natural.height))
-                    await MainActor.run { self.videoSize = corrected }
+                let videoTracks: [AVAssetTrack]
+                do {
+                    videoTracks = try await asset.loadTracks(withMediaType: .video)
+                } catch {
+                    await MainActor.run {
+                        self.isFormatUnsupported = true
+                        self.errorMessage = getUnsupportedFormatMessage()
+                        self.isLoading = false
+                    }
+                    return
+                }
+                
+                // Check if the video format is supported by AVFoundation
+                if videoTracks.isEmpty {
+                    await MainActor.run {
+                        self.isFormatUnsupported = true
+                        self.errorMessage = getUnsupportedFormatMessage()
+                        self.isLoading = false
+                    }
+                    return
+                }
+                
+                // Check if the video tracks are playable
+                do {
+                    let playable = try await asset.load(.isPlayable)
+                    if !playable {
+                        await MainActor.run {
+                            self.isFormatUnsupported = true  
+                            self.errorMessage = getUnsupportedFormatMessage()
+                            self.isLoading = false
+                        }
+                        return
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.isFormatUnsupported = true  
+                        self.errorMessage = getUnsupportedFormatMessage()
+                        self.isLoading = false
+                    }
+                    return
+                }
+                
+                if let track = videoTracks.first {
+                    do {
+                        let natural = try await track.load(.naturalSize)
+                        let transform = try await track.load(.preferredTransform)
+                        let transformedSize = natural.applying(transform)
+                        let corrected = CGSize(width: abs(transformedSize.width), height: abs(transformedSize.height))
+                        await MainActor.run { self.videoSize = corrected }
+                    } catch {
+                        print("Error loading track properties: \(error)")
+                        // Continue without video size information
+                    }
                 }
 
                 await MainActor.run {
@@ -278,6 +330,16 @@ struct AutoPlayVideoView: View {
             return "mp4"
         }
     }
+    
+    private func getUnsupportedFormatMessage() -> String {
+        let fileType = vaultItem.fileType ?? ""
+        
+        if fileType == "video/x-matroska" {
+            return "This MKV video contains codecs that are not supported by iOS. The video file is safely stored, but cannot be played on this device. Try converting to MP4 format for playback."
+        } else {
+            return "This video format (\(getFileExtension(from: fileType).uppercased())) is not supported for playback on iOS. The file is safely stored but cannot be played."
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -300,23 +362,47 @@ struct VideoLoadingView: View {
 
 struct VideoErrorView: View {
     let errorMessage: String
+    let isFormatUnsupported: Bool
+    let fileName: String?
     
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(systemName: isFormatUnsupported ? "play.slash" : "exclamationmark.triangle")
                 .font(.system(size: 50))
-                .foregroundColor(.red)
+                .foregroundColor(isFormatUnsupported ? .orange : .red)
             
-            Text("Error loading video")
+            Text(isFormatUnsupported ? "Unsupported Video Format" : "Error loading video")
                 .font(.headline)
                 .foregroundColor(.white)
+            
+            if let fileName = fileName {
+                Text(fileName)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+                    .padding(.horizontal, 40)
+            }
             
             Text(errorMessage)
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
+            
+            if isFormatUnsupported {
+                VStack(spacing: 8) {
+                    Text("Supported formats:")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                    
+                    Text("MP4, MOV, M4V")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .padding(.top, 10)
+            }
         }
+        .padding()
     }
 }
 
