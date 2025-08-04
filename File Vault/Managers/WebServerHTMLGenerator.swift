@@ -42,7 +42,7 @@ extension WebServerManager {
         let breadcrumbPath = folder.breadcrumbPath
         var breadcrumbs = "<a onclick=\"navigateToFolder('')\">📁 Root</a>"
         
-        for (index, pathFolder) in breadcrumbPath.enumerated() {
+        for (_, pathFolder) in breadcrumbPath.enumerated() {
             let folderIdString = pathFolder.id?.uuidString ?? ""
             breadcrumbs += " > <a onclick=\"navigateToFolder('\(folderIdString)')\">\(pathFolder.displayName)</a>"
         }
@@ -712,6 +712,21 @@ extension WebServerManager {
                     margin-bottom: 15px;
                 }
                 
+                .secondary-btn {
+                    background: #2196F3;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.3s;
+                }
+                
+                .secondary-btn:hover {
+                    background: #1976D2;
+                }
+                
                 @media (max-width: 768px) {
                     .container {
                         padding: 20px;
@@ -789,12 +804,31 @@ extension WebServerManager {
                     </div>
                     
                     <form id="uploadForm" enctype="multipart/form-data">
+                        <!-- Upload Type Toggle -->
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <div style="display: inline-flex; background: #f8f9fa; border-radius: 8px; padding: 4px; border: 1px solid #dee2e6;">
+                                <label style="display: flex; align-items: center; padding: 8px 16px; margin: 0; cursor: pointer; border-radius: 6px; transition: all 0.2s; background: #007bff; color: white;">
+                                    <input type="radio" name="uploadType" value="files" checked style="display: none;">
+                                    <span style="font-size: 14px; font-weight: 500;">📄 Files</span>
+                                </label>
+                                <label style="display: flex; align-items: center; padding: 8px 16px; margin: 0; cursor: pointer; border-radius: 6px; transition: all 0.2s; background: transparent; color: #6c757d;">
+                                    <input type="radio" name="uploadType" value="folders" style="display: none;">
+                                    <span style="font-size: 14px; font-weight: 500;">📁 Folders</span>
+                                </label>
+                            </div>
+                        </div>
+                        
                         <div class="upload-area" id="uploadArea">
                             <div class="upload-icon">📁</div>
-                            <div class="upload-text">Drop files here or click to browse</div>
-                            <div class="upload-hint">Supports images, videos, documents and more</div>
-                            <input type="file" id="fileInput" name="files" multiple accept="*/*">
+                            <div class="upload-text">Click to browse</div>
+                            <div class="upload-hint">Or drag and drop here</div>
+                            <div class="upload-mode-indicator" id="uploadModeIndicator" style="margin-top: 10px;">
+                                <small style="color: #007bff; font-weight: 500;">Ready to select files</small>
+                            </div>
                         </div>
+                        
+                        <input type="file" id="fileInput" name="files" multiple accept="*/*" style="display: none;">
+                        <input type="file" id="folderInput" name="folders" multiple webkitdirectory directory style="display: none;">
                         
                         <div class="selected-files" id="selectedFiles" style="display: none;"></div>
                         
@@ -880,6 +914,7 @@ extension WebServerManager {
             <script>
                 const uploadArea = document.getElementById('uploadArea');
                 const fileInput = document.getElementById('fileInput');
+                const folderInput = document.getElementById('folderInput');
                 const selectedFiles = document.getElementById('selectedFiles');
                 const uploadBtn = document.getElementById('uploadBtn');
                 const uploadForm = document.getElementById('uploadForm');
@@ -897,12 +932,14 @@ extension WebServerManager {
                 let files = [];
                 let currentFolderId = '\(currentFolderId?.replacingOccurrences(of: "'", with: "\\'") ?? "")';
                 
-                console.log('DEBUG: currentFolderId set to:', currentFolderId);
+                console.log('DEBUG: ====== INITIAL FOLDER ID SETUP ======');
+                console.log('DEBUG: currentFolderId set to:', `"${currentFolderId}"`);
                 console.log('DEBUG: currentFolderId type:', typeof currentFolderId);
                 console.log('DEBUG: currentFolderId length:', currentFolderId.length);
                 console.log('DEBUG: Raw folder ID from server: "\\(currentFolderId ?? "nil")"');
                 console.log('DEBUG: currentFolderId === "":', currentFolderId === '');
                 console.log('DEBUG: currentFolderId truthy check:', !!currentFolderId);
+                console.log('DEBUG: ====== END INITIAL SETUP ======');
                 
                 // Test the folder ID immediately
                 if (currentFolderId) {
@@ -931,6 +968,10 @@ extension WebServerManager {
                 function resetUploadState() {
                     files = [];
                     fileInput.value = '';
+                    folderInput.value = '';
+                    // Reset to files mode
+                    document.querySelector('input[name="uploadType"][value="files"]').checked = true;
+                    updateUploadMode();
                     updateSelectedFiles();
                     updateUploadButton();
                     hideStatus();
@@ -938,9 +979,58 @@ extension WebServerManager {
                     resetUploadButton();
                 }
                 
-                // Click to browse files
-                uploadArea.addEventListener('click', () => {
-                    fileInput.click();
+                // Handle upload type toggle
+                const uploadTypeRadios = document.querySelectorAll('input[name="uploadType"]');
+                const uploadModeIndicator = document.getElementById('uploadModeIndicator');
+                
+                uploadTypeRadios.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        updateUploadMode();
+                    });
+                });
+                
+                function updateUploadMode() {
+                    const selectedMode = document.querySelector('input[name="uploadType"]:checked').value;
+                    
+                    // Update visual state of upload type toggle buttons
+                    uploadTypeRadios.forEach(radio => {
+                        const label = radio.closest('label');
+                        if (label) {
+                            if (radio.value === selectedMode) {
+                                label.style.background = '#007bff';
+                                label.style.color = 'white';
+                            } else {
+                                label.style.background = 'transparent';
+                                label.style.color = '#6c757d';
+                            }
+                        }
+                    });
+                    
+                    // Update mode indicator text
+                    if (selectedMode === 'files') {
+                        uploadModeIndicator.innerHTML = '<small style="color: #007bff; font-weight: 500;">Ready to select files 📄</small>';
+                    } else {
+                        uploadModeIndicator.innerHTML = '<small style="color: #28a745; font-weight: 500;">Ready to select folders 📁</small>';
+                    }
+                }
+                
+                // Unified click to browse based on selected mode
+                uploadArea.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Clear any existing values
+                    fileInput.value = '';
+                    folderInput.value = '';
+                    
+                    // Check selected mode
+                    const selectedMode = document.querySelector('input[name="uploadType"]:checked').value;
+                    
+                    if (selectedMode === 'folders') {
+                        folderInput.click();
+                    } else {
+                        fileInput.click();
+                    }
                 });
                 
                 // Drag and drop functionality
@@ -958,17 +1048,45 @@ extension WebServerManager {
                     uploadArea.classList.remove('dragover');
                     
                     const droppedFiles = Array.from(e.dataTransfer.files);
-                    addFiles(droppedFiles);
+                    // Check if any files have webkitRelativePath (indicating folder structure)
+                    const hasfolderStructure = droppedFiles.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
+                    addFiles(droppedFiles, hasfolderStructure);
                 });
                 
                 // File input change
                 fileInput.addEventListener('change', (e) => {
+                    e.stopPropagation();
                     const inputFiles = Array.from(e.target.files);
-                    addFiles(inputFiles);
+                    if (inputFiles.length > 0) {
+                        // Clear the other input
+                        folderInput.value = '';
+                        addFiles(inputFiles);
+                    }
                 });
                 
-                function addFiles(newFiles) {
-                    files = [...files, ...newFiles];
+                // Folder input change
+                folderInput.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const inputFiles = Array.from(e.target.files);
+                    if (inputFiles.length > 0) {
+                        // Clear the other input
+                        fileInput.value = '';
+                        addFiles(inputFiles, true);
+                    }
+                });
+                
+                function addFiles(newFiles, preserveFolderStructure = false) {
+                    // Store files with their relative paths if folder structure should be preserved
+                    if (preserveFolderStructure && newFiles.length > 0) {
+                        // Files from folder selection have webkitRelativePath property
+                        const filesWithPaths = Array.from(newFiles).map(file => {
+                            file._folderPath = file.webkitRelativePath || '';
+                            return file;
+                        });
+                        files = [...files, ...filesWithPaths];
+                    } else {
+                        files = [...files, ...newFiles];
+                    }
                     updateSelectedFiles();
                     updateUploadButton();
                 }
@@ -1011,6 +1129,10 @@ extension WebServerManager {
                 function clearFiles() {
                     files = [];
                     fileInput.value = '';
+                    folderInput.value = '';
+                    // Reset to files mode
+                    document.querySelector('input[name="uploadType"][value="files"]').checked = true;
+                    updateUploadMode();
                     updateSelectedFiles();
                     updateUploadButton();
                     hideStatus();
@@ -1099,24 +1221,37 @@ extension WebServerManager {
                     const formData = new FormData();
                     
                     // Add current folder ID FIRST
+                    console.log('DEBUG: ====== FOLDER ID CHECK ======');
                     console.log('DEBUG: About to check folder ID for form submission');
-                    console.log('DEBUG: currentFolderId value:', currentFolderId);
+                    console.log('DEBUG: currentFolderId value:', `"${currentFolderId}"`);
+                    console.log('DEBUG: currentFolderId type:', typeof currentFolderId);
+                    console.log('DEBUG: currentFolderId length:', currentFolderId ? currentFolderId.length : 'N/A');
                     console.log('DEBUG: currentFolderId !== "":', currentFolderId !== '');
                     console.log('DEBUG: Boolean check result:', currentFolderId && currentFolderId !== '');
+                    console.log('DEBUG: Current URL:', window.location.href);
                     
                     if (currentFolderId && currentFolderId !== '') {
-                        console.log('DEBUG: Adding folder ID to form data:', currentFolderId);
+                        console.log('DEBUG: ✅ Adding folder ID to form data:', currentFolderId);
                         formData.append('folderId', currentFolderId);
-                        console.log('DEBUG: Folder ID added to form data');
+                        console.log('DEBUG: ✅ Folder ID added to form data successfully');
                     } else {
-                        console.log('DEBUG: No folder ID specified, uploading to root');
-                        console.log('DEBUG: currentFolderId was empty or falsy:', currentFolderId);
+                        console.log('DEBUG: ❌ No folder ID specified, uploading to root');
+                        console.log('DEBUG: ❌ currentFolderId was empty or falsy:', `"${currentFolderId}"`);
                     }
+                    console.log('DEBUG: ====== END FOLDER ID CHECK ======');
+
                     
                     // Add files AFTER folder ID
                     files.forEach((file, index) => {
                         formData.append('files', file);
-                        console.log('DEBUG: Added file to form data:', file.name);
+                        // Add folder path if available
+                        if (file._folderPath) {
+                            formData.append('filePaths', file._folderPath);
+                            console.log('DEBUG: Added file to form data:', file.name, 'with path:', file._folderPath);
+                        } else {
+                            formData.append('filePaths', '');
+                            console.log('DEBUG: Added file to form data:', file.name);
+                        }
                     });
                     
                     // Debug: Show all form data entries
@@ -1195,8 +1330,8 @@ extension WebServerManager {
                         
                         xhr.open('POST', '/upload', true);
                         
-                        // Set longer timeout for large file uploads (5 minutes)
-                        xhr.timeout = 300000;
+                        // No timeout for large file uploads
+                        // xhr.timeout = 0; // No timeout
                         
                         // Also send folder ID in header as backup
                         if (currentFolderId && currentFolderId !== '') {

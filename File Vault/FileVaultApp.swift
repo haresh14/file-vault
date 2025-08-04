@@ -13,6 +13,11 @@ struct FileVaultApp: App {
     // Initialize dependency container
     let dependencies = DependencyContainer.shared
     
+    init() {
+        // Handle background URLSession events
+        setupBackgroundURLSessionHandling()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -35,5 +40,12 @@ struct FileVaultApp: App {
         } else {
             print("DEBUG: ✅ Not first launch - no cleanup needed")
         }
+    }
+    
+    private func setupBackgroundURLSessionHandling() {
+        // The background session handling is actually done in AppDelegate or SceneDelegate
+        // For SwiftUI apps, we need to handle it differently
+        // Initialize the BackgroundUploadManager to ensure it's ready
+        _ = BackgroundUploadManager.shared
     }
 }

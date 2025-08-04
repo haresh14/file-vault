@@ -194,7 +194,7 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - File Operations
     
     /// Check if a file with the same content (size and type) already exists
-    private func isDuplicateContent(fileSize: Int64, fileType: String, targetFolder: Folder?) -> Bool {
+    internal func isDuplicateContent(fileSize: Int64, fileType: String, targetFolder: Folder?) -> Bool {
         let coreDataManager = CoreDataManager.shared
         let existingFiles: [VaultItem]
         

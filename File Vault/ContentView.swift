@@ -83,7 +83,15 @@ struct ContentView: View {
                 }
             }
         } else {
-            MainTabView()
+            ZStack {
+                MainTabView()
+                
+                // Notification overlay
+                NotificationOverlayView()
+                
+                // Upload progress overlay
+                UploadProgressOverlayView()
+            }
         }
     }
     

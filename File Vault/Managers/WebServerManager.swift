@@ -219,7 +219,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     private func receiveHTTPRequest(on connection: NWConnection) {
         var receivedData = Data()
-        let maxRequestSize = 2 * 1024 * 1024 * 1024 // 2GB max
+        // No size limit - handle any file size
         var expectedContentLength: Int?
         var headersComplete = false
         
@@ -236,18 +236,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     receivedData.append(data)
                     print("DEBUG: Received \(data.count) bytes, total: \(receivedData.count)")
                     
-                    // Check for max size limit
-                    if receivedData.count > maxRequestSize {
-                        print("DEBUG: Request too large: \(receivedData.count) bytes")
-                        let errorResponse = """
-                        {
-                            "success": false,
-                            "message": "File too large. Maximum size is 2GB."
-                        }
-                        """
-                        self.sendHTTPResponse(connection: connection, statusCode: 413, contentType: "application/json", body: errorResponse)
-                        return
-                    }
+                    // No size limit check - we can handle any file size
                     
                     // Check if we have complete headers (look for double CRLF in binary data)
                     if !headersComplete {
@@ -497,6 +486,17 @@ class WebServerManager: ObservableObject, WebServerManaging {
     // MARK: - File Upload Handling
     
     private func handleFileUpload(requestData: Data, connection: NWConnection) {
+        // For very large files, we should use streaming instead of loading everything into memory
+        // Check the content length to decide whether to use regular or streaming upload
+        let contentLength = extractContentLength(from: requestData)
+        
+        // If file is larger than 100MB, use streaming upload with background support
+        if contentLength > 100 * 1024 * 1024 {
+            handleLargeFileUpload(requestData: requestData, connection: connection)
+            return
+        }
+        
+        // Continue with regular upload for smaller files
         print("DEBUG: 🔄 handleFileUpload called with data size: \(requestData.count)")
         print("DEBUG: 🔄 Starting file upload processing...")
         
@@ -573,8 +573,9 @@ class WebServerManager: ObservableObject, WebServerManaging {
             if let fieldName = part.fieldName, fieldName == "folderId",
                let data = part.data, let folderIdString = String(data: data, encoding: .utf8),
                !folderIdString.isEmpty {
-                print("DEBUG: ✅ Found folder ID in form data: '\(folderIdString)'")
-                if let folderId = UUID(uuidString: folderIdString) {
+                let trimmedFolderId = folderIdString.trimmingCharacters(in: .whitespacesAndNewlines)
+                print("DEBUG: ✅ Found folder ID in form data: '\(trimmedFolderId)'")
+                if let folderId = UUID(uuidString: trimmedFolderId) {
                     targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
                     if let folder = targetFolder {
                         print("DEBUG: ✅ Target folder found: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
@@ -582,7 +583,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                         print("DEBUG: ❌ Folder ID is valid UUID but folder not found in database")
                     }
                 } else {
-                    print("DEBUG: ❌ Invalid folder ID format: \(folderIdString)")
+                    print("DEBUG: ❌ Invalid folder ID format: \(trimmedFolderId)")
                 }
                 break
             } else if let fieldName = part.fieldName, fieldName == "folderId" {
@@ -596,53 +597,164 @@ class WebServerManager: ObservableObject, WebServerManaging {
         
         if targetFolder == nil {
             print("DEBUG: ❌ No target folder specified, uploading to root level")
+            print("DEBUG: Headers checked, Form data checked - no folderId found anywhere")
         } else {
-            print("DEBUG: ✅ Will upload to folder: \(targetFolder!.displayName)")
+            print("DEBUG: ✅ Will upload to folder: \(targetFolder!.displayName) (ID: \(targetFolder!.id?.uuidString ?? "nil"))")
         }
+        
+        // Always use "whole" folder upload mode (folders preserve their structure)
+        let folderUploadMode = "whole"
+        
+        // Extract file paths for folder structure preservation
+        var filePaths: [String] = []
+        for part in parts {
+            if let fieldName = part.fieldName, fieldName == "filePaths",
+               let data = part.data, let filePath = String(data: data, encoding: .utf8) {
+                filePaths.append(filePath.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        
+        print("DEBUG: Extracted \(filePaths.count) file paths")
+        
+        // Count actual file parts for notification
+        let fileParts = parts.filter { $0.fileName != nil && $0.data != nil && !$0.data!.isEmpty }
+        let totalFiles = fileParts.count
+        let isLargeUpload = totalFiles > 50
+        
+        print("DEBUG: Starting regular file upload with \(totalFiles) files (large upload: \(isLargeUpload))")
+        
+        // Start upload progress tracking
+        NotificationManager.shared.startUploadProgress(uploadId: uploadId, totalFiles: totalFiles)
         
         var uploadedFiles: [String] = []
         var failedFiles: [String] = []
+        var filePartIndex = 0
         
-        for (index, part) in parts.enumerated() {
-            print("DEBUG: Processing part \(index)")
-            print("DEBUG: Part headers: \(part.headers)")
-            print("DEBUG: Part data size: \(part.data?.count ?? 0)")
-            print("DEBUG: Part filename: \(part.fileName ?? "none")")
-            
-            if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
-                do {
-                    // Determine file type based on extension
-                    let fileType = FileStorageManager.shared.determineFileType(from: fileName)
-                    print("DEBUG: Determined file type: \(fileType) for file: \(fileName)")
-                    
-                    // Save file using FileStorageManager
-                    let savedItem = try FileStorageManager.shared.saveFile(
-                        data: fileData,
-                        fileName: fileName,
-                        fileType: fileType,
-                        targetFolder: targetFolder
-                    )
-                    
-                    uploadedFiles.append(fileName)
-                    print("DEBUG: Successfully uploaded file: \(fileName), saved with ID: \(savedItem.id?.uuidString ?? "unknown")")
-                    
-                } catch FileStorageError.duplicateFile {
-                    print("DEBUG: Skipped duplicate file: \(fileName)")
-                    // Don't add to failed files - duplicates are expected and should be silently ignored
-                } catch {
-                    print("DEBUG: Error saving uploaded file \(fileName): \(error)")
-                    failedFiles.append(fileName)
+        // For large uploads, use batch processing
+        if isLargeUpload {
+            do {
+                                        try processBatchUpload(
+                            parts: parts,
+                            filePaths: filePaths,
+                            targetFolder: targetFolder,
+                            uploadId: uploadId,
+                            uploadedFiles: &uploadedFiles,
+                            failedFiles: &failedFiles,
+                            filePartIndex: &filePartIndex,
+                            folderUploadMode: folderUploadMode
+                        )
+            } catch {
+                print("DEBUG: Error in batch upload processing: \(error)")
+                // Fall back to sequential processing for this upload
+                for (_, part) in parts.enumerated() {
+                    if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
+                        failedFiles.append(fileName)
+                        filePartIndex += 1
+                    }
                 }
-            } else {
-                print("DEBUG: Skipping part \(index) - missing filename or data")
-                print("DEBUG: fileName exists: \(part.fileName != nil)")
-                print("DEBUG: fileData exists: \(part.data != nil)")
-                print("DEBUG: fileData not empty: \(!(part.data?.isEmpty ?? true))")
             }
+        } else {
+            // Use original processing for small uploads
+            for (index, part) in parts.enumerated() {
+                if !isLargeUpload {
+                    print("DEBUG: Processing part \(index)")
+                    print("DEBUG: Part filename: \(part.fileName ?? "none")")
+                }
+                
+                if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
+                    do {
+                        // Get the corresponding file path
+                        let filePath = filePartIndex < filePaths.count ? filePaths[filePartIndex] : ""
+                        
+                        // Determine target folder based on file path
+                        let actualTargetFolder = try createFolderStructureForFile(
+                            filePath: filePath,
+                            baseFolder: targetFolder,
+                            folderUploadMode: folderUploadMode
+                        )
+                        
+                        // Extract just the filename (without path) for FileStorageManager
+                        let actualFileName = URL(fileURLWithPath: fileName).lastPathComponent
+                        
+                        // Determine file type based on extension
+                        let fileType = FileStorageManager.shared.determineFileType(from: actualFileName)
+                        
+                        // Save file using FileStorageManager
+                        _ = try FileStorageManager.shared.saveFile(
+                            data: fileData,
+                            fileName: actualFileName,
+                            fileType: fileType,
+                            targetFolder: actualTargetFolder
+                        )
+                        
+                        uploadedFiles.append(fileName)
+                        if !isLargeUpload {
+                            print("DEBUG: Successfully uploaded file: \(fileName)")
+                        }
+                        
+                        filePartIndex += 1
+                        
+                        // Update progress notification less frequently for large uploads
+                        if !isLargeUpload || filePartIndex % 50 == 0 {
+                            NotificationManager.shared.updateUploadProgress(
+                                uploadId: uploadId,
+                                processedFiles: filePartIndex,
+                                uploadedFiles: uploadedFiles.count,
+                                failedFiles: failedFiles.count
+                            )
+                        }
+                        
+                    } catch FileStorageError.duplicateFile {
+                        if !isLargeUpload {
+                            print("DEBUG: Skipped duplicate file: \(fileName)")
+                        }
+                        filePartIndex += 1
+                        
+                        if !isLargeUpload || filePartIndex % 50 == 0 {
+                            NotificationManager.shared.updateUploadProgress(
+                                uploadId: uploadId,
+                                processedFiles: filePartIndex,
+                                uploadedFiles: uploadedFiles.count,
+                                failedFiles: failedFiles.count
+                            )
+                        }
+                    } catch {
+                        print("DEBUG: Error saving uploaded file \(fileName): \(error)")
+                        failedFiles.append(fileName)
+                        filePartIndex += 1
+                        
+                        if !isLargeUpload || filePartIndex % 50 == 0 {
+                            NotificationManager.shared.updateUploadProgress(
+                                uploadId: uploadId,
+                                processedFiles: filePartIndex,
+                                uploadedFiles: uploadedFiles.count,
+                                failedFiles: failedFiles.count
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Final progress update for large uploads
+        if isLargeUpload {
+            NotificationManager.shared.updateUploadProgress(
+                uploadId: uploadId,
+                processedFiles: filePartIndex,
+                uploadedFiles: uploadedFiles.count,
+                failedFiles: failedFiles.count
+            )
         }
         
         print("DEBUG: Total uploaded files: \(uploadedFiles.count)")
         print("DEBUG: Total failed files: \(failedFiles.count)")
+        
+        // Complete upload progress tracking
+        NotificationManager.shared.completeUpload(
+            uploadId: uploadId, 
+            uploadedFiles: uploadedFiles.count, 
+            failedFiles: failedFiles.count
+        )
         
         // Send JSON response
         let isSuccess = uploadedFiles.count > 0
@@ -1319,6 +1431,265 @@ extension WebServerManager {
         return ""
     }
     
+    private func extractContentLength(from data: Data) -> Int {
+        guard let headerEndRange = data.range(of: "\r\n\r\n".data(using: .utf8)!) else {
+            return 0
+        }
+        
+        let headerData = data.subdata(in: data.startIndex..<headerEndRange.lowerBound)
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            return 0
+        }
+        
+        let lines = headerString.components(separatedBy: "\r\n")
+        for line in lines {
+            if line.lowercased().hasPrefix("content-length:") {
+                let lengthString = line.replacingOccurrences(of: "content-length:", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespaces)
+                return Int(lengthString) ?? 0
+            }
+        }
+        return 0
+    }
+    
+    /// Creates folder structure based on file path and returns the target folder for the file
+    private func createFolderStructureForFile(filePath: String, baseFolder: Folder?, folderUploadMode: String = "whole") throws -> Folder? {
+        guard !filePath.isEmpty else {
+            return baseFolder
+        }
+        
+        // Split the path into components (folders)
+        let pathComponents = filePath.components(separatedBy: "/")
+        
+        // Remove the last component (filename) to get folder path
+        guard pathComponents.count > 1 else {
+            return baseFolder // File is in root of selected folder
+        }
+        
+        var folderComponents = Array(pathComponents.dropLast())
+        
+        // If folder upload mode is "contents", skip the first folder component (the selected folder itself)
+        if folderUploadMode == "contents" && !folderComponents.isEmpty {
+            folderComponents.removeFirst()
+            print("DEBUG: Folder upload mode is 'contents', skipping root folder. Remaining path: \(folderComponents.joined(separator: "/"))")
+            
+            // If no components left after removing root folder, upload to base folder
+            if folderComponents.isEmpty {
+                return baseFolder
+            }
+        }
+        
+        print("DEBUG: Creating folder structure for path: \(folderComponents.joined(separator: "/"))")
+        
+        var currentParent = baseFolder
+        
+        // Create each folder in the path
+        for folderName in folderComponents {
+            guard !folderName.isEmpty else { continue }
+            
+            // Check if folder already exists
+            let existingFolders = CoreDataManager.shared.fetchFolders(in: currentParent)
+            if let existingFolder = existingFolders.first(where: { $0.name == folderName }) {
+                print("DEBUG: Folder '\(folderName)' already exists")
+                currentParent = existingFolder
+            } else {
+                // Create new folder
+                print("DEBUG: Creating folder '\(folderName)'")
+                guard let newFolder = CoreDataManager.shared.createFolder(name: folderName, parent: currentParent) else {
+                    throw NSError(domain: "FolderCreationError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create folder: \(folderName)"])
+                }
+                currentParent = newFolder
+            }
+        }
+        
+        return currentParent
+    }
+    
+    private func handleLargeFileUpload(requestData: Data, connection: NWConnection) {
+        print("DEBUG: 📦 Handling large file upload with background support")
+        
+        // Generate unique upload ID for tracking
+        let uploadId = UUID().uuidString
+        activeUploads.insert(uploadId)
+        
+        // Parse the initial headers and multipart data
+        guard let headerEndRange = requestData.range(of: "\r\n\r\n".data(using: .utf8)!) else {
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
+            return
+        }
+        
+        let headerData = requestData.subdata(in: requestData.startIndex..<headerEndRange.lowerBound)
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
+            return
+        }
+        
+        let boundary = extractBoundary(from: headerString)
+        guard !boundary.isEmpty else {
+            sendHTTPResponse(connection: connection, statusCode: 400, body: "No boundary found")
+            return
+        }
+        
+        // Parse multipart data
+        let parts = parseMultipartData(data: requestData, boundary: boundary)
+        
+        // Count actual file parts for notification
+        let fileParts = parts.filter { $0.fileName != nil && $0.data != nil && !$0.data!.isEmpty }
+        let totalFiles = fileParts.count
+        print("DEBUG: Starting large file upload with \(totalFiles) files")
+        
+        // Extract folder information and file paths  
+        var targetFolderId: String? = nil
+        var filePaths: [String] = []
+        
+        // Always use "whole" folder upload mode (folders preserve their structure)
+        let folderUploadMode = "whole"
+        
+        for part in parts {
+            if let fieldName = part.fieldName, fieldName == "folderId",
+               let data = part.data, let folderIdString = String(data: data, encoding: .utf8),
+               !folderIdString.isEmpty {
+                targetFolderId = folderIdString.trimmingCharacters(in: .whitespacesAndNewlines)
+                print("DEBUG: Large upload - found folder ID: '\(targetFolderId!)'")
+            } else if let fieldName = part.fieldName, fieldName == "filePaths",
+                      let data = part.data, let filePath = String(data: data, encoding: .utf8) {
+                filePaths.append(filePath.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        
+        // Extract target folder from folder ID
+        var baseTargetFolder: Folder? = nil
+        if let targetFolderId = targetFolderId, !targetFolderId.isEmpty,
+           let folderId = UUID(uuidString: targetFolderId) {
+            baseTargetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
+            if let folder = baseTargetFolder {
+                print("DEBUG: Large upload - target folder: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+            } else {
+                print("DEBUG: Large upload - target folder ID \(targetFolderId) not found in database")
+            }
+        } else {
+            print("DEBUG: Large upload - no target folder specified, uploading to root level")
+            print("DEBUG: Large upload - targetFolderId was: '\(targetFolderId ?? "nil")'")
+        }
+        
+        // Start upload progress tracking
+        NotificationManager.shared.startUploadProgress(uploadId: uploadId, totalFiles: totalFiles)
+        
+        // Pre-create folder structure on main thread to avoid Core Data conflicts
+        var folderStructureMap: [String: Folder?] = [:]
+        var filePartIndexForMapping = 0
+        for part in parts {
+            if let fileName = part.fileName, !fileName.isEmpty {
+                let filePath = filePartIndexForMapping < filePaths.count ? filePaths[filePartIndexForMapping] : ""
+                filePartIndexForMapping += 1
+                
+                if !filePath.isEmpty && folderStructureMap[filePath] == nil {
+                    do {
+                        folderStructureMap[filePath] = try createFolderStructureForFile(
+                            filePath: filePath,
+                            baseFolder: baseTargetFolder,
+                            folderUploadMode: folderUploadMode
+                        )
+                    } catch {
+                        print("DEBUG: Error pre-creating folder structure for \(filePath): \(error)")
+                        folderStructureMap[filePath] = baseTargetFolder
+                    }
+                }
+            }
+        }
+        
+        // Process file uploads with folder structure preservation
+        var uploadedFiles: [String] = []
+        var failedFiles: [String] = []
+        var filePartIndex = 0
+        var processedFiles = 0
+        
+        // Start background task for large file processing
+        startBackgroundTask()
+        
+        // Process files sequentially for thread safety and memory management
+        for part in parts {
+            autoreleasepool {
+                if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
+                    do {
+                        // Get the corresponding file path
+                        let filePath = filePartIndex < filePaths.count ? filePaths[filePartIndex] : ""
+                        print("DEBUG: Large file - processing \(fileName) with path: '\(filePath)'")
+                        
+                        // Use pre-created folder structure to avoid Core Data conflicts
+                        let actualTargetFolder = folderStructureMap[filePath] ?? baseTargetFolder
+                        
+                        // Extract just the filename (without path) for FileStorageManager
+                        let actualFileName = URL(fileURLWithPath: fileName).lastPathComponent
+                        print("DEBUG: Large file - extracted filename: \(actualFileName) from full path: \(fileName)")
+                        
+                        // Determine file type based on extension
+                        let fileType = FileStorageManager.shared.determineFileType(from: actualFileName)
+                        
+                        // Use synchronous saving for large files to avoid threading issues
+                        _ = try FileStorageManager.shared.saveFile(
+                            data: fileData,
+                            fileName: actualFileName,
+                            fileType: fileType,
+                            targetFolder: actualTargetFolder
+                        )
+                        
+                        uploadedFiles.append(fileName)
+                        processedFiles += 1
+                        print("DEBUG: Large file upload success: \(fileName)")
+                        
+                        filePartIndex += 1
+                        
+                        // Update progress notification less frequently
+                        if processedFiles % 25 == 0 || processedFiles >= totalFiles {
+                            NotificationManager.shared.updateUploadProgress(
+                                uploadId: uploadId,
+                                processedFiles: processedFiles,
+                                uploadedFiles: uploadedFiles.count,
+                                failedFiles: failedFiles.count
+                            )
+                        }
+                        
+                    } catch FileStorageError.duplicateFile {
+                        print("DEBUG: Large file upload - skipped duplicate: \(fileName)")
+                        // Count duplicates as successful uploads
+                        uploadedFiles.append(fileName)
+                        processedFiles += 1
+                        filePartIndex += 1
+                    } catch {
+                        print("DEBUG: Error processing large file \(fileName): \(error)")
+                        failedFiles.append(fileName)
+                        processedFiles += 1
+                        filePartIndex += 1
+                    }
+                }
+            }
+        }
+        
+        // Complete upload tracking
+        activeUploads.remove(uploadId)
+        NotificationManager.shared.completeUpload(
+            uploadId: uploadId, 
+            uploadedFiles: uploadedFiles.count, 
+            failedFiles: failedFiles.count
+        )
+        print("DEBUG: Large file upload completed: \(uploadedFiles.count) uploaded, \(failedFiles.count) failed")
+        
+        // End background task when processing is complete
+        endBackgroundTask()
+        
+        // Send immediate response acknowledging upload started
+        let response = """
+        {
+            "success": true,
+            "message": "Large file upload initiated in background",
+            "uploadedFiles": [],
+            "failedFiles": []
+        }
+        """
+        sendHTTPResponse(connection: connection, statusCode: 200, contentType: "application/json", body: response)
+    }
+    
     private func parseMultipartData(data: Data, boundary: String) -> [MultipartPart] {
         print("DEBUG: parseMultipartData called with boundary: '\(boundary)', data size: \(data.count)")
         
@@ -1457,5 +1828,134 @@ extension WebServerManager {
         let part = MultipartPart(headers: headers, data: bodyData)
         print("DEBUG: Created part with filename: \(part.fileName ?? "none"), fieldName: \(part.fieldName ?? "none")")
         return part
+    }
+    
+    // MARK: - Batch Upload Processing
+    
+    private func processBatchUpload(
+        parts: [MultipartPart],
+        filePaths: [String],
+        targetFolder: Folder?,
+        uploadId: String,
+        uploadedFiles: inout [String],
+        failedFiles: inout [String],
+        filePartIndex: inout Int,
+        folderUploadMode: String
+    ) throws {
+        
+        print("DEBUG: Starting batch upload processing for \(parts.count) parts")
+        
+        // Batch size for Core Data operations - reduced for memory safety
+        let batchSize = 10
+        var batchItems: [(fileName: String, fileData: Data, actualFileName: String, fileType: String, targetFolder: Folder?)] = []
+        var processedInBatch = 0
+        var batchCounter = 0
+        
+        for (index, part) in parts.enumerated() {
+            if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
+                do {
+                    // Get the corresponding file path
+                    let filePath = filePartIndex < filePaths.count ? filePaths[filePartIndex] : ""
+                    
+                    // Determine target folder based on file path
+                    let actualTargetFolder = try createFolderStructureForFile(
+                        filePath: filePath,
+                        baseFolder: targetFolder,
+                        folderUploadMode: folderUploadMode
+                    )
+                    
+                    // Extract just the filename (without path) for FileStorageManager
+                    let actualFileName = URL(fileURLWithPath: fileName).lastPathComponent
+                    
+                    // Determine file type based on extension
+                    let fileType = FileStorageManager.shared.determineFileType(from: actualFileName)
+                    
+                    // Add to batch instead of processing immediately
+                    batchItems.append((
+                        fileName: fileName,
+                        fileData: fileData,
+                        actualFileName: actualFileName,
+                        fileType: fileType,
+                        targetFolder: actualTargetFolder
+                    ))
+                    
+                    filePartIndex += 1
+                    processedInBatch += 1
+                    
+                    // Process batch when it reaches the batch size or at the end
+                    if batchItems.count >= batchSize || index == parts.count - 1 {
+                        try processBatch(
+                            batchItems: batchItems,
+                            uploadedFiles: &uploadedFiles,
+                            failedFiles: &failedFiles
+                        )
+                        
+                        batchCounter += 1
+                        
+                        // Update progress notification less frequently (every 5 batches = 50 files)
+                        if batchCounter % 5 == 0 || index == parts.count - 1 {
+                            NotificationManager.shared.updateUploadProgress(
+                                uploadId: uploadId,
+                                processedFiles: filePartIndex,
+                                uploadedFiles: uploadedFiles.count,
+                                failedFiles: failedFiles.count
+                            )
+                        }
+                        
+                        print("DEBUG: Processed batch of \(batchItems.count) files. Total processed: \(filePartIndex)")
+                        
+                        // Clear batch for next iteration
+                        batchItems.removeAll()
+                    }
+                    
+                } catch {
+                    print("DEBUG: Error preparing file \(fileName) for batch: \(error)")
+                    failedFiles.append(fileName)
+                    filePartIndex += 1
+                }
+            }
+        }
+        
+        print("DEBUG: Batch upload processing completed. Total processed: \(filePartIndex)")
+    }
+    
+    private func processBatch(
+        batchItems: [(fileName: String, fileData: Data, actualFileName: String, fileType: String, targetFolder: Folder?)],
+        uploadedFiles: inout [String],
+        failedFiles: inout [String]
+    ) throws {
+        
+        // Process files sequentially but in smaller batches to avoid memory issues
+        // Core Data operations must happen on main thread for thread safety
+        
+        for item in batchItems {
+            autoreleasepool {
+                do {
+                    // Check for duplicate content first
+                    let fileSize = Int64(item.fileData.count)
+                    if FileStorageManager.shared.isDuplicateContent(fileSize: fileSize, fileType: item.fileType, targetFolder: item.targetFolder) {
+                        // Don't count duplicates as failures, just skip
+                        return
+                    }
+                    
+                    // Save file using FileStorageManager on main thread for Core Data safety
+                    _ = try FileStorageManager.shared.saveFile(
+                        data: item.fileData,
+                        fileName: item.actualFileName,
+                        fileType: item.fileType,
+                        targetFolder: item.targetFolder
+                    )
+                    
+                    uploadedFiles.append(item.fileName)
+                    
+                } catch FileStorageError.duplicateFile {
+                    // Don't count duplicates as failures
+                    return
+                } catch {
+                    failedFiles.append(item.fileName)
+                    print("DEBUG: Error in batch processing file \(item.fileName): \(error)")
+                }
+            }
+        }
     }
 } 
