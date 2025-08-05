@@ -5,6 +5,7 @@ import SwiftUI
 /// Keeping this model separate from any particular view makes it reusable
 /// across the project (e.g. in `VaultMainView`, filters, etc.).
 public enum CategoryType: String, CaseIterable {
+    case favorites = "Favorites"
     case photos = "Photos"
     case videos = "Videos"
     case audio = "Audio"
@@ -15,6 +16,7 @@ public enum CategoryType: String, CaseIterable {
     /// System SF Symbol associated with each category.
     var systemImage: String {
         switch self {
+        case .favorites: return "heart.fill"
         case .photos: return "photo"
         case .videos: return "video"
         case .audio: return "music.note"
@@ -27,6 +29,7 @@ public enum CategoryType: String, CaseIterable {
     /// Primary accent color used for iconography in the UI.
     var color: Color {
         switch self {
+        case .favorites: return .red
         case .photos: return .blue
         case .videos: return .purple
         case .audio: return .green

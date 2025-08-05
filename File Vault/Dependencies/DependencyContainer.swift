@@ -26,6 +26,8 @@ protocol CoreDataManaging {
     func fetchVaultItems(in folder: Folder?) -> [VaultItem]
     func fetchFolders(in parent: Folder?) -> [Folder]
     func moveVaultItem(_ item: VaultItem, to folder: Folder?)
+    func toggleFavorite(for item: VaultItem)
+    func fetchFavoriteVaultItems() -> [VaultItem]
 }
 
 protocol FileStorageManaging {
@@ -38,6 +40,11 @@ protocol FileStorageManaging {
     func determineFileType(from fileName: String) -> String
     func setupEncryptionKey(from password: String)
     func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws
+    func toggleFavorite(for vaultItem: VaultItem)
+    func fetchFavoriteItems() -> [VaultItem]
+    func renameFile(vaultItem: VaultItem, newFileName: String) throws
+    func prepareForSharing(vaultItem: VaultItem) throws -> URL
+    func cleanupTemporaryFile(at url: URL)
     func clearAllStoredFiles()
     func getStorageInfo() -> (fileCount: Int, usedSpace: Int64)
 }

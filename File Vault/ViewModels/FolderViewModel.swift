@@ -99,6 +99,17 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
             .sink { [weak self] _ in self?.loadContent() }
             .store(in: &cancellables)
+        
+        // Reset selection mode when tab changes
+        NotificationCenter.default.publisher(for: Notification.Name("TabDidChange"))
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    if self?.isSelectionMode == true {
+                        self?.exitSelectionMode()
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     deinit { cancellables.forEach { $0.cancel() } }

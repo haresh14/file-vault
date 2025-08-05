@@ -18,6 +18,7 @@ struct FilePreviewView: View {
     @State private var errorMessage: String?
     @State private var showingQuickLook = false
     @State private var temporaryFileURL: URL?
+    @State private var isFavorite = false
     
     var body: some View {
         NavigationView {
@@ -48,17 +49,30 @@ struct FilePreviewView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    // if canShareFile {
-                    //     Button("Share") {
-                    //         shareFile()
-                    //     }
-                    //     .foregroundColor(.white)
-                    // }
+                    HStack(spacing: 20) {
+                        // Favorite button
+                        Button(action: {
+                            FileStorageManager.shared.toggleFavorite(for: vaultItem)
+                            isFavorite.toggle()
+                        }) {
+                            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                                .foregroundColor(isFavorite ? .red : .white)
+                        }
+                        
+                        // Share button
+                        Button(action: {
+                            ShareManager.shared.shareVaultItem(vaultItem)
+                        }) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(.white)
+                        }
+                    }
                 }
             }
         }
         .onAppear {
             loadFileData()
+            isFavorite = vaultItem.isFavorite
         }
         .onDisappear {
             cleanup()

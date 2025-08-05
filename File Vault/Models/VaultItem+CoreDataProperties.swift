@@ -19,6 +19,7 @@ extension VaultItem {
     @NSManaged public var fileSize: Int64
     @NSManaged public var fileType: String?
     @NSManaged public var id: UUID?
+    @NSManaged public var isFavorite: Bool
     @NSManaged public var isTrashed: Bool
     @NSManaged public var trashedAt: Date?
     @NSManaged public var thumbnailFileName: String?

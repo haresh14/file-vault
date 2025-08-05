@@ -23,6 +23,7 @@ struct VaultToolbarView: ToolbarContent {
     let onSelectAll: () -> Void
     let onMove: () -> Void
     let onDelete: () -> Void
+    let onShare: (() -> Void)?
     let onCancel: () -> Void
     let onAdd: () -> Void
     let onSort: () -> Void
@@ -40,6 +41,7 @@ struct VaultToolbarView: ToolbarContent {
         onSelectAll: @escaping () -> Void,
         onMove: @escaping () -> Void,
         onDelete: @escaping () -> Void,
+        onShare: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         onAdd: @escaping () -> Void,
         onSort: @escaping () -> Void,
@@ -54,6 +56,7 @@ struct VaultToolbarView: ToolbarContent {
         self.onSelectAll = onSelectAll
         self.onMove = onMove
         self.onDelete = onDelete
+        self.onShare = onShare
         self.onCancel = onCancel
         self.onAdd = onAdd
         self.onSort = onSort
@@ -97,14 +100,26 @@ struct VaultToolbarView: ToolbarContent {
     @ViewBuilder
     private var selectionModeActions: some View {
         if hasSelectedItems {
-            Button(action: onMove) {
-                Image(systemName: "arrow.up.doc.on.clipboard")
+            Menu {
+                // Share option (if provided)
+                if let onShare = onShare {
+                    Button(action: onShare) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
+                
+                Button(action: onMove) {
+                    Label("Move", systemImage: "arrow.up.doc.on.clipboard")
+                }
+                
+                Divider()
+                
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
                     .foregroundColor(.blue)
-            }
-            
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .foregroundColor(.red)
             }
         }
         
@@ -113,18 +128,27 @@ struct VaultToolbarView: ToolbarContent {
     
     @ViewBuilder
     private var normalModeActions: some View {
-        if canAddFiles {
-            Button(action: onAdd) {
-                Image(systemName: "plus")
+        Menu {
+            if canAddFiles {
+                Button(action: onAdd) {
+                    Label("Add Files", systemImage: "plus")
+                }
             }
-        }
-        
-        Button(action: onSort) {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        
-        if !isEmpty && canAddFiles {
-            Button("Select", action: onEnterSelection)
+            
+            Button(action: onSort) {
+                Label("Sort", systemImage: "arrow.up.arrow.down")
+            }
+            
+            if !isEmpty && canAddFiles {
+                Divider()
+                
+                Button(action: onEnterSelection) {
+                    Label("Select Items", systemImage: "checkmark.circle")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .foregroundColor(.blue)
         }
     }
 }

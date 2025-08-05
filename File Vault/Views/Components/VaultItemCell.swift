@@ -13,8 +13,10 @@ struct VaultItemCell: View {
     let item: VaultItem
     let isSelected: Bool
     let isSelectionMode: Bool
+    let showFavoriteIndicator: Bool
     let onTap: () -> Void
     let onLongPress: () -> Void
+
     
     @State private var thumbnail: UIImage?
     @State private var isLoadingThumbnail = true
@@ -73,6 +75,21 @@ struct VaultItemCell: View {
                             Spacer()
                         }
                         .padding(4)
+                    }
+                }
+                
+                // Favorite indicator (top-right corner when not in selection mode)
+                if !isSelectionMode && item.isFavorite && showFavoriteIndicator {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.pink)
+                                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                                .padding(4)
+                        }
+                        Spacer()
                     }
                 }
                 

@@ -14,6 +14,11 @@ struct FolderContentView: View {
     @StateObject private var viewModel: FolderViewModel
     @StateObject private var loginStateManager = LoginStateManager.shared
     @Environment(\.managedObjectContext) var context
+    
+    // MARK: - File Rename State
+    @State private var showFileRenameAlert = false
+    @State private var fileRenameText = ""
+    @State private var fileToRename: VaultItem?
 
     // MARK: - Init
     init(folder: Folder?, navigationPath: Binding<NavigationPath>) {
@@ -95,38 +100,61 @@ struct FolderContentView: View {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if viewModel.isSelectionMode {
                     if !viewModel.selectedFolders.isEmpty || !viewModel.selectedFiles.isEmpty {
-                        Button(action: { viewModel.showMoveSheet = true }) {
-                            Image(systemName: "arrow.up.doc.on.clipboard")
-                                .foregroundColor(.blue)
-                        }
-                        Button(action: { 
-                            // Skip confirmation if trash is enabled
-                            if UserDefaults.standard.bool(forKey: "trashEnabled") {
-                                deleteSelectedItems()
-                            } else {
-                                viewModel.showDeleteAlert = true
+                        Menu {
+                            // Share button (only show for files, not folders)
+                            if !viewModel.selectedFiles.isEmpty {
+                                Button(action: { shareSelectedFiles() }) {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
                             }
-                        }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
+                            
+                            Button(action: { viewModel.showMoveSheet = true }) {
+                                Label("Move", systemImage: "arrow.up.doc.on.clipboard")
+                            }
+                            
+                            Divider()
+                            
+                            Button(role: .destructive, action: { 
+                                // Skip confirmation if trash is enabled
+                                if UserDefaults.standard.bool(forKey: "trashEnabled") {
+                                    deleteSelectedItems()
+                                } else {
+                                    viewModel.showDeleteAlert = true
+                                }
+                            }) {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundColor(.blue)
                         }
                     }
                     Button("Cancel") {
                         exitSelectionMode()
                     }
                 } else {
-                    if loginStateManager.canAddFiles {
-                        Button(action: { viewModel.showAddActionSheet = true }) {
-                            Image(systemName: "plus")
+                    Menu {
+                        if loginStateManager.canAddFiles {
+                            Button(action: { viewModel.showAddActionSheet = true }) {
+                                Label("Add Files", systemImage: "plus")
+                            }
                         }
+                        
+                        Button(action: { viewModel.showSortActionSheet = true }) {
+                            Label("Sort", systemImage: "arrow.up.arrow.down")
+                        }
+                        
+                        if !(folders.isEmpty && files.isEmpty) {
+                            Divider()
+                            
+                            Button(action: { enterSelectionMode() }) {
+                                Label("Select Items", systemImage: "checkmark.circle")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(.blue)
                     }
-                    Button(action: { viewModel.showSortActionSheet = true }) {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    Button("Select") {
-                        enterSelectionMode()
-                    }
-                    .disabled(folders.isEmpty && files.isEmpty)
                 }
             }
         }
@@ -154,6 +182,17 @@ struct FolderContentView: View {
             }
         } message: {
             Text("Enter a new name for the folder")
+        }
+        .alert("Rename File", isPresented: $showFileRenameAlert) {
+            TextField("File Name", text: $fileRenameText)
+            Button("Cancel", role: .cancel) {
+                cancelFileRename()
+            }
+            Button("Rename") {
+                performFileRename()
+            }
+        } message: {
+            Text("Enter a new name for the file")
         }
         .alert("Delete Items", isPresented: $viewModel.showDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -327,6 +366,18 @@ struct FolderContentView: View {
                             },
                             onRename: {
                                 startRenaming(folder)
+                            },
+                            onSelect: {
+                                if !viewModel.isSelectionMode {
+                                    viewModel.enterSelectionMode()
+                                }
+                                toggleFolderSelection(folder)
+                            },
+                            onMove: {
+                                moveFolder(folder)
+                            },
+                            onDelete: {
+                                deleteFolder(folder)
                             }
                         )
                         .background(
@@ -359,6 +410,28 @@ struct FolderContentView: View {
                                 } else {
                                     viewFile(file)
                                 }
+                            },
+                            onSelect: {
+                                if !viewModel.isSelectionMode {
+                                    viewModel.enterSelectionMode()
+                                }
+                                toggleFileSelection(file)
+                            },
+                            onFavoriteToggle: {
+                                // Add favorite functionality to FolderViewModel
+                                FileStorageManager.shared.toggleFavorite(for: file)
+                            },
+                            onRename: {
+                                startFileRename(for: file)
+                            },
+                            onMove: {
+                                moveFile(file)
+                            },
+                            onShare: {
+                                ShareManager.shared.shareVaultItem(file)
+                            },
+                            onDelete: {
+                                viewModel.prepareSwipeDeleteAlert(for: [file])
                             }
                         )
                         .swipeActions(edge: .trailing, allowsFullSwipe: !UserDefaults.standard.bool(forKey: "trashEnabled")) {
@@ -461,6 +534,47 @@ struct FolderContentView: View {
     private func viewFile(_ file: VaultItem) {
         viewModel.viewFile(file)
     }
+    
+    private func shareSelectedFiles() {
+        ShareManager.shared.shareVaultItems(Array(viewModel.selectedFiles)) {
+            DispatchQueue.main.async {
+                exitSelectionMode()
+            }
+        }
+    }
+    
+    private func moveFile(_ file: VaultItem) {
+        // Clear selections and add only this file
+        viewModel.selectedFiles.removeAll()
+        viewModel.selectedFolders.removeAll()
+        viewModel.selectedFiles.insert(file)
+        viewModel.showMoveSheet = true
+    }
+    
+    private func moveFolder(_ folder: Folder) {
+        // Clear selections and add only this folder
+        viewModel.selectedFiles.removeAll()
+        viewModel.selectedFolders.removeAll()
+        viewModel.selectedFolders.insert(folder)
+        viewModel.showMoveSheet = true
+    }
+    
+    private func deleteFolder(_ folder: Folder) {
+        // Check if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            // Move to trash without confirmation
+            CoreDataManager.shared.deleteFolder(folder)
+            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        } else {
+            // Show confirmation alert by entering selection mode and triggering delete alert
+            if !viewModel.isSelectionMode {
+                viewModel.enterSelectionMode()
+            }
+            viewModel.selectedFolders = [folder]
+            viewModel.showDeleteAlert = true
+        }
+    }
+    
     private func importAssets(_ results: [PHPickerResult]) {
         guard !results.isEmpty else { return }
         viewModel.showPhotoPicker = false
@@ -518,6 +632,56 @@ struct FolderContentView: View {
             processedItems += 1; viewModel.importProgress = processedItems / totalItems
         }
         viewModel.isImporting = false; viewModel.finishImportingAssets()
+    }
+    
+    // MARK: - File Rename Functions
+    private func startFileRename(for file: VaultItem) {
+        guard let fileName = file.fileName else { return }
+        fileToRename = file
+        fileRenameText = getFileNameWithoutExtension(fileName)
+        showFileRenameAlert = true
+    }
+    
+    private func performFileRename() {
+        guard let file = fileToRename, !fileRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            cancelFileRename()
+            return
+        }
+        
+        guard let oldFileName = file.fileName else {
+            cancelFileRename()
+            return
+        }
+        
+        // Preserve the original file extension
+        let url = URL(fileURLWithPath: oldFileName)
+        let fileExtension = url.pathExtension
+        let newFileName = fileExtension.isEmpty ? fileRenameText : "\(fileRenameText.trimmingCharacters(in: .whitespacesAndNewlines)).\(fileExtension)"
+        
+        do {
+            // Rename the physical file first
+            try FileStorageManager.shared.renameFile(vaultItem: file, newFileName: newFileName)
+            
+            // Refresh the view
+            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            
+            cancelFileRename()
+        } catch {
+            print("Error renaming file: \(error)")
+            // Show error to user - for now just cancel
+            cancelFileRename()
+        }
+    }
+    
+    private func cancelFileRename() {
+        showFileRenameAlert = false
+        fileToRename = nil
+        fileRenameText = ""
+    }
+    
+    private func getFileNameWithoutExtension(_ fileName: String) -> String {
+        let url = URL(fileURLWithPath: fileName)
+        return url.deletingPathExtension().lastPathComponent
     }
 }
 

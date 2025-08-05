@@ -53,6 +53,8 @@ final class CategoryViewModel: ObservableObject {
         guard !loginStateManager.shouldShowEmptyVault else { return [] }
 
         switch category {
+        case .favorites:
+            return favoriteItems
         case .photos:
             return photoItems
         case .videos:
@@ -69,6 +71,10 @@ final class CategoryViewModel: ObservableObject {
     }
 
     // MARK: - Private Helpers
+
+    private var favoriteItems: [VaultItem] {
+        allVaultItems.filter { $0.isFavorite }
+    }
 
     private var photoItems: [VaultItem] {
         allVaultItems.filter { $0.isImage }

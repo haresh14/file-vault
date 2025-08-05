@@ -621,6 +621,94 @@ class FileStorageManager: FileStorageManaging {
         }
     }
     
+    // MARK: - Favorites Management
+    
+    func toggleFavorite(for vaultItem: VaultItem) {
+        CoreDataManager.shared.toggleFavorite(for: vaultItem)
+    }
+    
+    func fetchFavoriteItems() -> [VaultItem] {
+        return CoreDataManager.shared.fetchFavoriteVaultItems()
+    }
+    
+    // MARK: - File Rename Management
+    
+    /// Rename a vault item's physical file and update Core Data
+    func renameFile(vaultItem: VaultItem, newFileName: String) throws {
+        guard let oldFileName = vaultItem.fileName else {
+            throw FileStorageError.invalidFileName
+        }
+        
+        // Check if the new filename already exists
+        let newFileURL = vaultDirectory.appendingPathComponent(newFileName)
+        if fileManager.fileExists(atPath: newFileURL.path) {
+            throw FileStorageError.fileAlreadyExists
+        }
+        
+        // Rename the main file
+        let oldFileURL = vaultDirectory.appendingPathComponent(oldFileName)
+        try fileManager.moveItem(at: oldFileURL, to: newFileURL)
+        
+        // Rename the thumbnail file if it exists
+        if let thumbnailFileName = vaultItem.thumbnailFileName {
+            let oldThumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
+            
+            if fileManager.fileExists(atPath: oldThumbnailURL.path) {
+                // Generate new thumbnail filename based on new main filename
+                let newThumbnailFileName = generateThumbnailFileName(for: newFileName)
+                let newThumbnailURL = thumbnailsDirectory.appendingPathComponent(newThumbnailFileName)
+                
+                try fileManager.moveItem(at: oldThumbnailURL, to: newThumbnailURL)
+                
+                // Update the thumbnail filename in Core Data
+                vaultItem.thumbnailFileName = newThumbnailFileName
+            }
+        }
+        
+        // Update the filename in Core Data
+        vaultItem.fileName = newFileName
+        vaultItem.updatedAt = Date()
+        
+        // Save the context
+        CoreDataManager.shared.save()
+        
+        print("DEBUG: Successfully renamed file from \(oldFileName) to \(newFileName)")
+    }
+    
+    /// Generate thumbnail filename based on original filename
+    private func generateThumbnailFileName(for fileName: String) -> String {
+        return "thumb_\(fileName).jpg"
+    }
+    
+    // MARK: - Share Management
+    
+    /// Prepare a vault item for sharing by decrypting it to a temporary file
+    func prepareForSharing(vaultItem: VaultItem) throws -> URL {
+        guard let fileName = vaultItem.fileName else {
+            throw FileStorageError.invalidFileName
+        }
+        
+        // Load and decrypt the file
+        let decryptedData = try loadFile(vaultItem: vaultItem)
+        
+        // Create a temporary file URL
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let tempFileURL = tempDirectory.appendingPathComponent(fileName)
+        
+        // Remove any existing file at this location
+        try? FileManager.default.removeItem(at: tempFileURL)
+        
+        // Write the decrypted data to the temporary file
+        try decryptedData.write(to: tempFileURL)
+        
+        return tempFileURL
+    }
+    
+    /// Clean up temporary sharing files
+    func cleanupTemporaryFile(at url: URL) {
+        try? FileManager.default.removeItem(at: url)
+    }
+    
     // MARK: - Encryption/Decryption
     
     private func encryptData(_ data: Data, using key: SymmetricKey) throws -> Data {
@@ -1063,6 +1151,7 @@ enum FileStorageError: LocalizedError {
     case invalidFileName
     case importFailed
     case duplicateFile
+    case fileAlreadyExists
     
     var errorDescription: String? {
         switch self {
@@ -1078,6 +1167,8 @@ enum FileStorageError: LocalizedError {
             return "Failed to import file from photo library."
         case .duplicateFile:
             return "File already exists in the target location."
+        case .fileAlreadyExists:
+            return "A file with this name already exists."
         }
     }
 } 

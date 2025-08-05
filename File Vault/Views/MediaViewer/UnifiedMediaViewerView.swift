@@ -17,6 +17,8 @@ struct UnifiedMediaViewerView: View {
     @State private var currentIndex: Int?
     // Whether horizontal scrolling should be disabled (when zoomed)
     @State private var isScrollDisabled: Bool = false
+    // Track favorite status for UI updates
+    @State private var favoriteStatus: [UUID: Bool] = [:]
     @Environment(\.dismiss) private var dismiss
     
     init(mediaItems: [VaultItem], initialIndex: Int) {
@@ -24,6 +26,15 @@ struct UnifiedMediaViewerView: View {
         self.initialIndex = initialIndex
         // We set the initial value in onAppear
         self._currentIndex = State(initialValue: initialIndex)
+    }
+    
+    // Computed property to get the current media item
+    private var currentMediaItem: VaultItem? {
+        guard let currentIndex = currentIndex,
+              currentIndex >= 0 && currentIndex < mediaItems.count else {
+            return nil
+        }
+        return mediaItems[currentIndex]
     }
     
     var body: some View {
@@ -71,11 +82,64 @@ struct UnifiedMediaViewerView: View {
                 .scrollDisabled(isScrollDisabled)
                 .ignoresSafeArea()
             }
+            
+            // Favorite and Share buttons overlay (hidden during zoom)
+            if !isScrollDisabled && !mediaItems.isEmpty {
+                VStack {
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 20) {
+                            // Favorite button
+                            Button(action: {
+                                if let currentItem = currentMediaItem, let itemId = currentItem.id {
+                                    FileStorageManager.shared.toggleFavorite(for: currentItem)
+                                    favoriteStatus[itemId] = !(favoriteStatus[itemId] ?? currentItem.isFavorite)
+                                }
+                            }) {
+                                let isFavorite = currentMediaItem?.id.flatMap { favoriteStatus[$0] } ?? currentMediaItem?.isFavorite ?? false
+                                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                                    .foregroundColor(isFavorite ? .red : .white)
+                                    .font(.title2)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.5))
+                                            .frame(width: 44, height: 44)
+                                    )
+                            }
+                            
+                            // Share button
+                            Button(action: {
+                                if let currentItem = currentMediaItem {
+                                    ShareManager.shared.shareVaultItem(currentItem)
+                                }
+                            }) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundColor(.white)
+                                    .font(.title2)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.5))
+                                            .frame(width: 44, height: 44)
+                                    )
+                            }
+                        }
+                        .padding(.trailing, 20)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 50) // Account for safe area
+            }
         }
         .statusBarHidden()
         .onAppear {
             // Set the initial page
             currentIndex = initialIndex
+            // Initialize favorite status for all items
+            for item in mediaItems {
+                if let itemId = item.id {
+                    favoriteStatus[itemId] = item.isFavorite
+                }
+            }
         }
         .gesture(
             // Swipe-down-to-close should only work when gestures are enabled (not zoomed)

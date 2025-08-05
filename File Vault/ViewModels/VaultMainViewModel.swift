@@ -129,6 +129,17 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
                 }
             }
             .store(in: &cancellables)
+        
+        // Reset selection mode when tab changes
+        NotificationCenter.default.publisher(for: Notification.Name("TabDidChange"))
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    if self?.isSelectionMode == true {
+                        self?.exitSelectionMode()
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Data Management
@@ -472,5 +483,55 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
     }
     
+    // MARK: - Favorites Management
+    
+    func toggleFavorite(for item: VaultItem) {
+        fileStorageManager.toggleFavorite(for: item)
+        
+        // Post notification to refresh other views
+        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        
+        loadVaultItems()
+    }
+    
+    // MARK: - Share Management
+    
+    func shareItem(_ item: VaultItem) {
+        ShareManager.shared.shareVaultItem(item)
+    }
+    
+    func shareSelectedItems() {
+        // Share all selected items at once
+        ShareManager.shared.shareVaultItems(Array(selectedItems)) { [weak self] in
+            DispatchQueue.main.async {
+                self?.exitSelectionMode()
+            }
+        }
+    }
+    
+    // MARK: - Single Item Move
+    
+    func moveItem(_ item: VaultItem) {
+        // Clear selection and add only this item
+        selectedItems.removeAll()
+        selectedItems.insert(item)
+        showMoveSheet = true
+    }
+    
+    // MARK: - Single Item Delete
+    
+    func deleteItem(_ item: VaultItem) {
+        // Check if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            // Move to trash without confirmation
+            try? fileStorageManager.deleteFile(vaultItem: item)
+            loadVaultItems()
+        } else {
+            // Show confirmation alert (implement via delegate pattern or notifications)
+            selectedItems = [item]
+            showDeleteAlert = true
+        }
+    }
+
     // MARK: - Helper Methods
 }

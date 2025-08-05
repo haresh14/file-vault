@@ -17,6 +17,12 @@ struct VaultMainView: View {
     @StateObject private var importProgressViewModel = ImportProgressViewModel()
     @StateObject private var loginStateManager = LoginStateManager.shared
     
+    // MARK: - Rename State
+    
+    @State private var showRenameAlert = false
+    @State private var renameText = ""
+    @State private var itemToRename: VaultItem?
+    
     // MARK: - Environment
     
     @Environment(\.managedObjectContext) var context
@@ -49,6 +55,7 @@ struct VaultMainView: View {
                                 viewModel.showDeleteAlert = true
                             }
                         },
+                        onShare: { viewModel.shareSelectedItems() },
                         onCancel: { viewModel.exitSelectionMode() },
                         onAdd: { viewModel.showAddActions() },
                         onSort: { viewModel.showSortActionSheet = true },
@@ -138,8 +145,42 @@ struct VaultMainView: View {
             isImporting: viewModel.isImporting,
             emptyStateConfig: emptyStateConfiguration,
             onItemTap: handleItemTap,
-            onItemLongPress: handleItemLongPress
+            onItemLongPress: handleItemLongPress,
+            onFavoriteToggle: { item in
+                viewModel.toggleFavorite(for: item)
+            },
+            onShare: { item in
+                viewModel.shareItem(item)
+            },
+            onRename: { item in
+                startRename(for: item)
+            },
+            onMove: { item in
+                viewModel.moveItem(item)
+            },
+            onDelete: { item in
+                viewModel.deleteItem(item)
+            },
+            onSelect: { item in
+                if !viewModel.isSelectionMode {
+                    viewModel.triggerSelectionHaptic()
+                    viewModel.enterSelectionMode()
+                }
+                viewModel.selectedItems.insert(item)
+            },
+            showFavoriteIndicator: true
         )
+        .alert("Rename", isPresented: $showRenameAlert) {
+            TextField("Name", text: $renameText)
+            Button("Cancel", role: .cancel) {
+                cancelRename()
+            }
+            Button("Rename") {
+                performRename()
+            }
+        } message: {
+            Text("Enter a new name")
+        }
     }
     
     /// Empty state configuration that respects fake login state
@@ -174,6 +215,57 @@ struct VaultMainView: View {
             viewModel.enterSelectionMode()
             viewModel.selectedItems.insert(item)
         }
+    }
+    
+    // MARK: - Rename Functions
+    
+    private func startRename(for item: VaultItem) {
+        guard let fileName = item.fileName else { return }
+        itemToRename = item
+        renameText = getFileNameWithoutExtension(fileName)
+        showRenameAlert = true
+    }
+    
+    private func performRename() {
+        guard let item = itemToRename, !renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            cancelRename()
+            return
+        }
+        
+        guard let oldFileName = item.fileName else {
+            cancelRename()
+            return
+        }
+        
+        // Preserve the original file extension
+        let url = URL(fileURLWithPath: oldFileName)
+        let fileExtension = url.pathExtension
+        let newFileName = fileExtension.isEmpty ? renameText : "\(renameText.trimmingCharacters(in: .whitespacesAndNewlines)).\(fileExtension)"
+        
+        do {
+            // Rename the physical file first
+            try FileStorageManager.shared.renameFile(vaultItem: item, newFileName: newFileName)
+            
+            // Refresh the view
+            viewModel.loadVaultItems()
+            
+            cancelRename()
+        } catch {
+            print("Error renaming file: \(error)")
+            // Show error to user - for now just cancel
+            cancelRename()
+        }
+    }
+    
+    private func cancelRename() {
+        showRenameAlert = false
+        itemToRename = nil
+        renameText = ""
+    }
+    
+    private func getFileNameWithoutExtension(_ fileName: String) -> String {
+        let url = URL(fileURLWithPath: fileName)
+        return url.deletingPathExtension().lastPathComponent
     }
 }
 

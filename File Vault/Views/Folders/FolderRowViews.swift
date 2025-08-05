@@ -46,6 +46,9 @@ struct SelectableFolderRowView: View {
     let isSelectionMode: Bool
     let onTap: () -> Void
     let onRename: () -> Void
+    let onSelect: (() -> Void)?
+    let onMove: (() -> Void)?
+    let onDelete: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -81,9 +84,33 @@ struct SelectableFolderRowView: View {
             onTap()
         }
         .contextMenu {
-            if !isSelectionMode {
-                Button(action: onRename) {
-                    Label("Rename", systemImage: "pencil")
+            // Select option
+            Button(action: {
+                onSelect?()
+            }) {
+                Label("Select", systemImage: "checkmark.circle")
+            }
+            
+            Divider()
+            
+            // Rename option
+            Button(action: onRename) {
+                Label("Rename", systemImage: "pencil")
+            }
+            
+            // Move option
+            Button(action: {
+                onMove?()
+            }) {
+                Label("Move", systemImage: "folder")
+            }
+            
+            if let onDelete = onDelete {
+                Divider()
+                
+                // Delete option
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
                 }
             }
         }

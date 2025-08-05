@@ -22,6 +22,13 @@ struct VaultGridView: View {
     
     let onItemTap: (VaultItem) -> Void
     let onItemLongPress: (VaultItem) -> Void
+    let onFavoriteToggle: ((VaultItem) -> Void)?
+    let onShare: ((VaultItem) -> Void)?
+    let onRename: ((VaultItem) -> Void)?
+    let onMove: ((VaultItem) -> Void)?
+    let onDelete: ((VaultItem) -> Void)?
+    let onSelect: ((VaultItem) -> Void)?
+    let showFavoriteIndicator: Bool
     
     // MARK: - Grid Configuration
     
@@ -43,9 +50,80 @@ struct VaultGridView: View {
                                 item: item,
                                 isSelected: selectedItems.contains(item),
                                 isSelectionMode: isSelectionMode,
+                                showFavoriteIndicator: showFavoriteIndicator,
                                 onTap: { onItemTap(item) },
                                 onLongPress: { onItemLongPress(item) }
                             )
+                            .contextMenu {
+                                // Only show context menu if at least one action is available
+                                if onSelect != nil || onFavoriteToggle != nil || onMove != nil || onShare != nil || onDelete != nil {
+                                    // Select option
+                                    if let onSelect = onSelect {
+                                        Button(action: {
+                                            onSelect(item)
+                                        }) {
+                                            Label("Select", systemImage: "checkmark.circle")
+                                        }
+                                        
+                                        Divider()
+                                    }
+                                    
+                                    // Favorite/Unfavorite option
+                                    if let onFavoriteToggle = onFavoriteToggle {
+                                        Button(action: {
+                                            onFavoriteToggle(item)
+                                        }) {
+                                            Label(
+                                                item.isFavorite ? "Unfavorite" : "Favorite",
+                                                systemImage: item.isFavorite ? "heart.slash" : "heart"
+                                            )
+                                        }
+                                    }
+                                    
+                                    // Rename option (available when other actions are present)
+                                    if let onRename = onRename {
+                                        Button(action: {
+                                            onRename(item)
+                                        }) {
+                                            Label("Rename", systemImage: "pencil")
+                                        }
+                                    }
+                                    
+                                    // Move option
+                                    if let onMove = onMove {
+                                        Button(action: {
+                                            onMove(item)   // Trigger move functionality directly
+                                        }) {
+                                            Label("Move", systemImage: "folder")
+                                        }
+                                    }
+                                    
+                                    if onShare != nil || onDelete != nil {
+                                        Divider()
+                                    }
+                                    
+                                    // Share option
+                                    if let onShare = onShare {
+                                        Button(action: {
+                                            onShare(item)
+                                        }) {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                        }
+                                    }
+                                    
+                                    // Delete option (in red)
+                                    if let onDelete = onDelete {
+                                        if onShare != nil {
+                                            Divider()
+                                        }
+                                        Button(role: .destructive, action: {
+                                            onDelete(item)
+                                        }) {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 2)
@@ -69,7 +147,14 @@ struct VaultGridView: View {
         isImporting: false,
         emptyStateConfig: .noPhotos(onAddPhotos: {}),
         onItemTap: { _ in },
-        onItemLongPress: { _ in }
+        onItemLongPress: { _ in },
+        onFavoriteToggle: nil,
+        onShare: nil,
+        onRename: nil,
+        onMove: nil,
+        onDelete: nil,
+        onSelect: nil,
+        showFavoriteIndicator: true
     )
 }
 
@@ -82,6 +167,13 @@ struct VaultGridView: View {
         isImporting: false,
         emptyStateConfig: .emptyFolder(onCreateFolder: {}, onAddFiles: {}),
         onItemTap: { _ in },
-        onItemLongPress: { _ in }
+        onItemLongPress: { _ in },
+        onFavoriteToggle: nil,
+        onShare: nil,
+        onRename: nil,
+        onMove: nil,
+        onDelete: nil,
+        onSelect: nil,
+        showFavoriteIndicator: true
     )
 }

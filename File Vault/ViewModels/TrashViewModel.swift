@@ -175,4 +175,18 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
         filePreviewItem = item
         showFilePreview = true
     }
+    
+    // MARK: - Favorites Management
+    
+    func toggleFavorite(for item: VaultItem) {
+        FileStorageManager.shared.toggleFavorite(for: item)
+        // Refresh the view to reflect the change
+        loadDeletedItems()
+    }
+    
+    // MARK: - Share Management
+    
+    func shareItem(_ item: VaultItem) {
+        ShareManager.shared.shareVaultItem(item)
+    }
 } 

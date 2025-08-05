@@ -54,6 +54,17 @@ final class CategoryFilesViewModel: ObservableObject {
                 self?.loadItems()
             }
             .store(in: &cancellables)
+        
+        // Reset selection mode when tab changes
+        NotificationCenter.default.publisher(for: Notification.Name("TabDidChange"))
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    if self?.isSelectionMode == true {
+                        self?.exitSelectionMode()
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     deinit { cancellables.forEach { $0.cancel() } }
@@ -134,6 +145,55 @@ final class CategoryFilesViewModel: ObservableObject {
         filePreviewItem = item
         showFilePreview = true
     }
+    
+    // MARK: - Favorites Management
+    
+    func toggleFavorite(for item: VaultItem) {
+        FileStorageManager.shared.toggleFavorite(for: item)
+        // Refresh the view to reflect the change
+        notifyGlobalRefresh()
+    }
+    
+    // MARK: - Share Management
+    
+    func shareItem(_ item: VaultItem) {
+        ShareManager.shared.shareVaultItem(item)
+    }
+    
+    func shareSelectedItems() {
+        // Share all selected items at once
+        ShareManager.shared.shareVaultItems(Array(selectedItems)) { [weak self] in
+            DispatchQueue.main.async {
+                self?.exitSelectionMode()
+            }
+        }
+    }
+    
+    // MARK: - Single Item Move
+    
+    func moveItem(_ item: VaultItem, showMoveSheet: @escaping () -> Void) {
+        // Clear selection and add only this item
+        selectedItems.removeAll()
+        selectedItems.insert(item)
+        showMoveSheet()
+    }
+    
+    // MARK: - Single Item Delete
+    
+    func deleteItem(_ item: VaultItem) {
+        // Check if trash is enabled
+        if UserDefaults.standard.bool(forKey: "trashEnabled") {
+            // Move to trash without confirmation
+            try? FileStorageManager.shared.deleteFile(vaultItem: item)
+            notifyGlobalRefresh()
+        } else {
+            // Show confirmation alert
+            selectedItems = [item]
+            enterSelectionMode()
+            // Trigger the alert via delegate or notification pattern
+            // For now, we'll handle this in the view level
+        }
+    }
 
     // MARK: - Private helpers
     private func notifyGlobalRefresh() {
@@ -143,6 +203,8 @@ final class CategoryFilesViewModel: ObservableObject {
     private func loadItems() {
         let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
         switch categoryType {
+        case .favorites:
+            items = allItems.filter { $0.isFavorite }
         case .photos:
             items = allItems.filter { $0.isImage }
         case .videos:

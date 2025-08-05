@@ -36,7 +36,14 @@ struct TrashView: View {
                             viewModel.enterSelectionMode()
                             viewModel.toggleSelection(item)
                         }
-                    }
+                    },
+                    onFavoriteToggle: nil,  // Remove favorite functionality in trash
+                    onShare: nil,           // Remove share functionality in trash
+                    onRename: nil,          // Remove rename functionality in trash
+                    onMove: nil,            // Remove move functionality in trash
+                    onDelete: nil,          // Remove delete functionality in trash
+                    onSelect: nil,          // Remove context menu selection
+                    showFavoriteIndicator: true
                 )
                 
                 // Bottom action bar (when items are selected)

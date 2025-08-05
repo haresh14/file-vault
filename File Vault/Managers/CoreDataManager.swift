@@ -405,6 +405,25 @@ class CoreDataManager: CoreDataManaging {
         save()
     }
     
+    func toggleFavorite(for item: VaultItem) {
+        item.isFavorite.toggle()
+        item.updatedAt = Date()
+        save()
+    }
+    
+    func fetchFavoriteVaultItems() -> [VaultItem] {
+        let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        request.predicate = NSPredicate(format: "isFavorite == true AND isTrashed == false")
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching favorite vault items: \(error)")
+            return []
+        }
+    }
+    
     func moveFolder(_ folder: Folder, to parent: Folder?) {
         // Prevent moving a folder into itself or its descendants
         if let parent = parent, isFolder(folder, ancestorOf: parent) {

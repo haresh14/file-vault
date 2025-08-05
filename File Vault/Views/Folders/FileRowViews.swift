@@ -95,6 +95,12 @@ struct SelectableFileRowView: View {
     let isSelected: Bool
     let isSelectionMode: Bool
     let onTap: () -> Void
+    let onSelect: (() -> Void)?
+    let onFavoriteToggle: (() -> Void)?
+    let onRename: (() -> Void)?
+    let onMove: (() -> Void)?
+    let onShare: (() -> Void)?
+    let onDelete: (() -> Void)?
 
     @State private var thumbnail: UIImage?
 
@@ -141,16 +147,78 @@ struct SelectableFileRowView: View {
             }
 
             Spacer()
-
-            if file.isVideo {
-                Image(systemName: "play.circle")
-                    .foregroundColor(.secondary)
-                    .font(.title3)
+            
+            HStack(spacing: 8) {
+                // Favorite indicator
+                if file.isFavorite {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+                
+                // Video play icon
+                if file.isVideo {
+                    Image(systemName: "play.circle")
+                        .foregroundColor(.secondary)
+                        .font(.title3)
+                }
             }
         }
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
+        }
+        .contextMenu {
+            // Select option
+            Button(action: {
+                onSelect?()
+            }) {
+                Label("Select", systemImage: "checkmark.circle")
+            }
+            
+            Divider()
+            
+            // Favorite/Unfavorite option
+            Button(action: {
+                onFavoriteToggle?()
+            }) {
+                Label(
+                    file.isFavorite ? "Unfavorite" : "Favorite",
+                    systemImage: file.isFavorite ? "heart.slash" : "heart"
+                )
+            }
+            
+            // Rename option
+            Button(action: {
+                onRename?()
+            }) {
+                Label("Rename", systemImage: "pencil")
+            }
+            
+            // Move option
+            Button(action: {
+                onMove?()
+            }) {
+                Label("Move", systemImage: "folder")
+            }
+            
+            Divider()
+            
+            // Share option
+            Button(action: {
+                onShare?()
+            }) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            
+            Divider()
+            
+            // Delete option (in red)
+            Button(role: .destructive, action: {
+                onDelete?()
+            }) {
+                Label("Delete", systemImage: "trash")
+            }
         }
         .onAppear {
             loadThumbnail()
