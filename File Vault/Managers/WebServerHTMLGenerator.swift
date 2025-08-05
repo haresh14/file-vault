@@ -1272,8 +1272,9 @@ extension WebServerManager {
                         xhr.upload.addEventListener('progress', (e) => {
                             if (e.lengthComputable) {
                                 const percent = (e.loaded / e.total) * 100;
+                                const uploadedCount = Math.floor((e.loaded / e.total) * files.length);
                                 showProgress(percent);
-                                updateUploadProgress(percent, 0, files.length);
+                                updateUploadProgress(percent, uploadedCount, files.length);
                             }
                         });
                         
