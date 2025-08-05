@@ -13,6 +13,7 @@ enum SortOption: String, CaseIterable {
     case size = "Size"
     case date = "Date"
     case kind = "Kind"
+    case favorites = "Favorites"
     
     var systemImage: String {
         switch self {
@@ -26,6 +27,8 @@ enum SortOption: String, CaseIterable {
             return "calendar"
         case .kind:
             return "folder"
+        case .favorites:
+            return "heart.fill"
         }
     }
 }

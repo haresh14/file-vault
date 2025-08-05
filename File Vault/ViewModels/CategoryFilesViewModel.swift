@@ -32,6 +32,8 @@ final class CategoryFilesViewModel: ObservableObject {
             sorted = items.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
         case .size:
             sorted = items.sorted { $0.fileSize < $1.fileSize }
+        case .favorites:
+            sorted = items.sorted { ($0.isFavorite && !$1.isFavorite) || ($0.isFavorite == $1.isFavorite && ($0.fileName ?? "") < ($1.fileName ?? "")) }
         case .kind:
             sorted = items.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
@@ -101,6 +103,14 @@ final class CategoryFilesViewModel: ObservableObject {
         notifyGlobalRefresh()
     }
 
+    func toggleFavoriteSelectedItems() {
+        for item in selectedItems {
+            FileStorageManager.shared.toggleFavorite(for: item)
+        }
+        exitSelectionMode()
+        notifyGlobalRefresh()
+    }
+    
     func deleteSelectedItems() {
         for item in selectedItems {
             do {

@@ -170,6 +170,8 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
             sorted = items.sorted { $0.fileSize < $1.fileSize }
         case .date:
             sorted = items.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
+        case .favorites:
+            sorted = items.sorted { ($0.isFavorite && !$1.isFavorite) || ($0.isFavorite == $1.isFavorite && ($0.fileName ?? "") < ($1.fileName ?? "")) }
         case .kind:
             sorted = items.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
@@ -498,6 +500,14 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     
     func shareItem(_ item: VaultItem) {
         ShareManager.shared.shareVaultItem(item)
+    }
+    
+    func toggleFavoriteSelectedItems() {
+        for item in selectedItems {
+            FileStorageManager.shared.toggleFavorite(for: item)
+        }
+        exitSelectionMode()
+        loadVaultItems()
     }
     
     func shareSelectedItems() {

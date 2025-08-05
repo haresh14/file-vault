@@ -61,6 +61,8 @@ struct FolderContentView: View {
             sorted = files.sorted { ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast) }
         case .size:
             sorted = files.sorted { $0.fileSize < $1.fileSize }
+        case .favorites:
+            sorted = files.sorted { ($0.isFavorite && !$1.isFavorite) || ($0.isFavorite == $1.isFavorite && ($0.fileName ?? "") < ($1.fileName ?? "")) }
         case .kind:
             sorted = files.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
@@ -99,8 +101,18 @@ struct FolderContentView: View {
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if viewModel.isSelectionMode {
+                    Button("Cancel") {
+                        exitSelectionMode()
+                    }
+                    
                     if !viewModel.selectedFolders.isEmpty || !viewModel.selectedFiles.isEmpty {
                         Menu {
+                            // Favorite toggle (only show for files, not folders)
+                            if !viewModel.selectedFiles.isEmpty {
+                                Button(action: { viewModel.toggleFavoriteSelectedFiles() }) {
+                                    Label("Favorite", systemImage: "heart")
+                                }
+                            }
                             // Share button (only show for files, not folders)
                             if !viewModel.selectedFiles.isEmpty {
                                 Button(action: { shareSelectedFiles() }) {
@@ -128,9 +140,6 @@ struct FolderContentView: View {
                             Image(systemName: "ellipsis.circle")
                                 .foregroundColor(.blue)
                         }
-                    }
-                    Button("Cancel") {
-                        exitSelectionMode()
                     }
                 } else {
                     Menu {

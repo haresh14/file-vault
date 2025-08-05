@@ -56,6 +56,7 @@ struct VaultMainView: View {
                             }
                         },
                         onShare: { viewModel.shareSelectedItems() },
+                        onFavorite: { viewModel.toggleFavoriteSelectedItems() },
                         onCancel: { viewModel.exitSelectionMode() },
                         onAdd: { viewModel.showAddActions() },
                         onSort: { viewModel.showSortActionSheet = true },

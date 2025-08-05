@@ -334,7 +334,7 @@ struct SettingsView: View {
             }
             
             Button(action: { showDeleteFilesAlert = true }) {
-                Label("Delete All Files Only", systemImage: "trash.fill")
+                Label("Delete All Files & Folders", systemImage: "trash.fill")
                     .foregroundColor(.orange)
             }
         }
@@ -352,7 +352,7 @@ struct SettingsView: View {
                 performDeleteAllFiles()
             }
         } message: {
-            Text("This will delete all files in your vault but keep your passcode and settings.")
+            Text("This will delete all files and folders in your vault but keep your passcode and settings.")
         }
     }
     #endif
@@ -524,6 +524,13 @@ struct SettingsView: View {
             
             // Delete from Core Data
             CoreDataManager.shared.deleteVaultItem(item)
+        }
+        
+        // Delete all folders from Core Data
+        let folders = CoreDataManager.shared.fetchAllFolders()
+        
+        for folder in folders {
+            CoreDataManager.shared.deleteFolder(folder)
         }
         
         // Save context to ensure changes are persisted

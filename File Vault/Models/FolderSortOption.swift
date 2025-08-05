@@ -6,6 +6,7 @@ public enum FolderSortOption: String, CaseIterable {
     case date = "Date"
     case size = "Size"
     case kind = "Kind"
+    case favorites = "Favorites"
 
     var systemImage: String {
         switch self {
@@ -14,6 +15,7 @@ public enum FolderSortOption: String, CaseIterable {
         case .date: return "calendar"
         case .size: return "arrow.up.arrow.down"
         case .kind: return "folder"
+        case .favorites: return "heart.fill"
         }
     }
 } 

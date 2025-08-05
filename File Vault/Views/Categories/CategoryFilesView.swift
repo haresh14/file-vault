@@ -198,8 +198,14 @@ struct CategoryFilesView: View {
 
         ToolbarItemGroup(placement: .navigationBarTrailing) {
             if viewModel.isSelectionMode {
+                Button("Cancel") { viewModel.exitSelectionMode() }
+                
                 if !viewModel.selectedItems.isEmpty {
                     Menu {
+                        Button(action: { viewModel.toggleFavoriteSelectedItems() }) {
+                            Label("Favorite", systemImage: "heart")
+                        }
+                        
                         Button(action: { viewModel.shareSelectedItems() }) {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
@@ -225,7 +231,6 @@ struct CategoryFilesView: View {
                             .foregroundColor(.blue)
                     }
                 }
-                Button("Cancel") { viewModel.exitSelectionMode() }
             } else {
                 Menu {
                     Button(action: { showSortActionSheet = true }) {

@@ -24,6 +24,7 @@ struct VaultToolbarView: ToolbarContent {
     let onMove: () -> Void
     let onDelete: () -> Void
     let onShare: (() -> Void)?
+    let onFavorite: (() -> Void)?
     let onCancel: () -> Void
     let onAdd: () -> Void
     let onSort: () -> Void
@@ -42,6 +43,7 @@ struct VaultToolbarView: ToolbarContent {
         onMove: @escaping () -> Void,
         onDelete: @escaping () -> Void,
         onShare: (() -> Void)? = nil,
+        onFavorite: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         onAdd: @escaping () -> Void,
         onSort: @escaping () -> Void,
@@ -57,6 +59,7 @@ struct VaultToolbarView: ToolbarContent {
         self.onMove = onMove
         self.onDelete = onDelete
         self.onShare = onShare
+        self.onFavorite = onFavorite
         self.onCancel = onCancel
         self.onAdd = onAdd
         self.onSort = onSort
@@ -99,8 +102,16 @@ struct VaultToolbarView: ToolbarContent {
     
     @ViewBuilder
     private var selectionModeActions: some View {
+        Button("Cancel", action: onCancel)
+        
         if hasSelectedItems {
             Menu {
+                // Favorite option
+                if let onFavorite = onFavorite {
+                    Button(action: onFavorite) {
+                        Label("Favorite", systemImage: "heart")
+                    }
+                }
                 // Share option (if provided)
                 if let onShare = onShare {
                     Button(action: onShare) {
@@ -122,8 +133,6 @@ struct VaultToolbarView: ToolbarContent {
                     .foregroundColor(.blue)
             }
         }
-        
-        Button("Cancel", action: onCancel)
     }
     
     @ViewBuilder

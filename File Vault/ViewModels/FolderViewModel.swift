@@ -328,10 +328,21 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
             sorted = folders.sorted { $0.totalItemCount < $1.totalItemCount }
         case .kind:
             sorted = folders.sorted { ($0.name ?? "") < ($1.name ?? "") }
+        case .favorites:
+            sorted = folders // Favorites not applicable to folders (keep current order)
         }
         return sortAscending ? sorted : sorted.reversed()
     }
 
+    // Toggle favorite for selected files
+    func toggleFavoriteSelectedFiles() {
+        for item in selectedFiles {
+            FileStorageManager.shared.toggleFavorite(for: item)
+        }
+        exitSelectionMode()
+        loadContent()
+    }
+    
     private func sort(files: [VaultItem]) -> [VaultItem] {
         let sorted: [VaultItem]
         switch sortOption {
@@ -343,6 +354,8 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
             sorted = files.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         case .size:
             sorted = files.sorted { $0.fileSize < $1.fileSize }
+        case .favorites:
+            sorted = files.sorted { ($0.isFavorite && !$1.isFavorite) || ($0.isFavorite == $1.isFavorite && ($0.fileName ?? "") < ($1.fileName ?? "")) }
         case .kind:
             sorted = files.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
