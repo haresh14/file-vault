@@ -19,6 +19,10 @@ struct ChangeAuthenticationView: View {
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var navigationPath = NavigationPath()
+    @State private var showMigrationProgress: Bool = false
+    @State private var migrationProgress: Int = 0
+    @State private var migrationTotal: Int = 0
+    @State private var newPasswordForMigration: String = ""
     @FocusState private var isCurrentPasswordFocused: Bool
     
     var body: some View {
@@ -51,18 +55,27 @@ struct ChangeAuthenticationView: View {
             .navigationDestination(for: AuthenticationType.self) { authType in
                 if authType.isPasscode {
                     PasscodeSetupView(authType: authType, onPasscodeSet: {
-                        onAuthChanged()
-                        dismiss()
+                        handlePasscodeChanged()
                     }, onCancel: {
                         navigationPath.removeLast()
                     })
                 } else {
                     PasswordSetupView(onPasswordSet: {
-                        onAuthChanged()
-                        dismiss()
+                        handlePasswordChanged()
                     }, onCancel: {
                         navigationPath.removeLast()
                     })
+                }
+            }
+            .navigationDestination(for: String.self) { destination in
+                if destination == "migration" {
+                    MigrationProgressView(
+                        currentProgress: migrationProgress,
+                        totalItems: migrationTotal,
+                        onCancel: {
+                            navigationPath.removeLast()
+                        }
+                    )
                 }
             }
         }
@@ -182,14 +195,12 @@ struct ChangeAuthenticationView: View {
                     isSelected: newAuthType == type,
                     onTap: { newAuthType = type }
                 )
-                .disabled(type == currentAuthType)
-                .opacity(type == currentAuthType ? 0.5 : 1.0)
             }
             
             if newAuthType == currentAuthType {
-                Text("This is your current authentication method")
+                Text("You are changing to the same authentication type")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.orange)
             }
         }
     }
@@ -207,10 +218,9 @@ struct ChangeAuthenticationView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(newAuthType != currentAuthType ? Color.blue : Color.gray)
+                    .fill(Color.blue)
             )
         }
-        .disabled(newAuthType == currentAuthType)
         .buttonStyle(PlainButtonStyle())
     }
     
@@ -258,6 +268,62 @@ struct ChangeAuthenticationView: View {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             showError = false
+        }
+    }
+    
+    // MARK: - Migration Handlers
+    
+    private func handlePasscodeChanged() {
+        startMigrationProcess()
+    }
+    
+    private func handlePasswordChanged() {
+        startMigrationProcess()
+    }
+    
+    private func startMigrationProcess() {
+        Task {
+            do {
+                // Get the new password that was just saved
+                let newPassword = try KeychainManager.shared.getPassword()
+                
+                await MainActor.run {
+                    migrationProgress = 0
+                    migrationTotal = 0
+                    // Navigate to migration view
+                    navigationPath.append("migration")
+                }
+                
+                // Start migration with old and new passwords
+                try await FileStorageManager.shared.migrateFilesToNewEncryptionKey(
+                    oldPassword: currentPassword,
+                    newPassword: newPassword,
+                    progress: { current, total in
+                        Task { @MainActor in
+                            migrationProgress = current
+                            migrationTotal = total
+                        }
+                    }
+                )
+                
+                // Migration completed successfully
+                // Update the encryption key to the new one
+                FileStorageManager.shared.setupEncryptionKey(from: newPassword)
+                
+                await MainActor.run {
+                    // Navigate back and dismiss
+                    navigationPath = NavigationPath()
+                    onAuthChanged()
+                    dismiss()
+                }
+                
+            } catch {
+                await MainActor.run {
+                    // Navigate back to auth view and show error
+                    navigationPath = NavigationPath()
+                    showError(message: "Failed to update encryption: \(error.localizedDescription)")
+                }
+            }
         }
     }
 }

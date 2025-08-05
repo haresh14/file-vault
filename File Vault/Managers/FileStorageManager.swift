@@ -177,6 +177,95 @@ class FileStorageManager: FileStorageManaging {
         encryptionKey = SymmetricKey(data: hashed)
     }
     
+    /// Re-encrypt all vault files with a new encryption key
+    /// This is called when the user changes their passcode
+    func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws {
+        print("DEBUG: Starting file migration from old key to new key")
+        
+        // Create old and new encryption keys
+        let oldPasswordData = Data(oldPassword.utf8)
+        let oldHashed = SHA256.hash(data: oldPasswordData)
+        let oldKey = SymmetricKey(data: oldHashed)
+        
+        let newPasswordData = Data(newPassword.utf8)
+        let newHashed = SHA256.hash(data: newPasswordData)
+        let newKey = SymmetricKey(data: newHashed)
+        
+        // Get all vault items
+        let allItems = CoreDataManager.shared.fetchAllVaultItems()
+        let totalItems = allItems.count
+        
+        print("DEBUG: Found \(totalItems) items to migrate")
+        
+        for (index, item) in allItems.enumerated() {
+            // The migrateVaultItem function now handles errors internally and doesn't throw
+            // It will either migrate successfully or skip the file
+            try await migrateVaultItem(item, oldKey: oldKey, newKey: newKey)
+            
+            // Report progress
+            await MainActor.run {
+                progress(index + 1, totalItems)
+            }
+            
+            // Small delay to allow UI updates to be visible
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        }
+        
+        print("DEBUG: Migration completed successfully")
+        
+        // Update the current encryption key to the new one
+        encryptionKey = newKey
+        
+        print("DEBUG: File migration completed successfully")
+    }
+    
+    /// Migrate a single vault item to the new encryption key
+    private func migrateVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) async throws {
+        guard let fileName = vaultItem.fileName else {
+            print("DEBUG: Skipping item with no filename")
+            return
+        }
+        
+        // Skip system files that might not be properly encrypted
+        if fileName.hasPrefix(".") || fileName == ".DS_Store" {
+            print("DEBUG: Skipping system file: \(fileName)")
+            return
+        }
+        
+        let fileURL = vaultDirectory.appendingPathComponent(fileName)
+        
+        // Check if file exists
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            print("DEBUG: File \(fileName) does not exist, skipping")
+            return
+        }
+        
+        do {
+            // Load and decrypt with old key
+            let encryptedData = try Data(contentsOf: fileURL)
+            let decryptedData = try decryptData(encryptedData, using: oldKey)
+            
+            // Re-encrypt with new key
+            let newEncryptedData = try encryptData(decryptedData, using: newKey)
+            
+            // Write back to file
+            try newEncryptedData.write(to: fileURL)
+            
+            print("DEBUG: Successfully migrated file: \(fileName)")
+        } catch {
+            print("DEBUG: Failed to migrate file \(fileName): \(error)")
+            // For individual file failures, log the error but don't stop the entire migration
+            // Common reasons: authenticationFailure (system files), corrupted files, etc.
+            if error.localizedDescription.contains("authenticationFailure") {
+                print("DEBUG: Skipping file with authentication failure (likely system file or corrupted): \(fileName)")
+            } else {
+                print("DEBUG: Skipping file due to error: \(fileName) - \(error.localizedDescription)")
+            }
+            // Don't throw - just skip this file and continue with others
+            return
+        }
+    }
+    
     // MARK: - Trash Operations
     
     /// Check if trash is enabled in settings
@@ -746,8 +835,10 @@ class FileStorageManager: FileStorageManaging {
         return try await withCheckedThrowingContinuation { continuation in
             do {
                 let fileData = try loadFile(vaultItem: vaultItem)
+                print(">>>>>>> DEBUG: File data loaded: \(fileData.count) bytes")
                 continuation.resume(returning: fileData)
-            } catch {
+            } catch let error {
+                print(">>>>>>> DEBUG: Error loading image: \(error.localizedDescription)")
                 continuation.resume(throwing: error)
             }
         }

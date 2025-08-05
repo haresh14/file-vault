@@ -126,7 +126,7 @@ struct SettingsView: View {
                     )
                 } else {
                     PasswordSetupView(
-                                                    onPasswordSet: {
+                        onPasswordSet: {
                                 showFakePasswordSheet = false
                                 isFakePasswordSet = true
                                 fakePasswordAlertMessage = "Fake password set successfully."

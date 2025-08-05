@@ -37,6 +37,7 @@ protocol FileStorageManaging {
     func loadImage(for vaultItem: VaultItem) async throws -> Data
     func determineFileType(from fileName: String) -> String
     func setupEncryptionKey(from password: String)
+    func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws
     func clearAllStoredFiles()
     func getStorageInfo() -> (fileCount: Int, usedSpace: Int64)
 }
