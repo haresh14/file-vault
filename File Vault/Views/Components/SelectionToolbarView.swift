@@ -157,8 +157,8 @@ struct FloatingSelectionBar: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "square.and.arrow.up")
                                         .font(.title2)
-                                    Text("Share")
-                                        .font(.caption2)
+                                    // Text("Share")
+                                    //     .font(.caption2)
                                 }
                                 .foregroundColor(.blue)
                             }

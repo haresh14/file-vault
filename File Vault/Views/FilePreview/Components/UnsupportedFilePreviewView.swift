@@ -46,18 +46,18 @@ struct UnsupportedFilePreviewView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
                 
-                if canShareFile {
-                    Button(action: onShareFile) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("Share File")
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.3))
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
-                }
+                // if canShareFile {
+                //     Button(action: onShareFile) {
+                //         HStack {
+                //             Image(systemName: "square.and.arrow.up")
+                //             Text("Share File")
+                //         }
+                //         .padding()
+                //         .background(Color.gray.opacity(0.3))
+                //         .foregroundColor(.white)
+                //         .cornerRadius(10)
+                //     }
+                // }
             }
         }
         .padding()

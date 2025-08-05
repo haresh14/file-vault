@@ -48,12 +48,12 @@ struct FilePreviewView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if canShareFile {
-                        Button("Share") {
-                            shareFile()
-                        }
-                        .foregroundColor(.white)
-                    }
+                    // if canShareFile {
+                    //     Button("Share") {
+                    //         shareFile()
+                    //     }
+                    //     .foregroundColor(.white)
+                    // }
                 }
             }
         }
