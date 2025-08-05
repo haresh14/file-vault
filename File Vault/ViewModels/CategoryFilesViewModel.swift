@@ -11,6 +11,9 @@ final class CategoryFilesViewModel: ObservableObject {
     @Published var sortOption: SortOption = .date
     @Published var sortAscending: Bool = false
     @Published var isSelectionMode: Bool = false
+    
+    // MARK: - Haptic Feedback State
+    private var hasTriggeredSelectionHaptic: Bool = false
     @Published var selectedItems: Set<VaultItem> = []
     
     // Media Viewer Management
@@ -88,11 +91,21 @@ final class CategoryFilesViewModel: ObservableObject {
     func enterSelectionMode() {
         isSelectionMode = true
         selectedItems.removeAll()
+        hasTriggeredSelectionHaptic = false
     }
 
     func exitSelectionMode() {
         isSelectionMode = false
         selectedItems.removeAll()
+        hasTriggeredSelectionHaptic = false
+    }
+    
+    func triggerSelectionHaptic() {
+        if !hasTriggeredSelectionHaptic {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            hasTriggeredSelectionHaptic = true
+        }
     }
 
     func moveSelectedItems(to destinationFolder: Folder?) {

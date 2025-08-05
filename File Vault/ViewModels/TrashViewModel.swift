@@ -16,6 +16,9 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
     @Published var selectedItems: Set<VaultItem> = []
     @Published var isSelectionMode: Bool = false
     
+    // MARK: - Haptic Feedback State
+    private var hasTriggeredSelectionHaptic: Bool = false
+    
     // MARK: - Alert States
     @Published var showDeleteAlert: Bool = false
     @Published var showRestoreAlert: Bool = false
@@ -65,11 +68,21 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
     func enterSelectionMode() {
         isSelectionMode = true
         selectedItems.removeAll()
+        hasTriggeredSelectionHaptic = false
     }
     
     func exitSelectionMode() {
         isSelectionMode = false
         selectedItems.removeAll()
+        hasTriggeredSelectionHaptic = false
+    }
+    
+    func triggerSelectionHaptic() {
+        if !hasTriggeredSelectionHaptic {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            hasTriggeredSelectionHaptic = true
+        }
     }
     
     func toggleSelection(_ item: VaultItem) {

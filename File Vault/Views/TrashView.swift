@@ -33,6 +33,7 @@ struct TrashView: View {
                     },
                     onItemLongPress: { item in
                         if !viewModel.isSelectionMode {
+                            viewModel.triggerSelectionHaptic()
                             viewModel.enterSelectionMode()
                             viewModel.toggleSelection(item)
                         }

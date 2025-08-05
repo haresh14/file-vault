@@ -21,6 +21,7 @@ struct VaultItemCell: View {
     @State private var thumbnail: UIImage?
     @State private var isLoadingThumbnail = true
     @State private var isPressed = false
+    @State private var longPressTriggered = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -120,19 +121,34 @@ struct VaultItemCell: View {
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Rectangle())
         .onTapGesture {
-            onTap()
+            if !longPressTriggered {
+                onTap()
+            }
         }
-        .onLongPressGesture(minimumDuration: 0.5, perform: onLongPress)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressed {
-                        isPressed = true
+        .onLongPressGesture(
+            minimumDuration: 0.3, // Reduced from 0.5 to feel more responsive
+            maximumDistance: 10,   // Prevent accidental triggers during scrolling
+            perform: {
+                longPressTriggered = true
+                onLongPress()
+                
+                // Reset the flag after a short delay to allow normal taps again
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    longPressTriggered = false
+                }
+            },
+            onPressingChanged: { pressing in
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = pressing
+                }
+                
+                if !pressing && longPressTriggered {
+                    // Reset press state when long press ends
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        longPressTriggered = false
                     }
                 }
-                .onEnded { _ in
-                    isPressed = false
-                }
+            }
         )
         .onAppear {
             loadThumbnail()

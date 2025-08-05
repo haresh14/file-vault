@@ -112,6 +112,7 @@ struct CategoryFilesView: View {
                         },
                         onLongPress: {
                             if !viewModel.isSelectionMode {
+                                viewModel.triggerSelectionHaptic()
                                 viewModel.enterSelectionMode()
                                 viewModel.toggleSelection(item)
                             }
@@ -121,6 +122,7 @@ struct CategoryFilesView: View {
                         // Select option
                         Button(action: {
                             if !viewModel.isSelectionMode {
+                                viewModel.triggerSelectionHaptic()
                                 viewModel.enterSelectionMode()
                             }
                             viewModel.toggleSelection(item)
