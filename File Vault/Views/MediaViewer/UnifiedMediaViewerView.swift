@@ -19,6 +19,8 @@ struct UnifiedMediaViewerView: View {
     @State private var isScrollDisabled: Bool = false
     // Track favorite status for UI updates
     @State private var favoriteStatus: [UUID: Bool] = [:]
+    // File info gesture handler
+    @StateObject private var gestureHandler = FileInfoGestureHandler()
     @Environment(\.dismiss) private var dismiss
     
     init(mediaItems: [VaultItem], initialIndex: Int) {
@@ -37,97 +39,114 @@ struct UnifiedMediaViewerView: View {
         return mediaItems[currentIndex]
     }
     
+    // Helper function to toggle favorite status
+    private func toggleFavorite() {
+        if let currentItem = currentMediaItem, let itemId = currentItem.id {
+            FileStorageManager.shared.toggleFavorite(for: currentItem)
+            favoriteStatus[itemId] = !(favoriteStatus[itemId] ?? currentItem.isFavorite)
+        }
+    }
+    
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            if !mediaItems.isEmpty {
-                // 1. Use a horizontal ScrollView
-                ScrollView(.horizontal, showsIndicators: false) {
-                    // 2. Use a LazyHStack for performance
-                    LazyHStack(spacing: 0) {
-                        ForEach(mediaItems.indices, id: \.self) { index in
-                            let item = mediaItems[index]
-                            let isActive = currentIndex == index
-                            
-                            Group {
-                                if item.isVideo {
-                                    AutoPlayVideoView(
-                                        vaultItem: item,
-                                        isActive: isActive,
-                                        scrollDisabled: $isScrollDisabled
-                                    )
-                                } else {
-                                    ZoomablePhotoView(
-                                        vaultItem: item,
-                                        isActive: isActive,
-                                        scrollDisabled: $isScrollDisabled
-                                    )
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                // Use the common FileInfoLayoutContainer
+                if let currentItem = currentMediaItem {
+                    FileInfoLayoutContainer(
+                        vaultItem: currentItem,
+                        gestureHandler: gestureHandler,
+                        geometry: geometry,
+                        onFavoriteToggle: toggleFavorite,
+                        onDismiss: { dismiss() },
+                        isScrollDisabled: isScrollDisabled
+                    ) {
+                        // Main media content
+                        ZStack {
+                            if !mediaItems.isEmpty {
+                                // 1. Use a horizontal ScrollView
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    // 2. Use a LazyHStack for performance
+                                    LazyHStack(spacing: 0) {
+                                        ForEach(mediaItems.indices, id: \.self) { index in
+                                            let item = mediaItems[index]
+                                            let isActive = currentIndex == index
+                                            
+                                            Group {
+                                                if item.isVideo {
+                                                    AutoPlayVideoView(
+                                                        vaultItem: item,
+                                                        isActive: isActive,
+                                                        scrollDisabled: $isScrollDisabled
+                                                    )
+                                                } else {
+                                                    ZoomablePhotoView(
+                                                        vaultItem: item,
+                                                        isActive: isActive,
+                                                        scrollDisabled: $isScrollDisabled
+                                                    )
+                                                }
+                                            }
+                                            // 3. Make each item take the full container width
+                                            .containerRelativeFrame(.horizontal)
+                                            .id(index) // Set an ID for scrollPosition to track
+                                        }
+                                    }
+                                    // 4. This is needed for the scroll target behavior to work correctly
+                                    .scrollTargetLayout()
                                 }
-                            }
-                            // 3. Make each item take the full container width
-                            .containerRelativeFrame(.horizontal)
-                            .id(index) // Set an ID for scrollPosition to track
-                            // Allow horizontal scroll gesture to co-exist with item gestures
-                        }
-                    }
-                    // 4. This is needed for the scroll target behavior to work correctly
-                    .scrollTargetLayout()
-                }
-                // 5. This modifier enables the paging behavior
-                .scrollTargetBehavior(.paging)
-                // 6. This binds the scroll position to your state variable
-                .scrollPosition(id: $currentIndex)
-                // Disable scroll when an item is zoomed in
-                .scrollDisabled(isScrollDisabled)
-                .ignoresSafeArea()
-            }
-            
-            // Favorite and Share buttons overlay (hidden during zoom)
-            if !isScrollDisabled && !mediaItems.isEmpty {
-                VStack {
-                    HStack {
-                        Spacer()
-                        HStack(spacing: 20) {
-                            // Favorite button
-                            Button(action: {
-                                if let currentItem = currentMediaItem, let itemId = currentItem.id {
-                                    FileStorageManager.shared.toggleFavorite(for: currentItem)
-                                    favoriteStatus[itemId] = !(favoriteStatus[itemId] ?? currentItem.isFavorite)
-                                }
-                            }) {
-                                let isFavorite = currentMediaItem?.id.flatMap { favoriteStatus[$0] } ?? currentMediaItem?.isFavorite ?? false
-                                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                                    .foregroundColor(isFavorite ? .red : .white)
-                                    .font(.title2)
-                                    .background(
-                                        Circle()
-                                            .fill(Color.black.opacity(0.5))
-                                            .frame(width: 44, height: 44)
-                                    )
+                                // 5. This modifier enables the paging behavior
+                                .scrollTargetBehavior(.paging)
+                                // 6. This binds the scroll position to your state variable
+                                .scrollPosition(id: $currentIndex)
+                                // Disable scroll when an item is zoomed in or during vertical gestures
+                                .scrollDisabled(isScrollDisabled || gestureHandler.shouldDisableHorizontalScroll)
+                                .ignoresSafeArea()
                             }
                             
-                            // Share button
-                            Button(action: {
-                                if let currentItem = currentMediaItem {
-                                    ShareManager.shared.shareVaultItem(currentItem)
+                            // Favorite and Share buttons overlay (hidden during zoom and when info panel is shown)
+                            if !isScrollDisabled && !mediaItems.isEmpty && !gestureHandler.showInfoPanel {
+                                VStack {
+                                    HStack {
+                                        Spacer()
+                                        HStack(spacing: 20) {
+                                            // Favorite button
+                                            Button(action: toggleFavorite) {
+                                                let isFavorite = currentItem.id.flatMap { favoriteStatus[$0] } ?? currentItem.isFavorite
+                                                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                                                    .foregroundColor(isFavorite ? .red : .white)
+                                                    .font(.title2)
+                                                    .background(
+                                                        Circle()
+                                                            .fill(Color.black.opacity(0.5))
+                                                            .frame(width: 44, height: 44)
+                                                    )
+                                            }
+                                            
+                                            // Share button
+                                            Button(action: {
+                                                ShareManager.shared.shareVaultItem(currentItem)
+                                            }) {
+                                                Image(systemName: "square.and.arrow.up")
+                                                    .foregroundColor(.white)
+                                                    .font(.title2)
+                                                    .background(
+                                                        Circle()
+                                                            .fill(Color.black.opacity(0.5))
+                                                            .frame(width: 44, height: 44)
+                                                    )
+                                            }
+                                        }
+                                        .padding(.trailing, 20)
+                                    }
+                                    Spacer()
                                 }
-                            }) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .foregroundColor(.white)
-                                    .font(.title2)
-                                    .background(
-                                        Circle()
-                                            .fill(Color.black.opacity(0.5))
-                                            .frame(width: 44, height: 44)
-                                    )
+                                .padding(.top, 50) // Account for safe area
                             }
                         }
-                        .padding(.trailing, 20)
                     }
-                    Spacer()
                 }
-                .padding(.top, 50) // Account for safe area
             }
         }
         .statusBarHidden()
@@ -141,17 +160,6 @@ struct UnifiedMediaViewerView: View {
                 }
             }
         }
-        .gesture(
-            // Swipe-down-to-close should only work when gestures are enabled (not zoomed)
-            DragGesture()
-                .onEnded { value in
-                    guard !isScrollDisabled else { return } // Disable when zoomed
-                    // Only trigger dismiss on vertical swipes
-                    if value.translation.height > 100 && abs(value.translation.height) > abs(value.translation.width) {
-                        dismiss()
-                    }
-                }
-        )
     }
 }
 

@@ -19,22 +19,57 @@ struct FilePreviewView: View {
     @State private var showingQuickLook = false
     @State private var temporaryFileURL: URL?
     @State private var isFavorite = false
+    // File info gesture handler (for non-media files)
+    @StateObject private var gestureHandler = FileInfoGestureHandler()
+    
+    // Helper function to toggle favorite status
+    private func toggleFavorite() {
+        FileStorageManager.shared.toggleFavorite(for: vaultItem)
+        isFavorite.toggle()
+    }
     
     var body: some View {
         NavigationView {
-            ZStack {
-                Color.black
-                    .ignoresSafeArea()
-                
-                if isLoading {
-                    FilePreviewLoadingView(fileName: vaultItem.fileName)
-                } else if let errorMessage = errorMessage {
-                    FilePreviewErrorView(
-                        message: errorMessage,
-                        onRetry: { loadFileData() }
-                    )
-                } else {
-                    previewContent
+            GeometryReader { geometry in
+                ZStack {
+                    Color.black
+                        .ignoresSafeArea()
+                    
+                    // Main layout that adjusts for info panel
+                    if vaultItem.isImage || vaultItem.isVideo {
+                        // Media files - use existing layout (handled by UnifiedMediaViewerView)
+                        if isLoading {
+                            FilePreviewLoadingView(fileName: vaultItem.fileName)
+                        } else if let errorMessage = errorMessage {
+                            FilePreviewErrorView(
+                                message: errorMessage,
+                                onRetry: { loadFileData() }
+                            )
+                        } else {
+                            previewContent
+                        }
+                    } else {
+                        // Non-media files - use common FileInfoLayoutContainer
+                        FileInfoLayoutContainer(
+                            vaultItem: vaultItem,
+                            gestureHandler: gestureHandler,
+                            geometry: geometry,
+                            onFavoriteToggle: toggleFavorite,
+                            onDismiss: nil // No dismiss for non-media files in NavigationView
+                        ) {
+                            // Main content area
+                            if isLoading {
+                                FilePreviewLoadingView(fileName: vaultItem.fileName)
+                            } else if let errorMessage = errorMessage {
+                                FilePreviewErrorView(
+                                    message: errorMessage,
+                                    onRetry: { loadFileData() }
+                                )
+                            } else {
+                                previewContent
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle(vaultItem.fileName ?? "File Preview")
@@ -51,10 +86,7 @@ struct FilePreviewView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 20) {
                         // Favorite button
-                        Button(action: {
-                            FileStorageManager.shared.toggleFavorite(for: vaultItem)
-                            isFavorite.toggle()
-                        }) {
+                        Button(action: toggleFavorite) {
                             Image(systemName: isFavorite ? "heart.fill" : "heart")
                                 .foregroundColor(isFavorite ? .red : .white)
                         }
