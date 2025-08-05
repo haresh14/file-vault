@@ -715,10 +715,6 @@ extension WebServerManager {
                     display: none;
                 }
                 
-                .selected-file-item.completed .file-progress-container {
-                    display: none !important;
-                }
-                
                 .progress-bar {
                     width: calc(100% - 40px);
                     height: 6px;
@@ -1182,16 +1178,21 @@ extension WebServerManager {
                 });
                 
                 function addFiles(newFiles, preserveFolderStructure = false) {
-                    // Store files with their relative paths if folder structure should be preserved
+                    // Store files with their relative paths and unique IDs if folder structure should be preserved
                     if (preserveFolderStructure && newFiles.length > 0) {
                         // Files from folder selection have webkitRelativePath property
                         const filesWithPaths = Array.from(newFiles).map(file => {
                             file._folderPath = file.webkitRelativePath || '';
+                            file._uniqueId = 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
                             return file;
                         });
                         files = [...files, ...filesWithPaths];
                     } else {
-                        files = [...files, ...newFiles];
+                        const filesWithIds = Array.from(newFiles).map(file => {
+                            file._uniqueId = 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                            return file;
+                        });
+                        files = [...files, ...filesWithIds];
                     }
                     updateSelectedFiles();
                     updateUploadButton();
@@ -1207,25 +1208,26 @@ extension WebServerManager {
                     selectedFiles.innerHTML = files.map((file, index) => {
                         const fileIcon = getFileIcon(file.type);
                         const fileSize = formatFileSize(file.size);
+                        const fileId = file._uniqueId;
                         
-                        return `<div class="selected-file-item" id="file-item-${index}" data-file-index="${index}">
+                        return `<div class="selected-file-item" id="file-item-${fileId}" data-file-id="${fileId}" data-array-index="${index}">
                             <div class="selected-file-info">
                                 <span class="selected-file-icon">${fileIcon}</span>
                                 <div class="file-details">
                                     <span class="selected-file-name">${file.name}</span>
                                     <span class="selected-file-size">${fileSize}</span>
                                 </div>
-                                <div class="file-status" id="file-status-${index}" style="display: none;">
+                                <div class="file-status" id="file-status-${fileId}" style="display: none;">
                                     <span class="status-text"></span>
                                 </div>
                             </div>
-                            <div class="file-progress-container" id="file-progress-${index}" style="display: none;">
+                            <div class="file-progress-container" id="file-progress-${fileId}" style="display: none;">
                                 <div class="file-progress-bar">
-                                    <div class="file-progress-fill" id="file-progress-fill-${index}"></div>
+                                    <div class="file-progress-fill" id="file-progress-fill-${fileId}"></div>
                                 </div>
-                                <span class="file-progress-text" id="file-progress-text-${index}">0%</span>
+                                <span class="file-progress-text" id="file-progress-text-${fileId}">0%</span>
                             </div>
-                            <button type="button" class="remove-file" onclick="removeFile(${index})" id="remove-btn-${index}">×</button>
+                            <button type="button" class="remove-file" onclick="removeFileById('${fileId}')" id="remove-btn-${fileId}">×</button>
                         </div>`;
                     }).join('');
                 }
@@ -1337,12 +1339,12 @@ extension WebServerManager {
                 }
                 
                 // Individual file progress management
-                function setFileStatus(index, status, message = '') {
-                    const fileItem = document.getElementById(`file-item-${index}`);
-                    const statusElement = document.getElementById(`file-status-${index}`);
-                    const statusText = statusElement.querySelector('.status-text');
+                function setFileStatus(fileId, status, message = '') {
+                    const fileItem = document.getElementById(`file-item-${fileId}`);
+                    const statusElement = document.getElementById(`file-status-${fileId}`);
+                    const statusText = statusElement?.querySelector('.status-text');
                     
-                    if (!fileItem || !statusElement) return;
+                    if (!fileItem || !statusElement || !statusText) return;
                     
                     // Remove existing status classes
                     fileItem.classList.remove('uploading', 'completed', 'failed');
@@ -1370,10 +1372,10 @@ extension WebServerManager {
                     }
                 }
                 
-                function updateFileProgress(index, progress) {
-                    const progressContainer = document.getElementById(`file-progress-${index}`);
-                    const progressFill = document.getElementById(`file-progress-fill-${index}`);
-                    const progressText = document.getElementById(`file-progress-text-${index}`);
+                function updateFileProgress(fileId, progress) {
+                    const progressContainer = document.getElementById(`file-progress-${fileId}`);
+                    const progressFill = document.getElementById(`file-progress-fill-${fileId}`);
+                    const progressText = document.getElementById(`file-progress-text-${fileId}`);
                     
                     if (!progressContainer || !progressFill || !progressText) return;
                     
@@ -1382,17 +1384,42 @@ extension WebServerManager {
                     progressText.textContent = `${Math.round(progress)}%`;
                 }
                 
-                function hideFileProgress(index) {
-                    const progressContainer = document.getElementById(`file-progress-${index}`);
+                function hideFileProgress(fileId) {
+                    const progressContainer = document.getElementById(`file-progress-${fileId}`);
                     if (progressContainer) {
                         progressContainer.style.display = 'none';
+                    }
+                }
+                
+                function removeFileById(fileId) {
+                    // Remove from DOM with animation
+                    const fileItem = document.getElementById(`file-item-${fileId}`);
+                    if (fileItem) {
+                        fileItem.style.opacity = '0';
+                        fileItem.style.transform = 'translateX(20px)';
+                        
+                        setTimeout(() => {
+                            fileItem.remove();
+                            
+                            // Remove from files array
+                            files = files.filter(file => file._uniqueId !== fileId);
+                            updateUploadButton();
+                        }, 300);
+                    }
+                }
+                
+                function removeFile(index) {
+                    // Legacy function for manual removal - find file by index and remove by ID
+                    if (index >= 0 && index < files.length) {
+                        const fileId = files[index]._uniqueId;
+                        removeFileById(fileId);
                     }
                 }
                 
 
                 
                 // Helper function to create unique file upload with XMLHttpRequest
-                function uploadSingleFileWithProgress(file, index, headers) {
+                function uploadSingleFileWithProgress(file, fileId, headers) {
                     return new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
                         
@@ -1400,7 +1427,7 @@ extension WebServerManager {
                         xhr.upload.addEventListener('progress', (e) => {
                             if (e.lengthComputable) {
                                 const progress = (e.loaded / e.total) * 100;
-                                updateFileProgress(index, progress);
+                                updateFileProgress(fileId, progress);
                             }
                         });
                         
@@ -1459,15 +1486,20 @@ extension WebServerManager {
                     showProgress();
                     updateProgress(0, originalFileCount);
                     
-                    // Process files from top to bottom (index 0 to length-1)
-                    for (let i = 0; i < files.length; i++) {
-                        const file = files[i];
+                    // Create a copy of files array to iterate through
+                    const filesToUpload = [...files];
+                    
+                    // Process files from the original array
+                    for (let i = 0; i < filesToUpload.length; i++) {
+                        const file = filesToUpload[i];
+                        const fileId = file._uniqueId;
+                        
                         console.log(`DEBUG: Uploading file ${i + 1}/${originalFileCount}: ${file.name}`);
                         
                         try {
                             // Set file status to uploading
-                            setFileStatus(i, 'uploading');
-                            updateFileProgress(i, 0);
+                            setFileStatus(fileId, 'uploading');
+                            updateFileProgress(fileId, 0);
                             
                             updateProgressDetail(`Uploading ${file.name}... (${i + 1}/${originalFileCount})`);
                             
@@ -1489,14 +1521,18 @@ extension WebServerManager {
                             }
                             
                             // Upload single file with proper progress tracking
-                            const result = await uploadSingleFileWithProgress(file, i, headers);
+                            const result = await uploadSingleFileWithProgress(file, fileId, headers);
                             
                             if (result.success) {
                                 uploaded++;
                                 console.log(`DEBUG: Successfully uploaded: ${file.name}`);
                                 
-                                // Mark as completed and keep in list with success state
-                                setFileStatus(i, 'completed');
+                                // Mark as completed and remove after a brief delay
+                                setFileStatus(fileId, 'completed');
+                                
+                                setTimeout(() => {
+                                    removeFileById(fileId);
+                                }, 800);
                                 
                             } else {
                                 failed++;
@@ -1504,8 +1540,8 @@ extension WebServerManager {
                                 console.error(`DEBUG: Failed to upload ${file.name}:`, result.message);
                                 
                                 // Mark as failed
-                                hideFileProgress(i);
-                                setFileStatus(i, 'failed', result.message);
+                                hideFileProgress(fileId);
+                                setFileStatus(fileId, 'failed', result.message);
                             }
                             
                         } catch (error) {
@@ -1514,8 +1550,8 @@ extension WebServerManager {
                             console.error(`DEBUG: Error uploading ${file.name}:`, error);
                             
                             // Mark as failed
-                            hideFileProgress(i);
-                            setFileStatus(i, 'failed', error.message);
+                            hideFileProgress(fileId);
+                            setFileStatus(fileId, 'failed', error.message);
                         }
                         
                         // Update overall progress
@@ -1528,8 +1564,11 @@ extension WebServerManager {
                     // Show results
                     if (failed === 0) {
                         showUploadSuccess(uploaded);
-                        // Don't clear files here as they're removed individually
+                        // Clear remaining files if any
                         setTimeout(() => {
+                            files = [];
+                            updateSelectedFiles();
+                            updateUploadButton();
                             hideUploadOverlay();
                             hideUploadDialog();
                             window.location.reload();
@@ -1607,8 +1646,8 @@ extension WebServerManager {
                                 files.forEach((file, index) => {
                                     const fileProgress = Math.min(100, (percent / 100) * 120); // Slightly faster progress per file
                                     if (fileProgress > 0) {
-                                        setFileStatus(index, 'uploading');
-                                        updateFileProgress(index, Math.min(100, fileProgress));
+                                        setFileStatus(file._uniqueId, 'uploading');
+                                        updateFileProgress(file._uniqueId, Math.min(100, fileProgress));
                                     }
                                 });
                             }
@@ -1621,10 +1660,16 @@ extension WebServerManager {
                             try {
                                 const response = JSON.parse(xhr.responseText);
                                 if (response.success) {
-                                    // Mark all files as completed and keep in list
-                                    files.forEach((file, index) => {
-                                        updateFileProgress(index, 100);
-                                        setFileStatus(index, 'completed');
+                                    // Mark all files as completed and remove them
+                                    const filesToRemove = [...files]; // Create copy for removal
+                                    filesToRemove.forEach((file, index) => {
+                                        updateFileProgress(file._uniqueId, 100);
+                                        setFileStatus(file._uniqueId, 'completed');
+                                        
+                                        // Remove files with staggered delay
+                                        setTimeout(() => {
+                                            removeFileById(file._uniqueId);
+                                        }, 500 + (index * 100));
                                     });
                                     
                                     showUploadSuccess(files.length);
@@ -1638,8 +1683,8 @@ extension WebServerManager {
                                 } else {
                                     // Mark all files as failed
                                     files.forEach((file, index) => {
-                                        hideFileProgress(index);
-                                        setFileStatus(index, 'failed', response.message || 'Upload failed');
+                                        hideFileProgress(file._uniqueId);
+                                        setFileStatus(file._uniqueId, 'failed', response.message || 'Upload failed');
                                     });
                                     
                                     hideUploadOverlay();
