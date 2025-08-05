@@ -372,6 +372,10 @@ class WebServerManager: ObservableObject, WebServerManaging {
             print("DEBUG: ⬆️ POST /upload request received - Handling file upload")
             print("DEBUG: ⬆️ Request data size: \(data.count) bytes")
             handleFileUpload(requestData: data, connection: connection)
+        case ("POST", "/upload/stream"):
+            print("DEBUG: 🌊 POST /upload/stream request received - Handling streaming file upload")
+            print("DEBUG: 🌊 Request data size: \(data.count) bytes")
+            handleStreamingFileUpload(requestData: data, connection: connection)
         case ("POST", "/api/folder/create"):
             print("DEBUG: 📁 POST /api/folder/create - Creating folder")
             handleCreateFolder(requestData: data, connection: connection)
@@ -794,6 +798,164 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             // Also trigger a general refresh notification
             NotificationCenter.default.post(name: Notification.Name("VaultDataChanged"), object: nil)
+        }
+    }
+    
+    // MARK: - Streaming Upload Handler
+    
+    private func handleStreamingFileUpload(requestData: Data, connection: NWConnection) {
+        print("DEBUG: 🌊 Starting streaming file upload processing...")
+        
+        // Generate unique upload ID for tracking
+        let uploadId = UUID().uuidString
+        activeUploads.insert(uploadId)
+        
+        // Find the end of HTTP headers (double CRLF)
+        let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
+        guard let headerEndRange = requestData.range(of: headerEndMarker) else {
+            print("DEBUG: No HTTP header end marker found in streaming upload request")
+            sendStreamingResponse(connection: connection, success: false, message: "Bad Request")
+            return
+        }
+        
+        // Extract headers (safe to convert to UTF-8)
+        let headerData = requestData.subdata(in: requestData.startIndex..<headerEndRange.lowerBound)
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            print("DEBUG: Failed to convert header data to UTF-8 string")
+            sendStreamingResponse(connection: connection, success: false, message: "Bad Request")
+            return
+        }
+        
+        // Extract folder ID from headers (streaming uploads use headers for metadata)
+        var targetFolder: Folder? = nil
+        let headerLines = headerString.components(separatedBy: "\r\n")
+        
+        for line in headerLines {
+            if line.lowercased().hasPrefix("x-folder-id:") {
+                let folderIdFromHeader = line.replacingOccurrences(of: "x-folder-id:", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespaces)
+                print("DEBUG: 🌊 Found folder ID in header: '\(folderIdFromHeader)'")
+                if let folderId = UUID(uuidString: folderIdFromHeader) {
+                    targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
+                    if let folder = targetFolder {
+                        print("DEBUG: ✅ Target folder found: \(folder.displayName)")
+                        break
+                    }
+                }
+            }
+        }
+        
+        // Extract file metadata from headers
+        var fileName: String?
+        var filePath: String?
+        
+        for line in headerLines {
+            if line.lowercased().hasPrefix("x-file-name:") {
+                fileName = line.replacingOccurrences(of: "x-file-name:", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespaces)
+                // URL decode the filename
+                fileName = fileName?.removingPercentEncoding
+            } else if line.lowercased().hasPrefix("x-file-path:") {
+                filePath = line.replacingOccurrences(of: "x-file-path:", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespaces)
+                // URL decode the file path
+                filePath = filePath?.removingPercentEncoding
+            }
+        }
+        
+        guard let fileName = fileName, !fileName.isEmpty else {
+            print("DEBUG: 🌊 No filename found in streaming upload")
+            sendStreamingResponse(connection: connection, success: false, message: "Filename required")
+            activeUploads.remove(uploadId)
+            return
+        }
+        
+        // Extract file data (everything after headers)
+        let fileData = requestData.subdata(in: headerEndRange.upperBound..<requestData.endIndex)
+        print("DEBUG: 🌊 Processing single file: \(fileName), size: \(fileData.count) bytes")
+        
+        // Process the file immediately in an autoreleasepool
+        autoreleasepool {
+            do {
+                // Determine target folder based on file path if provided
+                let actualTargetFolder: Folder?
+                if let filePath = filePath, !filePath.isEmpty {
+                    actualTargetFolder = try createFolderStructureForFile(
+                        filePath: filePath,
+                        baseFolder: targetFolder,
+                        folderUploadMode: "whole"
+                    )
+                } else {
+                    actualTargetFolder = targetFolder
+                }
+                
+                // Extract just the filename (without path) for FileStorageManager
+                let actualFileName = URL(fileURLWithPath: fileName).lastPathComponent
+                
+                // Determine file type based on extension
+                let fileType = FileStorageManager.shared.determineFileType(from: actualFileName)
+                
+                // Save file using FileStorageManager
+                _ = try FileStorageManager.shared.saveFile(
+                    data: fileData,
+                    fileName: actualFileName,
+                    fileType: fileType,
+                    targetFolder: actualTargetFolder
+                )
+                
+                print("DEBUG: 🌊 ✅ Successfully processed streaming file: \(fileName)")
+                
+                // Send success response
+                sendStreamingResponse(connection: connection, success: true, message: "File uploaded successfully", fileName: fileName)
+                
+                // Notify UI to refresh
+                DispatchQueue.main.async {
+                    CoreDataManager.shared.save()
+                    NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                    NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: CoreDataManager.shared.context)
+                    NotificationCenter.default.post(name: Notification.Name("VaultDataChanged"), object: nil)
+                }
+                
+            } catch FileStorageError.duplicateFile {
+                print("DEBUG: 🌊 Skipped duplicate file: \(fileName)")
+                sendStreamingResponse(connection: connection, success: true, message: "File already exists (skipped)", fileName: fileName)
+            } catch {
+                print("DEBUG: 🌊 ❌ Error processing streaming file \(fileName): \(error)")
+                sendStreamingResponse(connection: connection, success: false, message: "Failed to save file: \(error.localizedDescription)")
+            }
+        }
+        
+        // Clean up upload tracking
+        activeUploads.remove(uploadId)
+    }
+    
+    private func sendStreamingResponse(connection: NWConnection, success: Bool, message: String, fileName: String? = nil) {
+        var response: [String: Any] = [
+            "success": success,
+            "message": message
+        ]
+        
+        if let fileName = fileName {
+            response["fileName"] = fileName
+        }
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: response)
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+            sendHTTPResponse(
+                connection: connection,
+                statusCode: success ? 200 : 400,
+                contentType: "application/json",
+                body: jsonString
+            )
+        } catch {
+            print("DEBUG: Error creating streaming response: \(error)")
+            sendHTTPResponse(
+                connection: connection,
+                statusCode: 500,
+                contentType: "application/json",
+                body: "{\"success\": false, \"message\": \"Internal server error\"}"
+            )
         }
     }
     

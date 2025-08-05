@@ -568,49 +568,155 @@ extension WebServerManager {
                 }
                 
                 .selected-file-item {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 10px;
-                    background: #f8f9fa;
+                    display: block;
+                    padding: 12px;
+                    border: 1px solid #e0e0e0;
                     border-radius: 8px;
                     margin-bottom: 8px;
+                    background: #f8f9fa;
+                    transition: all 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+                    position: relative;
+                }
+                
+                .selected-file-item.uploading {
+                    border-color: #007bff;
+                    background: #f0f8ff;
+                }
+                
+                .selected-file-item.completed {
+                    border-color: #28a745;
+                    background: linear-gradient(135deg, #d4edda 0%, #f0fff0 100%);
+                }
+                
+                .selected-file-item.failed {
+                    border-color: #dc3545;
+                    background: #fff0f0;
                 }
                 
                 .selected-file-info {
                     display: flex;
                     align-items: center;
-                    flex: 1;
+                    gap: 12px;
+                    margin-bottom: 8px;
                 }
                 
                 .selected-file-icon {
                     font-size: 18px;
-                    margin-right: 10px;
+                    flex-shrink: 0;
+                }
+                
+                .file-details {
+                    flex: 1;
+                    min-width: 0;
                 }
                 
                 .selected-file-name {
                     font-weight: 500;
                     color: #333;
-                    margin-right: 10px;
+                    display: block;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 
                 .selected-file-size {
                     color: #666;
                     font-size: 12px;
+                    display: block;
+                    margin-top: 2px;
+                }
+                
+                .file-status {
+                    flex-shrink: 0;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: 500;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
+                .file-status .status-text {
+                    color: #666;
+                }
+                
+                .selected-file-item.uploading .file-status .status-text {
+                    color: #007bff;
+                }
+                
+                .selected-file-item.completed .file-status .status-text {
+                    color: #28a745;
+                }
+                
+                .selected-file-item.failed .file-status .status-text {
+                    color: #dc3545;
+                }
+                
+                .file-progress-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 8px;
+                }
+                
+                .file-progress-bar {
+                    flex: 1;
+                    height: 6px;
+                    background: #e9ecef;
+                    border-radius: 3px;
+                    overflow: hidden;
+                }
+                
+                .file-progress-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #007bff, #0056b3);
+                    width: 0%;
+                    transition: width 0.3s ease;
+                    border-radius: 3px;
+                }
+                
+                .file-progress-text {
+                    font-size: 11px;
+                    color: #666;
+                    font-weight: 500;
+                    min-width: 35px;
+                    text-align: right;
                 }
                 
                 .remove-file {
-                    background: #dc3545;
-                    color: white;
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    background: none;
                     border: none;
-                    border-radius: 50%;
-                    width: 24px;
-                    height: 24px;
+                    color: #999;
+                    font-size: 16px;
                     cursor: pointer;
-                    font-size: 14px;
+                    padding: 4px;
+                    line-height: 1;
+                    border-radius: 50%;
+                    width: 20px;
+                    height: 20px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    opacity: 0.6;
+                    transition: all 0.2s ease;
+                }
+                
+                .remove-file:hover {
+                    background: #ff4444;
+                    color: white;
+                    opacity: 1;
+                }
+                
+                .selected-file-item.completed .remove-file,
+                .selected-file-item.uploading .remove-file {
+                    display: none;
+                }
+                
+                .selected-file-item.completed .file-progress-container {
+                    display: none !important;
                 }
                 
                 .progress-bar {
@@ -1102,14 +1208,25 @@ extension WebServerManager {
                         const fileIcon = getFileIcon(file.type);
                         const fileSize = formatFileSize(file.size);
                         
-                        return '<div class="selected-file-item">' +
-                            '<div class="selected-file-info">' +
-                                '<span class="selected-file-icon">' + fileIcon + '</span>' +
-                                '<span class="selected-file-name">' + file.name + '</span>' +
-                                '<span class="selected-file-size">' + fileSize + '</span>' +
-                            '</div>' +
-                            '<button type="button" class="remove-file" onclick="removeFile(' + index + ')">×</button>' +
-                        '</div>';
+                        return `<div class="selected-file-item" id="file-item-${index}" data-file-index="${index}">
+                            <div class="selected-file-info">
+                                <span class="selected-file-icon">${fileIcon}</span>
+                                <div class="file-details">
+                                    <span class="selected-file-name">${file.name}</span>
+                                    <span class="selected-file-size">${fileSize}</span>
+                                </div>
+                                <div class="file-status" id="file-status-${index}" style="display: none;">
+                                    <span class="status-text"></span>
+                                </div>
+                            </div>
+                            <div class="file-progress-container" id="file-progress-${index}" style="display: none;">
+                                <div class="file-progress-bar">
+                                    <div class="file-progress-fill" id="file-progress-fill-${index}"></div>
+                                </div>
+                                <span class="file-progress-text" id="file-progress-text-${index}">0%</span>
+                            </div>
+                            <button type="button" class="remove-file" onclick="removeFile(${index})" id="remove-btn-${index}">×</button>
+                        </div>`;
                     }).join('');
                 }
                 
@@ -1209,14 +1326,224 @@ extension WebServerManager {
                     uploadOverlay.style.display = 'none';
                 }
                 
-                // Form submission
-                uploadForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
+                function updateProgress(current, total) {
+                    const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+                    showProgress(percent);
+                    updateUploadProgress(percent, current, total);
+                }
+                
+                function updateProgressDetail(message) {
+                    uploadProgressDetail.textContent = message;
+                }
+                
+                // Individual file progress management
+                function setFileStatus(index, status, message = '') {
+                    const fileItem = document.getElementById(`file-item-${index}`);
+                    const statusElement = document.getElementById(`file-status-${index}`);
+                    const statusText = statusElement.querySelector('.status-text');
                     
-                    if (files.length === 0) {
-                        showStatus('Please select files to upload', true);
-                        return;
+                    if (!fileItem || !statusElement) return;
+                    
+                    // Remove existing status classes
+                    fileItem.classList.remove('uploading', 'completed', 'failed');
+                    
+                    // Add new status class and update text
+                    switch (status) {
+                        case 'uploading':
+                            fileItem.classList.add('uploading');
+                            statusElement.style.display = 'block';
+                            statusText.textContent = 'Uploading';
+                            break;
+                        case 'completed':
+                            fileItem.classList.add('completed');
+                            statusElement.style.display = 'block';
+                            statusText.textContent = 'Completed';
+                            break;
+                        case 'failed':
+                            fileItem.classList.add('failed');
+                            statusElement.style.display = 'block';
+                            statusText.textContent = message || 'Failed';
+                            break;
+                        default:
+                            statusElement.style.display = 'none';
+                            statusText.textContent = '';
                     }
+                }
+                
+                function updateFileProgress(index, progress) {
+                    const progressContainer = document.getElementById(`file-progress-${index}`);
+                    const progressFill = document.getElementById(`file-progress-fill-${index}`);
+                    const progressText = document.getElementById(`file-progress-text-${index}`);
+                    
+                    if (!progressContainer || !progressFill || !progressText) return;
+                    
+                    progressContainer.style.display = 'flex';
+                    progressFill.style.width = `${progress}%`;
+                    progressText.textContent = `${Math.round(progress)}%`;
+                }
+                
+                function hideFileProgress(index) {
+                    const progressContainer = document.getElementById(`file-progress-${index}`);
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                }
+                
+
+                
+                // Helper function to create unique file upload with XMLHttpRequest
+                function uploadSingleFileWithProgress(file, index, headers) {
+                    return new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        
+                        // Set up progress tracking
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const progress = (e.loaded / e.total) * 100;
+                                updateFileProgress(index, progress);
+                            }
+                        });
+                        
+                        xhr.addEventListener('load', () => {
+                            try {
+                                const result = JSON.parse(xhr.responseText);
+                                resolve(result);
+                            } catch (error) {
+                                reject(new Error('Invalid response format'));
+                            }
+                        });
+                        
+                        xhr.addEventListener('error', () => {
+                            reject(new Error('Network error'));
+                        });
+                        
+                        xhr.addEventListener('timeout', () => {
+                            reject(new Error('Upload timeout'));
+                        });
+                        
+                        // Set up request
+                        xhr.open('POST', '/upload/stream', true);
+                        
+                        // Add headers
+                        Object.keys(headers).forEach(key => {
+                            xhr.setRequestHeader(key, headers[key]);
+                        });
+                        
+                        // Send file
+                        xhr.send(file);
+                    });
+                }
+                
+                // Check if streaming upload is supported and should be used
+                function shouldUseStreamingUpload() {
+                    // Use streaming for multiple files or files larger than 50MB
+                    const streamingFileThreshold = 50 * 1024 * 1024; // 50MB
+                    const streamingCountThreshold = 10; // 10+ files
+                    
+                    const hasLargeFiles = files.some(file => file.size > streamingFileThreshold);
+                    const hasMultipleFiles = files.length > streamingCountThreshold;
+                    
+                    console.log(`DEBUG: Upload decision - Files: ${files.length}, Large files: ${hasLargeFiles}, Multiple files: ${hasMultipleFiles}`);
+                    return hasLargeFiles || hasMultipleFiles;
+                }
+                
+                // Streaming upload function
+                async function uploadFilesStream() {
+                    console.log('DEBUG: Starting streaming upload for', files.length, 'files');
+                    
+                    let uploaded = 0;
+                    let failed = 0;
+                    const errors = [];
+                    const originalFileCount = files.length;
+                    
+                    showProgress();
+                    updateProgress(0, originalFileCount);
+                    
+                    // Process files from top to bottom (index 0 to length-1)
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        console.log(`DEBUG: Uploading file ${i + 1}/${originalFileCount}: ${file.name}`);
+                        
+                        try {
+                            // Set file status to uploading
+                            setFileStatus(i, 'uploading');
+                            updateFileProgress(i, 0);
+                            
+                            updateProgressDetail(`Uploading ${file.name}... (${i + 1}/${originalFileCount})`);
+                            
+                            // Create headers for streaming upload
+                            const headers = {};
+                            
+                            // Add folder ID if present
+                            if (currentFolderId && currentFolderId !== '') {
+                                headers['X-Folder-ID'] = currentFolderId;
+                            }
+                            
+                            // Add file metadata
+                            headers['X-File-Name'] = encodeURIComponent(file.name);
+                            headers['Content-Type'] = 'application/octet-stream';
+                            
+                            // Add file path if it's a folder upload
+                            if (file._folderPath) {
+                                headers['X-File-Path'] = encodeURIComponent(file._folderPath);
+                            }
+                            
+                            // Upload single file with proper progress tracking
+                            const result = await uploadSingleFileWithProgress(file, i, headers);
+                            
+                            if (result.success) {
+                                uploaded++;
+                                console.log(`DEBUG: Successfully uploaded: ${file.name}`);
+                                
+                                // Mark as completed and keep in list with success state
+                                setFileStatus(i, 'completed');
+                                
+                            } else {
+                                failed++;
+                                errors.push(`${file.name}: ${result.message}`);
+                                console.error(`DEBUG: Failed to upload ${file.name}:`, result.message);
+                                
+                                // Mark as failed
+                                hideFileProgress(i);
+                                setFileStatus(i, 'failed', result.message);
+                            }
+                            
+                        } catch (error) {
+                            failed++;
+                            errors.push(`${file.name}: ${error.message}`);
+                            console.error(`DEBUG: Error uploading ${file.name}:`, error);
+                            
+                            // Mark as failed
+                            hideFileProgress(i);
+                            setFileStatus(i, 'failed', error.message);
+                        }
+                        
+                        // Update overall progress
+                        updateProgress(i + 1, originalFileCount);
+                    }
+                    
+                    hideProgress();
+                    resetUploadButton();
+                    
+                    // Show results
+                    if (failed === 0) {
+                        showUploadSuccess(uploaded);
+                        // Don't clear files here as they're removed individually
+                        setTimeout(() => {
+                            hideUploadOverlay();
+                            hideUploadDialog();
+                            window.location.reload();
+                        }, 2000);
+                    } else {
+                        hideUploadOverlay();
+                        const message = `Uploaded ${uploaded} files, ${failed} failed.`;
+                        showStatus(message, failed > 0);
+                    }
+                }
+                
+                // Traditional batch upload function (for backward compatibility)
+                async function uploadFilesBatch() {
+                    console.log('DEBUG: Starting batch upload for', files.length, 'files');
                     
                     const formData = new FormData();
                     
@@ -1275,6 +1602,15 @@ extension WebServerManager {
                                 const uploadedCount = Math.floor((e.loaded / e.total) * files.length);
                                 showProgress(percent);
                                 updateUploadProgress(percent, uploadedCount, files.length);
+                                
+                                // Update individual file progress for batch upload
+                                files.forEach((file, index) => {
+                                    const fileProgress = Math.min(100, (percent / 100) * 120); // Slightly faster progress per file
+                                    if (fileProgress > 0) {
+                                        setFileStatus(index, 'uploading');
+                                        updateFileProgress(index, Math.min(100, fileProgress));
+                                    }
+                                });
                             }
                         });
                         
@@ -1285,8 +1621,13 @@ extension WebServerManager {
                             try {
                                 const response = JSON.parse(xhr.responseText);
                                 if (response.success) {
+                                    // Mark all files as completed and keep in list
+                                    files.forEach((file, index) => {
+                                        updateFileProgress(index, 100);
+                                        setFileStatus(index, 'completed');
+                                    });
+                                    
                                     showUploadSuccess(files.length);
-                                    clearFiles();
                                     
                                     // Hide overlay and refresh after showing success
                                     setTimeout(() => {
@@ -1295,6 +1636,12 @@ extension WebServerManager {
                                         window.location.reload();
                                     }, 2000);
                                 } else {
+                                    // Mark all files as failed
+                                    files.forEach((file, index) => {
+                                        hideFileProgress(index);
+                                        setFileStatus(index, 'failed', response.message || 'Upload failed');
+                                    });
+                                    
                                     hideUploadOverlay();
                                     showStatus(response.message || 'Upload failed', true);
                                 }
@@ -1347,6 +1694,25 @@ extension WebServerManager {
                         resetUploadButton();
                         hideUploadOverlay();
                         showStatus('Upload failed: ' + error.message, true);
+                    }
+                }
+                
+                // Form submission
+                uploadForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    if (files.length === 0) {
+                        showStatus('Please select files to upload', true);
+                        return;
+                    }
+                    
+                    // Choose upload method based on file characteristics
+                    if (shouldUseStreamingUpload()) {
+                        console.log('DEBUG: Using streaming upload for better memory efficiency');
+                        await uploadFilesStream();
+                    } else {
+                        console.log('DEBUG: Using traditional batch upload');
+                        await uploadFilesBatch();
                     }
                 });
                 
