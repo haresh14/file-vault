@@ -11,6 +11,7 @@ import Combine
 
 @MainActor
 class TrashViewModel: ObservableObject, MediaViewerManageable {
+    private let loginStateManager = LoginStateManager.shared
     // MARK: - Published Properties
     @Published var deletedItems: [VaultItem] = []
     @Published var selectedItems: Set<VaultItem> = []
@@ -49,6 +50,12 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
     
     // MARK: - Data Loading
     func loadDeletedItems() {
+        // During fake login, do not reveal trashed files either
+        guard !loginStateManager.shouldShowEmptyVault else {
+            deletedItems = []
+            return
+        }
+
         let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
         request.predicate = NSPredicate(format: "isTrashed == true")
         request.sortDescriptors = [NSSortDescriptor(key: "trashedAt", ascending: false)]

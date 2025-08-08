@@ -97,6 +97,12 @@ final class CategoryViewModel: ObservableObject {
     }
 
     private func loadVaultItems() {
+        // During fake login, present an empty dataset
+        guard !loginStateManager.shouldShowEmptyVault else {
+            allVaultItems = []
+            return
+        }
+
         allVaultItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
     }
 } 

@@ -33,7 +33,9 @@ struct CategoryView: View {
                     ForEach(CategoryType.allCases, id: \.self) { categoryType in
                         NavigationLink(destination: CategoryFilesView(
                             categoryType: categoryType
-                        )) {
+                        )
+                        // Ensure a unique identity per category to avoid SwiftUI reuse issues
+                        .id(categoryType)) {
                             CategoryCard(
                                 categoryType: categoryType,
                                 itemCount: getItemCount(for: categoryType)

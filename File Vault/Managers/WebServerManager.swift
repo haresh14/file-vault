@@ -357,6 +357,13 @@ class WebServerManager: ObservableObject, WebServerManaging {
         let path = components[1]
         print("DEBUG: Method: \(method), Path: \(path)")
         
+        // Block all web access when in fake login mode
+        if LoginStateManager.shared.shouldShowEmptyVault {
+            print("DEBUG: Fake login active - blocking web server request")
+            sendHTTPResponse(connection: connection, statusCode: 403, body: "<html><body><h2>Access disabled</h2><p>Web access is disabled in fake login mode.</p></body></html>")
+            return
+        }
+        
         // Route the request
         switch (method, path) {
         case ("GET", "/"):

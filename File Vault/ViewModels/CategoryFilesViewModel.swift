@@ -43,6 +43,7 @@ final class CategoryFilesViewModel: ObservableObject {
     // MARK: - Private
     private let categoryType: CategoryType
     private var cancellables = Set<AnyCancellable>()
+    private let loginStateManager = LoginStateManager.shared
 
     // MARK: - Init
     init(categoryType: CategoryType) {
@@ -211,6 +212,12 @@ final class CategoryFilesViewModel: ObservableObject {
     }
 
     private func loadItems() {
+        // Hide all items during fake login for security
+        guard !loginStateManager.shouldShowEmptyVault else {
+            items = []
+            return
+        }
+
         let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
         switch categoryType {
         case .favorites:

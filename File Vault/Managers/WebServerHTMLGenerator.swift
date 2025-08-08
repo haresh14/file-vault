@@ -10,6 +10,11 @@ import Foundation
 extension WebServerManager {
     
     func getFolderContents(folderId: String?) -> (folders: [Folder], files: [VaultItem]) {
+        // In fake login mode, never expose any folders or files via the web UI
+        if LoginStateManager.shared.shouldShowEmptyVault {
+            return (folders: [], files: [])
+        }
+
         let targetFolder: Folder?
         
         if let folderId = folderId, let uuid = UUID(uuidString: folderId) {
