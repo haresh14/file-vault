@@ -127,7 +127,6 @@ struct VaultGridView: View {
                         }
                     }
                     .padding(.horizontal, 2)
-                    .searchable(text: .constant(searchText), prompt: "Search files")
                 }
             }
         }
