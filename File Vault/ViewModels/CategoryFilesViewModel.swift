@@ -5,9 +5,10 @@ import SwiftUI
 /// View model that powers `CategoryFilesView`, encapsulating loading, sorting,
 /// selection, move and delete logic so the SwiftUI view can remain purely
 /// declarative.
-final class CategoryFilesViewModel: ObservableObject {
+final class CategoryFilesViewModel: ObservableObject, SearchManageable {
     // MARK: - Published State
     @Published private(set) var items: [VaultItem] = []
+    @Published var searchText: String = ""
     @Published var sortOption: SortOption = .date
     @Published var sortAscending: Bool = false
     @Published var isSelectionMode: Bool = false
@@ -22,20 +23,26 @@ final class CategoryFilesViewModel: ObservableObject {
     @Published var filePreviewItem: VaultItem?
 
     // MARK: - Computed
-    /// Items sorted according to the currently chosen sort option and order.
+    /// Items filtered by search text and sorted according to the currently chosen sort option and order.
     var sortedItems: [VaultItem] {
+        // First apply search filter
+        let filteredItems = searchText.isEmpty ? items : items.filter { item in
+            item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
+        }
+        
+        // Then sort the filtered items
         let sorted: [VaultItem]
         switch sortOption {
         case .userDefault, .date:
-            sorted = items.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
+            sorted = filteredItems.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         case .name:
-            sorted = items.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
+            sorted = filteredItems.sorted { ($0.fileName ?? "") < ($1.fileName ?? "") }
         case .size:
-            sorted = items.sorted { $0.fileSize < $1.fileSize }
+            sorted = filteredItems.sorted { $0.fileSize < $1.fileSize }
         case .favorites:
-            sorted = items.sorted { ($0.isFavorite && !$1.isFavorite) || ($0.isFavorite == $1.isFavorite && ($0.fileName ?? "") < ($1.fileName ?? "")) }
+            sorted = filteredItems.sorted { ($0.isFavorite && !$1.isFavorite) || ($0.isFavorite == $1.isFavorite && ($0.fileName ?? "") < ($1.fileName ?? "")) }
         case .kind:
-            sorted = items.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
+            sorted = filteredItems.sorted { ($0.fileType ?? "") < ($1.fileType ?? "") }
         }
         return sortAscending ? sorted : sorted.reversed()
     }
@@ -83,7 +90,7 @@ final class CategoryFilesViewModel: ObservableObject {
     }
 
     func selectAll() {
-        selectedItems = Set(items)
+        selectedItems = Set(sortedItems)
     }
 
     func enterSelectionMode() {
@@ -235,5 +242,15 @@ final class CategoryFilesViewModel: ObservableObject {
         case .allFiles:
             items = allItems
         }
+    }
+    
+    // MARK: - SearchManageable Implementation
+    
+    typealias SearchableItem = VaultItem
+    
+    var allItems: [VaultItem] { items }
+    
+    func matches(item: VaultItem, searchText: String) -> Bool {
+        item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
     }
 } 

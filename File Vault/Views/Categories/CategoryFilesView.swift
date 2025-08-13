@@ -40,7 +40,7 @@ struct CategoryFilesView: View {
     var body: some View {
         ZStack {
             Group {
-                if viewModel.items.isEmpty {
+                if sortedItems.isEmpty {
                     emptyState
                 } else {
                     itemsGrid
@@ -50,6 +50,7 @@ struct CategoryFilesView: View {
         .navigationTitle(categoryType.rawValue)
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(viewModel.isSelectionMode)
+        .searchable(text: $viewModel.searchText, prompt: "Search \(categoryType.rawValue.lowercased())")
         .toolbar { toolbarContent }
         .sheet(isPresented: $showSortActionSheet) { sortSheet }
         .fullScreenCover(isPresented: isMediaViewerPresented) { mediaViewer }
@@ -80,16 +81,27 @@ struct CategoryFilesView: View {
     // MARK: - Subviews
     private var emptyState: some View {
         VStack(spacing: 20) {
-            Image(systemName: categoryType.systemImage)
+            Image(systemName: viewModel.isSearching ? "magnifyingglass" : categoryType.systemImage)
                 .font(.system(size: 80))
                 .foregroundColor(.gray)
-            Text("No \(categoryType.rawValue)")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text("Files of this type will appear here when you add them to your vault")
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+            
+            if viewModel.isSearching {
+                Text("No Results")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text("No \(categoryType.rawValue.lowercased()) match '\(viewModel.searchText)'")
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else {
+                Text("No \(categoryType.rawValue)")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text("Files of this type will appear here when you add them to your vault")
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -237,7 +249,7 @@ struct CategoryFilesView: View {
                         Label("Sort", systemImage: "arrow.up.arrow.down")
                     }
                     
-                    if !viewModel.items.isEmpty {
+                    if !sortedItems.isEmpty {
                         Divider()
                         
                         Button(action: { viewModel.enterSelectionMode() }) {
