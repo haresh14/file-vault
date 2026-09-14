@@ -99,10 +99,9 @@ These are real implementation issues, not old video-player TODOs:
 
 - Screenshot and screen-recording **toggles are not persisted** across launches (they default back to on).
 - Screenshot **alert still fires** if that protection toggle is off; only the overlay is gated.
-- Background processing task ID is registered in code but not listed in Info.plist.
-- No `NSLocalNetworkUsageDescription` for the LAN server.
 - Folder tab has no search field.
 - No in-app camera capture.
+- `VaultMainViewModelTests.swift` references removed ViewModel members and currently prevents the unit-test target from compiling.
 
 ## Need help?
 

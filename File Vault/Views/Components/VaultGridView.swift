@@ -63,6 +63,7 @@ struct VaultGridView: View {
                                             onSelect(item)
                                         }) {
                                             Label("Select", systemImage: "checkmark.circle")
+                                                .labelStyle(.titleAndIcon)
                                         }
                                         
                                         Divider()
@@ -77,6 +78,7 @@ struct VaultGridView: View {
                                                 item.isFavorite ? "Unfavorite" : "Favorite",
                                                 systemImage: item.isFavorite ? "heart.slash" : "heart"
                                             )
+                                            .labelStyle(.titleAndIcon)
                                         }
                                     }
                                     
@@ -86,6 +88,7 @@ struct VaultGridView: View {
                                             onRename(item)
                                         }) {
                                             Label("Rename", systemImage: "pencil")
+                                                .labelStyle(.titleAndIcon)
                                         }
                                     }
                                     
@@ -95,6 +98,7 @@ struct VaultGridView: View {
                                             onMove(item)   // Trigger move functionality directly
                                         }) {
                                             Label("Move", systemImage: "folder")
+                                                .labelStyle(.titleAndIcon)
                                         }
                                     }
                                     
@@ -108,6 +112,7 @@ struct VaultGridView: View {
                                             onShare(item)
                                         }) {
                                             Label("Share", systemImage: "square.and.arrow.up")
+                                                .labelStyle(.titleAndIcon)
                                         }
                                     }
                                     
@@ -120,6 +125,7 @@ struct VaultGridView: View {
                                             onDelete(item)
                                         }) {
                                             Label("Delete", systemImage: "trash")
+                                                .labelStyle(.titleAndIcon)
                                         }
                                     }
                                 }

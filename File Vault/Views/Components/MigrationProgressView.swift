@@ -109,7 +109,7 @@ struct MigrationProgressView: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         MigrationProgressView(
             currentProgress: 15,
             totalItems: 50,

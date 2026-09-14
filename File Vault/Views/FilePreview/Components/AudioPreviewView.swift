@@ -88,7 +88,7 @@ struct AudioPreviewView: View {
                                 player?.seek(to: time)
                             }
                         }
-                        .accentColor(.white)
+                        .tint(.white)
                         
                         HStack {
                             Text(formatTime(currentTime))

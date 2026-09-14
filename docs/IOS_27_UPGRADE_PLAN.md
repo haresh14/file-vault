@@ -12,6 +12,19 @@
 
 **Constraint for agents:** One agent owns the files listed on its task. Do not edit another task’s files. If two tasks touch the same file, they are sequential.
 
+## Implementation status — 2026-09-14
+
+Completed:
+- All Wave B source migrations (`NavigationStack`, `dismiss`, tint/onChange, scene-aware security and sharing, Optic ID handling, context-menu labels).
+- Wave C project work. A checked-in `File Vault/Info.plist` now contains the local-network description, background-task identifier array, launch screen, scene manifest, orientations, and existing Face ID/background modes.
+- Deployment target remains **iOS 18.5** and Swift language mode remains **5.0**.
+- App builds successfully with the installed Xcode 26.6 / iOS 26.5 SDK, and IDE lint reports no errors.
+
+Pending external validation:
+- Xcode 27 / iOS 27 SDK build (Xcode 27 is not installed on this machine).
+- E1–E12 manual checks on an iOS 27 simulator/device.
+- Unit-test execution: the test target currently does not compile because pre-existing `VaultMainViewModelTests.swift` references removed ViewModel members. This is not caused by the migration.
+
 ---
 
 ## 0. Compatibility verdict (features vs iOS 27)
@@ -21,7 +34,7 @@ Nothing in the vault’s core stack is **removed** on iOS 27. AES-GCM, Keychain,
 | Feature / API we use | iOS 27 status | Action | Replacement if needed |
 |----------------------|---------------|--------|------------------------|
 | SwiftUI `WindowGroup` scene | Required (UIKit apps without scenes fail to launch) | Keep | Already SwiftUI scene-based |
-| Generated launch screen (`UILaunchScreen_Generation`) | Apps built with iOS 27 SDK **must** have a launch screen | Verify generated key is present | Add `UILaunchScreen` / storyboard if generation is insufficient |
+| Explicit `UILaunchScreen` dictionary | Apps built with iOS 27 SDK **must** have a launch screen | Keep and verify | Use a launch storyboard only if iOS 27 validation rejects the dictionary |
 | `NavigationView` | **Deprecated through iOS 27** | Replace | `NavigationStack` (single column; already used in `FolderView`) |
 | `.accentColor(_:)` view modifier | Soft-deprecated (tint is the replacement) | Replace at call sites | `.tint(_:)` |
 | `@Environment(\.presentationMode)` | Deprecated | Replace | `@Environment(\.dismiss)` |

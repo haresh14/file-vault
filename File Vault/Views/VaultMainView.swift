@@ -30,7 +30,7 @@ struct VaultMainView: View {
     // MARK: - Body
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             mainContent
                 .vaultNavigationTitle(
                     isSelectionMode: viewModel.isSelectionMode,

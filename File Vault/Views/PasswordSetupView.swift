@@ -328,7 +328,7 @@ enum PasswordStrength {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         PasswordSetupView(
             onPasswordSet: { print("Password set") },
             onCancel: { print("Cancelled") }

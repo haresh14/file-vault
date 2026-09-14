@@ -14,7 +14,7 @@ struct WebUploadTabView: View {
     @State private var showInstructions = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     // Header
@@ -248,7 +248,7 @@ struct WebUploadQRCodeView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 Text("Scan QR Code")
                     .font(.title)

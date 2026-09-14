@@ -43,7 +43,7 @@ struct SheetView {
         let onDismiss: () -> Void
         
         var body: some View {
-            NavigationView {
+            NavigationStack {
                 VStack(spacing: 0) {
                     Header(title: "Sort Options", onDismiss: onDismiss)
                     
@@ -96,7 +96,7 @@ struct SheetView {
         let onDismiss: () -> Void
         
         var body: some View {
-            NavigationView {
+            NavigationStack {
                 VStack(spacing: 0) {
                     Header(title: "Add Files", onDismiss: onDismiss)
                     
@@ -201,7 +201,7 @@ struct SheetView {
         }
         
         var body: some View {
-            NavigationView {
+            NavigationStack {
                 VStack(spacing: 0) {
                     Header(title: title, onDismiss: onDismiss)
                     

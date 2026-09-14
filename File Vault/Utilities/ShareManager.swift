@@ -14,6 +14,26 @@ class ShareManager {
     
     private init() {}
     
+    /// Key window of the scene the user is currently interacting with, falling back to
+    /// another visible window in that same scene when no window reports itself as key.
+    private static func activeKeyWindow() -> UIWindow? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let ordered = scenes.filter { $0.activationState == .foregroundActive }
+            + scenes.filter { $0.activationState == .foregroundInactive }
+            + scenes.filter {
+                $0.activationState != .foregroundActive && $0.activationState != .foregroundInactive
+            }
+
+        for scene in ordered {
+            if let window = scene.windows.first(where: { $0.isKeyWindow })
+                ?? scene.windows.first(where: { !$0.isHidden })
+                ?? scene.windows.first {
+                return window
+            }
+        }
+        return nil
+    }
+
     /// Share a vault item using the system share sheet
     /// - Parameters:
     ///   - vaultItem: The vault item to share
@@ -34,8 +54,7 @@ class ShareManager {
             return
         }
         
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootViewController = windowScene.windows.first?.rootViewController else {
+        guard let rootViewController = ShareManager.activeKeyWindow()?.rootViewController else {
             print("Error: Unable to get root view controller for sharing")
             return
         }

@@ -25,7 +25,7 @@ struct CategoryView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 150), spacing: 16)

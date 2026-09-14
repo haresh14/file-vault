@@ -174,6 +174,7 @@ struct SelectableFileRowView: View {
                 onSelect?()
             }) {
                 Label("Select", systemImage: "checkmark.circle")
+                    .labelStyle(.titleAndIcon)
             }
             
             Divider()
@@ -186,6 +187,7 @@ struct SelectableFileRowView: View {
                     file.isFavorite ? "Unfavorite" : "Favorite",
                     systemImage: file.isFavorite ? "heart.slash" : "heart"
                 )
+                .labelStyle(.titleAndIcon)
             }
             
             // Rename option
@@ -193,6 +195,7 @@ struct SelectableFileRowView: View {
                 onRename?()
             }) {
                 Label("Rename", systemImage: "pencil")
+                    .labelStyle(.titleAndIcon)
             }
             
             // Move option
@@ -200,6 +203,7 @@ struct SelectableFileRowView: View {
                 onMove?()
             }) {
                 Label("Move", systemImage: "folder")
+                    .labelStyle(.titleAndIcon)
             }
             
             Divider()
@@ -209,6 +213,7 @@ struct SelectableFileRowView: View {
                 onShare?()
             }) {
                 Label("Share", systemImage: "square.and.arrow.up")
+                    .labelStyle(.titleAndIcon)
             }
             
             Divider()
@@ -218,6 +223,7 @@ struct SelectableFileRowView: View {
                 onDelete?()
             }) {
                 Label("Delete", systemImage: "trash")
+                    .labelStyle(.titleAndIcon)
             }
         }
         .onAppear {

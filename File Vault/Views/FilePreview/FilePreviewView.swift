@@ -29,7 +29,7 @@ struct FilePreviewView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             GeometryReader { geometry in
                 ZStack {
                     Color.black
@@ -55,7 +55,7 @@ struct FilePreviewView: View {
                             gestureHandler: gestureHandler,
                             geometry: geometry,
                             onFavoriteToggle: toggleFavorite,
-                            onDismiss: nil // No dismiss for non-media files in NavigationView
+                            onDismiss: nil // The enclosing NavigationStack owns dismissal.
                         ) {
                             // Main content area
                             if isLoading {

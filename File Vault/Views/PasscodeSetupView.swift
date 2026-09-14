@@ -210,7 +210,7 @@ struct PasscodeSetupView: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         PasscodeSetupView(
             authType: .passcode4,
             onPasscodeSet: { print("Passcode set") },

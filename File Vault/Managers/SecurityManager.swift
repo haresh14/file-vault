@@ -34,6 +34,44 @@ class SecurityManager: ObservableObject, SecurityManaging {
         setupMotionDetection()
     }
     
+    // MARK: - Scene Lookup
+
+    /// Window scenes ordered so the one the user is actually looking at comes first.
+    private var candidateWindowScenes: [UIWindowScene] {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let foregroundActive = scenes.filter { $0.activationState == .foregroundActive }
+        let foregroundInactive = scenes.filter { $0.activationState == .foregroundInactive }
+        let remaining = scenes.filter {
+            $0.activationState != .foregroundActive && $0.activationState != .foregroundInactive
+        }
+        return foregroundActive + foregroundInactive + remaining
+    }
+
+    private var activeWindowScene: UIWindowScene? {
+        candidateWindowScenes.first
+    }
+
+    /// Key window of the foreground scene, ignoring our own protection overlay.
+    private var activeKeyWindow: UIWindow? {
+        for scene in candidateWindowScenes {
+            let windows = scene.windows.filter { $0 !== overlayWindow }
+            if let window = windows.first(where: { $0.isKeyWindow })
+                ?? windows.first(where: { !$0.isHidden })
+                ?? windows.first {
+                return window
+            }
+        }
+        return nil
+    }
+
+    /// Capture state of the screen(s) actually showing our windows. iPhone Mirroring and
+    /// external displays can put the app on a screen that is not `UIScreen.main`.
+    private var isScreenBeingCaptured: Bool {
+        let scenes = candidateWindowScenes
+        guard !scenes.isEmpty else { return UIScreen.main.isCaptured }
+        return scenes.contains { $0.screen.isCaptured }
+    }
+
     // MARK: - Screenshot Protection
     
     private func setupScreenshotProtection() {
@@ -81,7 +119,7 @@ class SecurityManager: ObservableObject, SecurityManaging {
     }
     
     @objc private func capturedDidChange() {
-        let isBeingCaptured = UIScreen.main.isCaptured
+        let isBeingCaptured = isScreenBeingCaptured
         print("DEBUG: Screen recording status changed: \(isBeingCaptured)")
         
         if isBeingCaptured && isRecordingProtectionEnabled {
@@ -132,13 +170,15 @@ class SecurityManager: ObservableObject, SecurityManaging {
     }
     
     private func createOverlayWindow() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+        guard let windowScene = activeWindowScene else {
             return
         }
         
         overlayWindow = UIWindow(windowScene: windowScene)
         overlayWindow?.windowLevel = UIWindow.Level.alert + 1
         overlayWindow?.backgroundColor = .black
+        // The cover must stay fully opaque; nothing behind it may show through.
+        overlayWindow?.isOpaque = true
         overlayWindow?.isHidden = false
         
         let hostingController = UIHostingController(rootView: SecurityOverlayView())
@@ -173,11 +213,15 @@ class SecurityManager: ObservableObject, SecurityManaging {
     }
     
     private func showScreenshotAlert() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
+        guard let rootViewController = activeKeyWindow?.rootViewController else {
             return
         }
         
+        var presentingViewController = rootViewController
+        while let presented = presentingViewController.presentedViewController {
+            presentingViewController = presented
+        }
+
         let alert = UIAlertController(
             title: "Security Notice",
             message: "Screenshot detected. Please ensure your vault contents remain secure.",
@@ -186,7 +230,7 @@ class SecurityManager: ObservableObject, SecurityManaging {
         
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         
-        window.rootViewController?.present(alert, animated: true)
+        presentingViewController.present(alert, animated: true)
     }
     
     // MARK: - Public Methods

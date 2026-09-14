@@ -18,7 +18,7 @@ where SortType.RawValue == String, SortType: SortOptionProtocol {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Sort options
                 VStack(spacing: 0) {

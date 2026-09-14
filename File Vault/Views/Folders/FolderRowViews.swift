@@ -35,6 +35,7 @@ struct FolderRowView: View {
         .contextMenu {
             Button(action: onRename) {
                 Label("Rename", systemImage: "pencil")
+                    .labelStyle(.titleAndIcon)
             }
         }
     }
@@ -89,6 +90,7 @@ struct SelectableFolderRowView: View {
                 onSelect?()
             }) {
                 Label("Select", systemImage: "checkmark.circle")
+                    .labelStyle(.titleAndIcon)
             }
             
             Divider()
@@ -96,6 +98,7 @@ struct SelectableFolderRowView: View {
             // Rename option
             Button(action: onRename) {
                 Label("Rename", systemImage: "pencil")
+                    .labelStyle(.titleAndIcon)
             }
             
             // Move option
@@ -103,6 +106,7 @@ struct SelectableFolderRowView: View {
                 onMove?()
             }) {
                 Label("Move", systemImage: "folder")
+                    .labelStyle(.titleAndIcon)
             }
             
             if let onDelete = onDelete {
@@ -111,6 +115,7 @@ struct SelectableFolderRowView: View {
                 // Delete option
                 Button(role: .destructive, action: onDelete) {
                     Label("Delete", systemImage: "trash")
+                        .labelStyle(.titleAndIcon)
                 }
             }
         }

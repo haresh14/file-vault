@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 
 struct DocumentPickerView: UIViewControllerRepresentable {
     let completion: ([(Data, String)]) -> Void
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [
@@ -41,7 +41,7 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            parent.presentationMode.wrappedValue.dismiss()
+            parent.dismiss()
             
             // Process URLs and immediately read their data to avoid security-scoped resource issues
             DispatchQueue.global(qos: .userInitiated).async {
@@ -79,7 +79,7 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
         
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            parent.presentationMode.wrappedValue.dismiss()
+            parent.dismiss()
         }
     }
 } 

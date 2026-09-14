@@ -44,17 +44,17 @@ Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `MainTabView`), 
 |---------|---------------|--------|
 | `IPHONEOS_DEPLOYMENT_TARGET` | 18.5 | Set on the project, app target, and unit-test target. The UI-test target does not set its own value (inherits the project 18.5). |
 | `SWIFT_VERSION` | 5.0 | Project setting (not “Swift 5.9+”) |
-| `GENERATE_INFOPLIST_FILE` | YES | No checked-in `Info.plist` |
-| `INFOPLIST_KEY_NSFaceIDUsageDescription` | `Use Face ID to unlock your secure vault` | Only privacy usage string in the project |
-| `INFOPLIST_KEY_UIBackgroundModes` | `background-fetch background-processing` | Used with `BackgroundTasks` |
-| Scene manifest | Generated | Single `WindowGroup` |
+| `GENERATE_INFOPLIST_FILE` | NO | Checked-in `File Vault/Info.plist` |
+| `NSFaceIDUsageDescription` | `Use Face ID to unlock your secure vault` | Face ID unlock |
+| `NSLocalNetworkUsageDescription` | `File Vault uses the local network so you can upload files from a browser on the same Wi-Fi.` | LAN web upload |
+| `UIBackgroundModes` | `background-fetch`, `background-processing` | Used with `BackgroundTasks` |
+| `BGTaskSchedulerPermittedIdentifiers` | `com.haresh.FileVault.upload-processing` | Matches registration in `WebServerManager` |
+| Scene manifest | Explicit in Info.plist | SwiftUI `WindowGroup` |
+| Launch screen | Explicit empty `UILaunchScreen` dictionary | Required when linking with iOS 27 SDK |
 | Signing | Automatic | Team `AYL8H487NP` |
 | Entitlements file | **None** | No App Groups, iCloud, associated domains, or push entitlement |
 
-**Missing plist keys used in code (current gap, not an OS-upgrade change):**
-
-- `BGTaskSchedulerPermittedIdentifiers` for `com.haresh.FileVault.upload-processing` is registered in code but not declared in Info.plist.
-- No `NSLocalNetworkUsageDescription` / Bonjour usage strings, though the LAN server uses `Network.framework` with `includePeerToPeer = true`.
+No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 
 ### 2.2 Apple frameworks in use
 
@@ -503,15 +503,15 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 Recorded so upgrades do not “fix” the wrong thing:
 
 1. Keychain service `com.filevault.app` ≠ bundle id `com.haresh.FileVault`.
-2. Background task identifier is not in Info.plist.
-3. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
-4. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
-5. Thumbnails are **not** AES-encrypted (filenames can leak that a file exists).
-6. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
-7. Screenshot/recording Settings toggles are not persisted (see §4.3).
-8. `SearchViewModel` / `VaultItemSearchViewModel` / `FolderSearchViewModel` are unused by app screens.
-9. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
-10. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
+2. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
+3. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
+4. Thumbnails are **not** AES-encrypted (filenames can leak that a file exists).
+5. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
+6. Screenshot/recording Settings toggles are not persisted (see §4.3).
+7. `SearchViewModel` / `VaultItemSearchViewModel` / `FolderSearchViewModel` are unused by app screens.
+8. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
+9. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
+10. `VaultMainViewModelTests.swift` references removed ViewModel members and prevents the unit-test target from compiling.
 
 ---
 

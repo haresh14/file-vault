@@ -42,7 +42,7 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 if loginStateManager.canAccessFullSettings {
                     securitySection
@@ -109,7 +109,7 @@ struct SettingsView: View {
             Text(fakePasswordAlertMessage)
         }
         .sheet(isPresented: $showFakePasswordSheet) {
-            NavigationView {
+            NavigationStack {
                 if currentAuthType.isPasscode {
                     PasscodeSetupView(
                         authType: currentAuthType,

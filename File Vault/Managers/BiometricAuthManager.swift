@@ -43,6 +43,9 @@ class BiometricAuthManager: BiometricAuthManaging {
             type = .touchID
         case .faceID:
             type = .faceID
+        case .opticID:
+            // Optic ID is not a Face ID variant, so it must not be surfaced as one.
+            type = .none
         default:
             type = .none
         }

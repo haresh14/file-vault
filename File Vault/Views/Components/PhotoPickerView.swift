@@ -11,7 +11,7 @@ import PhotosUI
 /// Photo picker wrapper for PHPickerViewController
 struct PhotoPickerView: UIViewControllerRepresentable {
     let completion: ([PHPickerResult]) -> Void
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var configuration = PHPickerConfiguration(photoLibrary: .shared())
@@ -38,7 +38,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
         }
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            parent.presentationMode.wrappedValue.dismiss()
+            parent.dismiss()
             
             guard !results.isEmpty else { return }
             

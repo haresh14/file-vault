@@ -51,8 +51,8 @@ struct MainTabView: View {
                 }
                 .tag(4)
         }
-        .accentColor(.blue)
-        .onChange(of: selectedTab) { _ in
+        .tint(.blue)
+        .onChange(of: selectedTab) { _, _ in
             // Send notification to reset selection modes when tab changes
             NotificationCenter.default.post(name: Notification.Name("TabDidChange"), object: nil)
         }

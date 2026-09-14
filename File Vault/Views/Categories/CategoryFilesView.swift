@@ -138,6 +138,7 @@ struct CategoryFilesView: View {
                             viewModel.toggleSelection(item)
                         }) {
                             Label("Select", systemImage: "checkmark.circle")
+                                .labelStyle(.titleAndIcon)
                         }
                         
                         Divider()
@@ -150,6 +151,7 @@ struct CategoryFilesView: View {
                                 item.isFavorite ? "Unfavorite" : "Favorite",
                                 systemImage: item.isFavorite ? "heart.slash" : "heart"
                             )
+                            .labelStyle(.titleAndIcon)
                         }
                         
                         // Rename option
@@ -157,6 +159,7 @@ struct CategoryFilesView: View {
                             startRename(for: item)
                         }) {
                             Label("Rename", systemImage: "pencil")
+                                .labelStyle(.titleAndIcon)
                         }
                         
                         // Move option
@@ -164,6 +167,7 @@ struct CategoryFilesView: View {
                             viewModel.moveItem(item, showMoveSheet: { showMoveSheet = true })
                         }) {
                             Label("Move", systemImage: "folder")
+                                .labelStyle(.titleAndIcon)
                         }
                         
                         Divider()
@@ -173,6 +177,7 @@ struct CategoryFilesView: View {
                             viewModel.shareItem(item)
                         }) {
                             Label("Share", systemImage: "square.and.arrow.up")
+                                .labelStyle(.titleAndIcon)
                         }
                         
                         Divider()
@@ -191,6 +196,7 @@ struct CategoryFilesView: View {
                             }
                         }) {
                             Label("Delete", systemImage: "trash")
+                                .labelStyle(.titleAndIcon)
                         }
                     }
                 }
