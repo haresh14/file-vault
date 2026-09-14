@@ -43,7 +43,7 @@ Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `MainTabView`), 
 | Setting | Current value | Notes |
 |---------|---------------|--------|
 | `IPHONEOS_DEPLOYMENT_TARGET` | 18.5 | Set on the project, app target, and unit-test target. The UI-test target does not set its own value (inherits the project 18.5). |
-| `SWIFT_VERSION` | 5.0 | README still says Swift 5.9+ / iOS 17+ — project file wins |
+| `SWIFT_VERSION` | 5.0 | Project setting (not “Swift 5.9+”) |
 | `GENERATE_INFOPLIST_FILE` | YES | No checked-in `Info.plist` |
 | `INFOPLIST_KEY_NSFaceIDUsageDescription` | `Use Face ID to unlock your secure vault` | Only privacy usage string in the project |
 | `INFOPLIST_KEY_UIBackgroundModes` | `background-fetch background-processing` | Used with `BackgroundTasks` |
@@ -502,18 +502,16 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 Recorded so upgrades do not “fix” the wrong thing:
 
-1. README says iOS 17+ / Swift 5.9+; Xcode project is **iOS 18.5 / Swift 5.0**.
-2. README lists video-player TODOs (white screen, missing seek/volume, pinch zoom). Code now has a scrubber, speed menu, and video pinch/double-tap zoom — treat README TODOs as stale until re-verified on device.
-3. Keychain service `com.filevault.app` ≠ bundle id `com.haresh.FileVault`.
-4. Background task identifier is not in Info.plist.
-5. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
-6. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
-7. Thumbnails are **not** AES-encrypted (filenames can leak that a file exists).
-8. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
-9. Screenshot/recording Settings toggles are not persisted (see §4.3).
-10. `SearchViewModel` / `VaultItemSearchViewModel` / `FolderSearchViewModel` are unused by app screens.
-11. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
-12. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
+1. Keychain service `com.filevault.app` ≠ bundle id `com.haresh.FileVault`.
+2. Background task identifier is not in Info.plist.
+3. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
+4. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
+5. Thumbnails are **not** AES-encrypted (filenames can leak that a file exists).
+6. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
+7. Screenshot/recording Settings toggles are not persisted (see §4.3).
+8. `SearchViewModel` / `VaultItemSearchViewModel` / `FolderSearchViewModel` are unused by app screens.
+9. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
+10. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
 
 ---
 
