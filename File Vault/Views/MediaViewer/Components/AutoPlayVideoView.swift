@@ -32,6 +32,22 @@ struct AutoPlayVideoView: View {
     // Panning is only meaningful once the video is larger than its container
     private var isZoomed: Bool { scale > 1.0 }
 
+    /// Offset that keeps whatever sits under the pinch midpoint pinned there while the
+    /// scale changes, so zooming grows out of the fingers rather than the screen centre.
+    /// `anchor` is a unit point in the container's own coordinate space.
+    private func anchoredOffset(for anchor: UnitPoint, newScale: CGFloat, in container: CGSize) -> CGSize {
+        guard lastScale > 0 else { return lastOffset }
+        // Pinch midpoint measured from the centre, which is what scaleEffect scales about
+        let focusX = (anchor.x - 0.5) * container.width
+        let focusY = (anchor.y - 0.5) * container.height
+        // Scaling about that midpoint pushes every other point away from it by the same ratio
+        let ratio = newScale / lastScale
+        return CGSize(
+            width: focusX + (lastOffset.width - focusX) * ratio,
+            height: focusY + (lastOffset.height - focusY) * ratio
+        )
+    }
+
     // Keep panning within the visible bounds given current scale and video aspect
     private func boundOffset(_ raw: CGSize, in container: CGSize) -> CGSize {
         // Determine displayed video size (aspect-fit)
@@ -68,31 +84,6 @@ struct AutoPlayVideoView: View {
                         CustomVideoPlayerView(player: player)
                             .scaleEffect(scale)
                             .offset(offset)
-                            .simultaneousGesture(
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        let newScale = lastScale * value
-                                        scale = max(newScale, 0.5)
-                                        // Clamp offset to new bounds so content never disappears
-                                        offset = boundOffset(offset, in: geometry.size)
-                                        if isActive {
-                                            scrollDisabled = scale > 1.0
-                                        }
-                                    }
-                                    .onEnded { _ in
-                                        lastScale = scale
-                                        // Ensure offset in range on gesture end
-                                        offset = boundOffset(offset, in: geometry.size)
-                                        if scale <= 1.0 {
-                                            withAnimation(.spring()) {
-                                                scale = 1.0
-                                                offset = .zero
-                                                lastScale = 1.0
-                                                lastOffset = .zero
-                                            }
-                                        }
-                                    }
-                            )
                             // Pan gesture. The mask keeps it out of the recognizer chain at 1x so
                             // drags reach the pager's scroll view instead of being swallowed by the
                             // video; while zoomed the pager is disabled and panning takes over.
@@ -194,6 +185,38 @@ struct AutoPlayVideoView: View {
                     )
                 }
             }
+            // Pinch to zoom. Attached to the container instead of the player so the
+            // anchor arrives in container coordinates, unaffected by the transforms
+            // already applied to the video.
+            .simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        guard player != nil else { return }
+                        let newScale = max(lastScale * value.magnification, 0.5)
+                        let anchored = anchoredOffset(for: value.startAnchor, newScale: newScale, in: geometry.size)
+                        scale = newScale
+                        // Clamp offset to new bounds so content never disappears
+                        offset = boundOffset(anchored, in: geometry.size)
+                        if isActive {
+                            scrollDisabled = scale > 1.0
+                        }
+                    }
+                    .onEnded { _ in
+                        guard player != nil else { return }
+                        lastScale = scale
+                        // Ensure offset in range on gesture end
+                        offset = boundOffset(offset, in: geometry.size)
+                        lastOffset = offset
+                        if scale <= 1.0 {
+                            withAnimation(.spring()) {
+                                scale = 1.0
+                                offset = .zero
+                                lastScale = 1.0
+                                lastOffset = .zero
+                            }
+                        }
+                    }
+            )
         }
         .onAppear {
             if player == nil {
