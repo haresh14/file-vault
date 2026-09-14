@@ -22,6 +22,9 @@ struct ZoomablePhotoView: View {
     // Reset zoom when the photo is no longer active
     @State private var lastIsActive: Bool = true
     
+    // Panning is only meaningful once the photo is larger than its container
+    private var isZoomed: Bool { scale > 1.0 }
+
     // Keep panning within bounds for current scale
     private func boundOffset(_ raw: CGSize, in container: CGSize) -> CGSize {
         // Determine the photo's un-scaled display size (aspect-fit) within the container
@@ -60,67 +63,69 @@ struct ZoomablePhotoView: View {
                         .aspectRatio(contentMode: .fit)
                         .scaleEffect(scale)
                         .offset(offset)
+                        // Pinch to zoom
                         .simultaneousGesture(
-                            SimultaneousGesture(
-                                // Pinch to zoom
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        let newScale = lastScale * value
-                                        scale = max(newScale, 0.5) // Allow zoom out to 0.5x, no upper limit
-                                        // Clamp offset to new bounds so content never disappears
-                                        offset = boundOffset(offset, in: geometry.size)
-                                        if isActive {
-                                            scrollDisabled = scale > 1.0
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    let newScale = lastScale * value
+                                    scale = max(newScale, 0.5) // Allow zoom out to 0.5x, no upper limit
+                                    // Clamp offset to new bounds so content never disappears
+                                    offset = boundOffset(offset, in: geometry.size)
+                                    if isActive {
+                                        scrollDisabled = scale > 1.0
+                                    }
+                                }
+                                .onEnded { _ in
+                                    lastScale = scale
+                                    // Ensure offset in range on gesture end
+                                    offset = boundOffset(offset, in: geometry.size)
+                                    if scale <= 1.0 {
+                                        withAnimation(.spring()) {
+                                            scale = 1.0
+                                            offset = .zero
+                                            lastScale = 1.0
+                                            lastOffset = .zero
                                         }
                                     }
-                                    .onEnded { _ in
-                                        lastScale = scale
-                                        // Ensure offset in range on gesture end
-                                        offset = boundOffset(offset, in: geometry.size)
-                                        if scale <= 1.0 {
-                                            withAnimation(.spring()) {
-                                                scale = 1.0
-                                                offset = .zero
-                                                lastScale = 1.0
-                                                lastOffset = .zero
-                                            }
-                                        }
-                                        if isActive {
-                                            scrollDisabled = scale > 1.0
-                                        }
-                                    },
-                                
-                                // Pan gesture
-                                DragGesture()
-                                    .onChanged { value in
-                                        guard scale > 1.0 else { return }
-                                        // Follow the finger 1:1
-                                        let raw = CGSize(
-                                            width: lastOffset.width + value.translation.width,
-                                            height: lastOffset.height + value.translation.height
-                                        )
-                                        let bounded = boundOffset(raw, in: geometry.size)
-                                        offset = bounded
+                                    if isActive {
+                                        scrollDisabled = scale > 1.0
                                     }
-                                    .onEnded { value in
-                                        guard scale > 1.0 else { return }
-                                        // Determine momentum using predicted end translation
-                                        let predictedRaw = CGSize(
-                                            width: lastOffset.width + value.predictedEndTranslation.width,
-                                            height: lastOffset.height + value.predictedEndTranslation.height
-                                        )
-                                        let shouldUseMomentum = hypot(value.predictedEndTranslation.width - value.translation.width,
-                                                                      value.predictedEndTranslation.height - value.translation.height) > 40
-                                        let target = shouldUseMomentum ? boundOffset(predictedRaw, in: geometry.size) : offset
-                                        withAnimation(.easeOut(duration: 0.45)) {
-                                            offset = target
-                                        }
-                                        lastOffset = offset
-                                        if isActive {
-                                            scrollDisabled = scale > 1.0
-                                        }
+                                }
+                        )
+                        // Pan gesture. The mask keeps it out of the recognizer chain at 1x so
+                        // drags reach the pager's scroll view instead of being swallowed by the
+                        // image; while zoomed the pager is disabled and panning takes over.
+                        .simultaneousGesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    guard isZoomed else { return }
+                                    // Follow the finger 1:1
+                                    let raw = CGSize(
+                                        width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height
+                                    )
+                                    let bounded = boundOffset(raw, in: geometry.size)
+                                    offset = bounded
+                                }
+                                .onEnded { value in
+                                    guard isZoomed else { return }
+                                    // Determine momentum using predicted end translation
+                                    let predictedRaw = CGSize(
+                                        width: lastOffset.width + value.predictedEndTranslation.width,
+                                        height: lastOffset.height + value.predictedEndTranslation.height
+                                    )
+                                    let shouldUseMomentum = hypot(value.predictedEndTranslation.width - value.translation.width,
+                                                                  value.predictedEndTranslation.height - value.translation.height) > 40
+                                    let target = shouldUseMomentum ? boundOffset(predictedRaw, in: geometry.size) : offset
+                                    withAnimation(.easeOut(duration: 0.45)) {
+                                        offset = target
                                     }
-                            )
+                                    lastOffset = offset
+                                    if isActive {
+                                        scrollDisabled = scale > 1.0
+                                    }
+                                },
+                            including: isZoomed ? .all : .subviews
                         )
                         .onTapGesture(count: 2) {
                             // Double tap to zoom
