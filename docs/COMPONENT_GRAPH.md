@@ -1,6 +1,6 @@
 # Component graph
 
-How File Vault is composed after the behavior-preserving refactor. Facades (`FileStorageManager`, `CoreDataManager`, `SecurityManager`, `WebServerManager`) remain the public entry points; focused files behind them do the work.
+How File Vault is composed. `FileStorageManager`, `CoreDataManager`, `SecurityManager`, and `WebServerManager` are the public manager entry points; focused files behind them do the work.
 
 ## 1. Runtime layers
 
@@ -293,7 +293,7 @@ flowchart TB
 | `WebServerManaging` | `WebServerManager` |
 | `AppDataManaging` | `AppDataManager` |
 
-View-model collaboration protocols (not DI): `SelectionManageable`, `ImportManageable`, `MediaViewerManageable`, `SearchManageable`, `AlertManageable`, plus unused-but-kept `SheetManageable` / `ErrorManageable`.
+View-model collaboration protocols (not DI): `SelectionManageable`, `ImportManageable`, `MediaViewerManageable`, `SearchManageable`, `AlertManageable`. `SheetManageable` and `ErrorManageable` exist in Models and are not adopted by current view models.
 
 ## 8. Cross-cutting notifications
 

@@ -12,8 +12,8 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 ## Opening the Project
 
 1. **Locate the project file**:
-   - Navigate to your project folder: `/Users/mac/Flexteam/projects/flexteam/File Vault/`
-   - Find the file named `File Vault.xcodeproj` (it has a blue icon)
+   - Open the repository folder
+   - Find `File Vault.xcodeproj`
 
 2. **Open in Xcode**:
    - Double-click on `File Vault.xcodeproj`
@@ -22,55 +22,18 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 
 ## Adding Privacy Permissions
 
-Since iOS requires explicit user permission for accessing sensitive features, we need to add descriptions for why our app needs these permissions.
+Face ID usage is declared in `File Vault/Info.plist` as `NSFaceIDUsageDescription`: `Use Face ID to unlock your secure vault`.
 
-### Setting Up Privacy Permissions
+Photo library access uses `PHPickerViewController`. Do not add `NSPhotoLibraryUsageDescription`.
 
-The app needs Face ID permission to work properly.
-
-### Method 1: Through Xcode UI
-
-1. **Select the project**: Click on "File Vault" at the top of the navigator
-2. **Select the target**: Make sure "File Vault" target is selected
-3. **Go to Info tab**: Click on the "Info" tab
-4. **Add Face ID permission**:
-   - Click the "+" button under "Custom iOS Target Properties"
-   - Type: `Privacy - Face ID Usage Description`
-   - Press Enter
-   - In the Value column, type: `File Vault uses Face ID to protect your private photos and videos`
-
-> **Note**: Photo library permissions are NOT needed! The app uses Apple's secure PHPickerViewController which runs in a separate process and provides photos without requiring any permissions. This is more secure as the app never has direct access to your photo library.
-
-### Method 2: Direct Info.plist Edit
-
-1. **Create Info.plist file**:
-   - Right-click on the "File Vault" folder in Xcode's navigator
-   - Select "New File..."
-   - Choose "Property List" under Resources
-   - Name it "Info.plist"
-   - Click "Create"
-
-2. **Add the XML content**:
-   - Right-click on Info.plist → "Open As" → "Source Code"
-   - Replace content with:
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-   <plist version="1.0">
-   <dict>
-       <key>NSFaceIDUsageDescription</key>
-       <string>File Vault uses Face ID to protect your private photos and videos</string>
-   </dict>
-   </plist>
-   ```
-
+LAN web upload uses `NSLocalNetworkUsageDescription` in the same Info.plist.
 ## Building and Running the App
 
 ### On iOS Simulator
 
 1. **Select a simulator**:
    - At the top of Xcode, next to the "Play" button, you'll see a device selector
-   - Click on it and choose a simulator (e.g., "iPhone 16 Pro")
+   - Click on it and choose a simulator (for example iPhone 18 Pro)
    - If no simulators are listed, go to Window → Devices and Simulators to download one
 
 2. **Build and run**:
@@ -110,7 +73,7 @@ File Vault (Blue folder icon) - Main app folder
 ├── Coordinators/ - Authentication and lock orchestration
 ├── Dependencies/ - Dependency container
 ├── Models/ - Data structures and protocols
-├── Managers/ - Compatibility facades and focused infrastructure services
+├── Managers/ - Storage, security, web, Core Data services
 ├── Services/ - Shared import workflow
 ├── Utilities/ - Helper classes
 ├── Views/ - UI components
@@ -127,9 +90,9 @@ Component relationships (auth, tabs, storage, security, web server) are in [COMP
 
 ### Key Files for Beginners
 
-1. **ContentView.swift**: The main screen of your app
-2. **File_VaultApp.swift**: Where the app starts
-3. **Assets.xcassets**: Where you add app icons and images
+1. **ContentView.swift**: Auth gates and the unlocked tab root
+2. **FileVaultApp.swift**: App entry
+3. **Assets.xcassets**: App icons and images
 
 ## Common Xcode Tasks
 
@@ -189,7 +152,7 @@ Component relationships (auth, tabs, storage, security, web server) are in [COMP
 - Close and reopen Xcode
 
 ### Simulator not showing up
-- Xcode → Preferences → Components → Download simulators
+- Xcode → Settings → Components → Download simulators
 
 ### App crashes on launch
 - Check the console for error messages
@@ -198,13 +161,4 @@ Component relationships (auth, tabs, storage, security, web server) are in [COMP
 ### Build fails
 - Check Issue Navigator for specific errors
 - Try cleaning build folder
-- Ensure you're using correct Swift version
-
-## Next Steps
-
-Now that you understand the basics, you can:
-1. Test the current authentication features
-2. Proceed to implement file storage
-3. Add the main vault UI
-
-Remember: Don't hesitate to use Xcode's built-in help (Help menu) or hover over buttons to see tooltips! 
+- Ensure you're using Swift 5.0 language mode as set in the project 

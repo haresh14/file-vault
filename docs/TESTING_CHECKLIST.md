@@ -1,193 +1,105 @@
 # Testing Checklist - Core Features
 
-Use this checklist to verify that all core features are working correctly.
+Use this checklist against a simulator or device. Automated coverage lives in `File VaultTests` (run serially) and `File VaultUITests`.
 
-## Pre-Test Setup ✅
+## Pre-test
 
-- [ ] Project opens successfully in Xcode
-- [ ] Privacy permissions added to Info.plist (see [Developer Guide](DEVELOPER_GUIDE.md#adding-privacy-permissions))
-- [ ] App builds without errors (Cmd+B)
-- [ ] App runs on simulator/device (Cmd+R)
+- [ ] Project opens in Xcode
+- [ ] App builds (Cmd+B)
+- [ ] App runs on simulator or device (Cmd+R)
 
-## First Launch Test 🚀
+Face ID, local network, and launch screen strings are already in `File Vault/Info.plist`.
 
-1. [ ] **Delete app** from simulator/device (to test fresh install)
-   - Long press app icon → Remove App → Delete App
-   - OR Long press lock icon for 3 seconds on login screen (debug only)
+## First launch
 
-2. [ ] **Launch app**
-   - Should see "Set Your Passcode" screen
-   - Lock icon should be visible
-   - Two password fields should be present
+1. [ ] Delete the app (or use DEBUG Settings → Simulate First Launch Cleanup)
+2. [ ] Launch: **Security Setup** with 4-digit passcode, 6-digit passcode, and password
+3. [ ] Continue into setup:
+   - [ ] 4-digit: exact length, confirm match
+   - [ ] 6-digit: exact length, confirm match
+   - [ ] Password: minimum 6 characters, confirm match
+4. [ ] After setup, the five tabs appear: Folder, Category, Gallery, Web Upload, Settings
 
-3. [ ] **Test passcode validation**
-   - [ ] Try passcode with less than 4 characters → Should show error
-   - [ ] Try different passcodes in both fields → Should show "Passcodes don't match"
-   - [ ] Enter matching passcodes (4+ characters) → Should proceed to main screen
+## Main tabs
 
-## Main Screen Test 📱
+1. [ ] Folder: empty-state create folder / add files; nested folders; swipe delete
+2. [ ] Category: Favorites, Photos, Videos, Audio, Documents, Other, All Files
+3. [ ] Gallery: grid, search, add content (photos/videos, files, web upload)
+4. [ ] Web Upload: start/stop server, URL, QR; fake login cannot start the server
+5. [ ] Settings: Security, Advanced Security, Trash, disk usage, About `1.0.0`
 
-1. [ ] **Verify main screen appears**
-   - Green shield icon
-   - "Welcome to Your Vault" text
-   - Settings gear icon in top right
+## Auto-lock
 
-2. [ ] **Test Settings**
-   - [ ] Tap gear icon → Settings should open
-   - [ ] Check "Auto-Lock" picker with options: Immediately, 30 Seconds, 1 Minute, 5 Minutes, Never
-   - [ ] Change lock timeout and verify it saves
-   - [ ] Check biometric toggle (see Biometric section below)
-   - [ ] Tap "Done" to close settings
+Default timeout is **30 seconds**. Options: Immediately, 5s, 10s, 15s, 30s, 1 min, 5 min, Never.
 
-## Lock Timeout Test ⏰ (NEW!)
+1. [ ] Immediately: return from background → credential (or biometrics)
+2. [ ] 30 seconds: return before 30s → stay unlocked; after 30s → lock
+3. [ ] Never: return after a long wait → stay unlocked
 
-Test each timeout option:
+## Privacy overlay
 
-1. [ ] **Set to "Immediately"**
-   - Background app → Return immediately → Should require passcode
-   
-2. [ ] **Set to "5 Seconds"**
-   - Background app → Return within 3 seconds → Should NOT require passcode
-   - Background app → Wait 6+ seconds → Return → Should require passcode
-   
-3. [ ] **Set to "10 Seconds"**
-   - Background app → Return within 8 seconds → Should NOT require passcode
-   - Background app → Wait 12+ seconds → Return → Should require passcode
-   
-4. [ ] **Set to "15 Seconds"**
-   - Background app → Return within 12 seconds → Should NOT require passcode
-   - Background app → Wait 17+ seconds → Return → Should require passcode
-   
-5. [ ] **Set to "30 Seconds"** (default)
-   - Background app → Return within 20 seconds → Should NOT require passcode
-   - Background app → Wait 35+ seconds → Return → Should require passcode
-   
-6. [ ] **Set to "1 Minute"**
-   - Background app → Return within 50 seconds → Should NOT require passcode
-   - Background app → Wait 65+ seconds → Return → Should require passcode
-   
-7. [ ] **Set to "5 Minutes"**
-   - Background app → Return within 4 minutes → Should NOT require passcode
-   - Background app → Wait 5+ minutes → Return → Should require passcode
-   
-8. [ ] **Set to "Never"**
-   - Background app → Wait any amount of time → Return → Should NOT require passcode
-   - ⚠️ Not recommended for security
+- [ ] App Switcher preview does not show vault contents (lock cover)
 
-## Privacy Overlay Test 🛡️ (NEW!)
+## Biometrics
 
-1. [ ] **App Switcher Privacy**
-   - From main screen, swipe up (or double-tap home) to see app switcher
-   - File Vault preview should show black screen with lock icon
-   - No sensitive content should be visible
+Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face. Prefer a physical device.
 
-## Biometric Authentication Test 🔍
+1. [ ] Settings toggle matches hardware (Face ID or Touch ID)
+2. [ ] After timeout, biometric prompt runs first
+3. [ ] Cancel biometric → passcode/password UI
+4. [ ] Success unlocks the real vault
 
-**⚠️ Important Note:** Biometric authentication has limited functionality on simulator. For full testing, use a physical device with Face ID or Touch ID.
+## Unlock
 
-**For Simulator:**
-1. [ ] Enable Face ID in simulator: **Features → Face ID → Enrolled**
-2. [ ] In Settings, biometric toggle should show warning if not available
-3. [ ] If available, toggle ON and test authentication
-4. [ ] You can simulate Face ID match: **Features → Face ID → Matching Face**
-5. [ ] You can simulate Face ID failure: **Features → Face ID → Non-matching Face**
+1. [ ] Wrong credential → error, fields clear
+2. [ ] Correct credential → tabs
+3. [ ] Fake password (if set) → empty UI, no add, no web server, Settings About only
 
-**For Physical Device:**
-1. [ ] If device has Face ID/Touch ID, toggle should work
-2. [ ] Background app → Wait for timeout → Return
-3. [ ] Should prompt for biometric automatically
-4. [ ] Cancel biometric → Should show passcode screen
-5. [ ] Approve biometric → Should unlock immediately
+## Change authentication
 
-**Console Messages to Check:**
-- Look for: `"DEBUG: Biometrics available"` or `"DEBUG: Biometrics not available"`
-- If not available, check error message in console
+- [ ] Change method in Settings re-encrypts files
+- [ ] Old credential cannot decrypt
+- [ ] Fake password is cleared
 
-## Background/Foreground Test 🔄
+## Files and folders
 
-1. [ ] **Test immediate background**
-   - With timeout set to "30 Seconds" or longer
-   - Press Home button (or swipe up)
-   - Immediately return to app
-   - Should NOT require authentication
+- [ ] Import up to 50 photos/videos; document picker
+- [ ] Nested folders: create, rename, move, delete
+- [ ] Gallery and category search; folder tab has no search
+- [ ] Sort, multi-select, favorite, share, rename, move
+- [ ] Trash restore / empty / disable with contents
 
-2. [ ] **Test timeout**
-   - Press Home button (or swipe up)
-   - Wait for your configured timeout period
-   - Return to app
-   - Should show passcode screen
+## Preview
 
-3. [ ] **Console monitoring**
-   - Watch for: `"DEBUG: App going to background, showing privacy overlay"`
-   - And: `"DEBUG: App coming to foreground, within timeout period - no auth needed"`
+- [ ] Photo pinch, pan, double-tap zoom, swipe between items
+- [ ] Video play/pause, scrubber, ±15s, speed, pinch/double-tap zoom
+- [ ] Audio; PDF; other documents via QuickLook
 
-## Passcode Entry Test 🔐
+## Web upload
 
-1. [ ] **Test wrong passcode**
-   - Enter incorrect passcode
-   - Should show "Incorrect passcode" error
-   - Field should clear
+- [ ] Start server on port 8080; open URL from another device on the same Wi‑Fi
+- [ ] Upload small and large files; optional downloads default off
 
-2. [ ] **Test correct passcode**
-   - Enter correct passcode
-   - Should unlock and show main screen
+## Device security
 
-## Edge Cases Test 🧪
+- [ ] Screenshot: alert appears even if the Settings toggle is off; overlay follows the toggle
+- [ ] Screen recording overlay when that toggle is on
+- [ ] Shake to lock / flip to lock when enabled
 
-1. [ ] **Force quit test**
-   - Double tap home (or swipe up and hold)
-   - Swipe up on app to force quit
-   - Relaunch app
-   - Should require authentication
+## Developer (DEBUG)
 
-2. [ ] **Rotation test** (if iPad or iPhone with rotation)
-   - Rotate device while on passcode screen
-   - UI should adapt properly
+- [ ] Complete App Reset → Security Setup on relaunch
+- [ ] Delete All Files & Folders keeps the credential
 
-## Developer Options Test 🛠️
+## Automated tests
 
-1. [ ] **Settings Reset**
-   - In Settings → Developer Options → Reset App
-   - Confirm → App closes
-   - Relaunch → Should show setup screen
+```sh
+xcodebuild -project "File Vault.xcodeproj" -scheme "File Vault" \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  test -only-testing:"File VaultTests" -parallel-testing-enabled NO
+```
 
-2. [ ] **Quick Reset** (Debug only)
-   - On login screen, long press lock icon for 3 seconds
-   - App closes → Relaunch → Should show setup screen
+- [ ] Unit tests pass serially
+- [ ] UI tests on iPhone and iPad: first-launch auth, tabs, fake vault, add controls
 
-## Known Limitations 📝
-
-These are expected behaviors:
-- Main screen only shows placeholder content
-- No actual photo/video storage yet
-- No ability to change passcode after initial setup
-- Biometric may not work on all simulators
-
-## Troubleshooting 🔧
-
-### Biometric not working
-- Check console for: `"DEBUG: Biometrics not available. Error:"`
-- On simulator: Features → Face ID → Enrolled
-- Try on physical device for full functionality
-
-### Lock timeout not working as expected
-- Check Settings → Auto-Lock setting
-- Verify console shows correct timeout messages
-- Make sure to wait full timeout period + a few seconds
-
-### Privacy overlay not showing
-- Should appear immediately when backgrounding
-- Check console for: `"DEBUG: App going to background, showing privacy overlay"`
-
-## All Tests Complete? ✨
-
-If all tests pass, the core features are working correctly:
-- [ ] All authentication flows work correctly
-- [ ] Lock timeout works as configured
-- [ ] Privacy overlay protects content in app switcher
-- [ ] File storage and import working
-- [ ] Media viewer functioning
-- [ ] Web upload server operational
-- [ ] No crashes or major bugs
-
-Congratulations! The File Vault app is fully functional! 🎉 
+The full OS-upgrade checklist is in [FEATURES.md](FEATURES.md#9-upgrade-verification-checklist).

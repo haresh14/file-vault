@@ -14,8 +14,8 @@
 
 | Field | Value |
 |--------|--------|
-| Last inventoried from source | 2026-09-14 |
-| Last verified against source | 2026-09-14 |
+| Last inventoried from source | 2026-09-16 |
+| Last verified against source | 2026-09-16 |
 | App version (About UI) | 1.0.0 |
 | Marketing version (Xcode) | 1.0 |
 | Bundle ID | `com.haresh.FileVault` |
@@ -32,7 +32,7 @@ File Vault is a **local, encrypted file vault** for iOS. Users store photos, vid
 
 There is **no cloud sync, no App Groups, no widgets, no Share Extension, and no App Intents**. The only network feature is an optional **LAN HTTP server** for browser upload/download on the same Wi‑Fi.
 
-Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `MainTabView`), MVVM ViewModels, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
+Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `AuthenticationCoordinator` → `MainTabView`), MVVM view models, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
 
 ---
 
@@ -67,7 +67,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | Security (Keychain) | Real and fake credentials; `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` |
 | LocalAuthentication | Face ID / Touch ID |
 | PhotosUI | `PHPickerViewController` (images + videos, limit 50) |
-| Photos | Legacy `PHAsset` import path in `FileStorageManager` (not the primary UI path) |
+| Photos | `PHAsset` import path on `FileStorageManager` / `PhotoImportService` (primary UI path is `PHPicker` + `VaultImportService`) |
 | UniformTypeIdentifiers | MIME/UTI mapping; document picker types |
 | AVFoundation / AVKit | Video/audio playback, video thumbnails, player controls, `AVAudioSession` playback category for audio |
 | MediaPlayer | Imported in `AudioPreviewView` but unused (no Now Playing / remote commands) |
@@ -118,7 +118,7 @@ Order of gates in `ContentView`:
 2. Password/passcode set?
 3. Authenticated?
 
-If biometrics are enabled and available, Face ID / Touch ID runs first (0.3s delay). Cancel / failure falls back to `PasscodeView` (numeric OTP UI or alphanumeric password field, depending on auth type). The loading screen `BiometricCheckView` always shows the **Face ID** SF Symbol, even on Touch ID devices. Legacy users with a stored password but no auth type are forced to `.password`.
+If biometrics are enabled and available, Face ID / Touch ID runs first (0.3s delay). Cancel / failure falls back to `PasscodeView` (numeric OTP UI or alphanumeric password field, depending on auth type). The loading screen `BiometricCheckView` always shows the **Face ID** SF Symbol, even on Touch ID devices. Users with a stored password but no auth type are treated as `.password`.
 
 On **every** successful unlock (biometric, real passcode, or fake passcode), `FileStorageManager.setupEncryptionKey(from:)` is called with the **real** Keychain password. Fake login does not derive a different key; it only hides data in the UI.
 
@@ -148,7 +148,7 @@ Every item below is a **must-keep** behavior unless product explicitly drops it.
 | A5 | Store credential | Saved in Keychain, this-device-only, not iCloud Keychain sync | `KeychainManager.savePassword`, service `com.filevault.app`, account `userPassword` | Security.framework |
 | A6 | Unlock with passcode/password | Custom UI, not system passcode sheet | `PasscodeView` | SwiftUI |
 | A7 | Enable Face ID / Touch ID | Settings toggle; disabled if hardware/enrollment unavailable. `LABiometryType` only maps `.faceID` and `.touchID`; any other type (including Optic ID if present) is treated as `.none` | `BiometricAuthManager`, UserDefaults `biometricEnabled` | LocalAuthentication (`LAContext`) |
-| A8 | Biometric unlock | Prompt on foreground if enabled; cancel title **"Use Password"**; `localizedFallbackTitle = ""` (no Enter Password / device-passcode fallback on the biometric policy). Success always sets **real** login | `ContentView.checkBiometricAuthentication` | `LAPolicy.deviceOwnerAuthenticationWithBiometrics` |
+| A8 | Biometric unlock | Prompt on foreground if enabled; cancel title **"Use Password"**; `localizedFallbackTitle = ""` (no Enter Password / device-passcode fallback on the biometric policy). Success always sets **real** login | `AuthenticationCoordinator` | `LAPolicy.deviceOwnerAuthenticationWithBiometrics` |
 | A9 | Biometric lockout | After **3** failures, blocked for **30 seconds** | `maxFailureAttempts`, `failureResetInterval` | LocalAuthentication |
 | A10 | Change authentication | Verify current credential → pick new type → set new credential → re-encrypt all files | `ChangeAuthenticationView`, `MigrationProgressView` | CryptoKit + Core Data |
 | A11 | Auto-lock timeout | Picker: Immediately, 5s, 10s, 15s, 30s, 1 min, 5 min, Never | `KeychainManager.LockTimeout` | Scene phase / UIApplication notifications |
@@ -179,7 +179,7 @@ Fake login does **not** use a second encrypted store. ViewModels return empty li
 | S5 | Flip to lock | Off | Transition into `UIDeviceOrientation.faceDown` → lock | `UIDevice.orientationDidChangeNotification` |
 | S6 | Security logs | — | Last **100** strings in UserDefaults `SecurityLogs` (debug-oriented, not shown in Settings UI) | UserDefaults |
 
-Toggles live in Settings → Advanced Security. **Persistence:** shake and flip write UserDefaults in `enableShakeToLock` / `enableFlipToLock`. Screenshot and recording toggles update in-memory/`@Published` state via `enableScreenshotProtection` / `enableRecordingProtection` but **do not write UserDefaults**; `saveSettings()` exists and is never called from Settings. After relaunch, screenshot/recording fall back to default **on**.
+Toggles live in Settings → Advanced Security. Shake and flip write UserDefaults in `enableShakeToLock` / `enableFlipToLock`. Screenshot and recording toggles update in-memory/`@Published` state via `enableScreenshotProtection` / `enableRecordingProtection` and do not write UserDefaults; `saveSettings()` is unused by Settings. After relaunch, screenshot/recording default to **on**.
 
 ### 4.4 Main navigation
 
@@ -213,13 +213,13 @@ Changing tabs posts `TabDidChange`, which **clears multi-select** in list/grid s
 
 | ID | Feature | Behavior | Apple APIs |
 |----|---------|----------|------------|
-| I1 | Import photos & videos | System photo picker; images **and** videos; **max 50**; `preferredAssetRepresentationMode = .current` | PhotosUI `PHPickerViewController` — **no** `NSPhotoLibraryUsageDescription` (picker is out-of-process) |
+| I1 | Import photos & videos | System photo picker; images **and** videos; **max 50**; `preferredAssetRepresentationMode = .current` | PhotosUI `PHPickerViewController` via `VaultImportService` — **no** `NSPhotoLibraryUsageDescription` (picker is out-of-process) |
 | I2 | Import files | Files app / document picker; multi-select; security-scoped read | `UIDocumentPickerViewController` for `image`, `movie`, `video`, `pdf`, `text`, `data` |
 | I3 | Web import | Browser upload into current/root folder (see 4.11) | Network.framework HTTP |
 | I4 | Duplicate detection | Same `fileSize` + `fileType` in **target folder** → `FileStorageError.duplicateFile` | — |
 | I5 | Name collision | Auto-rename `name (n).ext` | — |
 | I6 | Import progress overlay | Progress UI during gallery/folder imports | `ImportProgressView` |
-| I7 | Thumbnails | Images and videos: 200×200 JPEG @ 0.7; videos get a play overlay | `UIGraphicsImageRenderer`, AVFoundation image generator |
+| I7 | Thumbnails | Images and videos: 200×200 JPEG @ 0.7; videos get a play overlay | `ThumbnailGenerationService`, `UIGraphicsImageRenderer`, AVFoundation image generator |
 
 **Not implemented:** in-app camera / microphone capture (`UIImagePickerController` / `AVCaptureSession` are not used). Import is library + Files + web only.
 
@@ -229,7 +229,7 @@ MIME detection: `FileStorageManager.determineFileType(from:)` by extension; UTI 
 
 | ID | Feature | Behavior | APIs |
 |----|---------|----------|------|
-| O1 | Rename file | Alert; renames encrypted file + thumbnail on disk | `RenameManager` |
+| O1 | Rename file | Alert; renames encrypted file + thumbnail on disk | `FileStorageManager.renameFile` |
 | O2 | Move file | Universal / gallery folder pickers | Core Data relationship |
 | O3 | Favorite | Toggle `isFavorite`; heart in viewer and lists | Core Data |
 | O4 | Share / export | Decrypt to temp file → share sheet | `UIActivityViewController`, `ShareManager`, `prepareForSharing` |
@@ -297,7 +297,7 @@ Playback decrypts to a temporary file; original vault file stays encrypted.
 | W3 | QR code | QR of server URL | Core Image `CIQRCodeGenerator` |
 | W4 | Help / instructions | Same-WiFi upload steps | SwiftUI sheet |
 | W5 | Download toggle | Off by default (`webServerDownloadEnabled`); only while server running | UserDefaults |
-| W6 | Browser UI | Folder browse, breadcrumbs, upload, manage when not fake login | `WebServerHTMLGenerator` |
+| W6 | Browser UI | Folder browse, breadcrumbs, upload, manage when not fake login | `WebServerHTMLGenerator`, `WebServerHTMLComponents` |
 | W7 | Block fake login | UI disabled; HTTP 403 | — |
 | W8 | Background keep-alive | `UIBackgroundTask` named `WebServerUpload` while uploads in flight | UIKit background task |
 | W9 | BG processing stub | Registers `com.haresh.FileVault.upload-processing` | BackgroundTasks |
@@ -351,8 +351,8 @@ Fake login: **About only**.
 
 | ID | Feature | Behavior |
 |----|---------|----------|
-| X1 | Alerts / errors | `AlertView` / `ErrorView` + categorized messages (`ErrorManageable`) |
-| X2 | Sheets | Shared sheet protocol (`SheetManageable`) for pickers |
+| X1 | Alerts | SwiftUI `.alert` on folder, gallery, category, trash, and settings screens; `FolderViewModel` implements `AlertManageable` |
+| X2 | Sheets | SwiftUI `.sheet` / `.fullScreenCover` for pickers, add content, web upload, trash, and auth change |
 | X3 | Dark mode | System SwiftUI colors (`Color(.systemGray6)`, etc.); no custom theme engine |
 | X4 | Orientations | iPhone: portrait + landscape; iPad: all four |
 | X5 | Localization | **English hardcoded strings only** — no `Localizable.strings` |
@@ -493,7 +493,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 **Build**
 
-- [ ] Warn-as-known: deprecations listed in the upgrade plan only
+- [ ] Warn-as-known: deprecations listed in [IOS_27_UPGRADE_PLAN.md](IOS_27_UPGRADE_PLAN.md) only
 - [ ] No new unprotected network endpoints (LAN server remains opt-in and local)
 
 ---
@@ -509,21 +509,20 @@ Recorded so upgrades do not “fix” the wrong thing:
 5. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
 6. Screenshot/recording Settings toggles are not persisted (see §4.3).
 7. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
-8. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
+8. Screenshot detection shows an alert even when screenshot protection is off; only the inactive-state overlay is gated.
 
 ---
 
 ## 11. Open questions (need product confirmation)
 
-If any of these are wrong, say so and this catalog will be updated before an upgrade plan is written:
+If any of these are wrong, say so and this catalog will be corrected:
 
 1. **Fake vault:** Confirm it is intentionally a *UI disguise* (empty lists), not a second encrypted dataset.
 2. **Thumbnails:** Confirm it is acceptable that thumbnails stay unencrypted JPEG in `Documents/Thumbnails`.
 3. **Camera:** Confirm there is no in-app camera and we should not add one during OS upgrades.
 4. **iCloud Backup:** Vault lives in `Documents/`. Do you want vault files excluded from iCloud/computer backup (`isExcludedFromBackup`), or is backup OK?
-5. **Local network permission copy:** If a future iOS requires `NSLocalNetworkUsageDescription`, what user-facing sentence should we show?
-6. **Optic ID / visionOS / Mac Catalyst:** In or out of scope for upcoming upgrades?
-7. **Minimum OS after upgrade:** Keep supporting iOS 18.5, or raise the deployment target to the new OS only?
+5. **Optic ID / visionOS / Mac Catalyst:** In or out of scope for upcoming upgrades?
+6. **Minimum OS after upgrade:** Keep supporting iOS 18.5, or raise the deployment target to the new OS only?
 
 ---
 

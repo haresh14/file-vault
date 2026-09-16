@@ -25,7 +25,7 @@ The full technical inventory (for OS upgrades and regressions) is in [docs/FEATU
 
 Face ID usage text is already set on the target (`NSFaceIDUsageDescription`). Photo library access uses `PHPickerViewController` and does not need `NSPhotoLibraryUsageDescription`.
 
-New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening the project, signing, and troubleshooting. Some privacy steps in that guide are historical — the Face ID key is already in the target Info settings.
+New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening the project, signing, and troubleshooting.
 
 ## Features
 
@@ -72,7 +72,7 @@ File Vault/
 ├── Coordinators/               # Authentication and lock orchestration
 ├── Dependencies/               # DependencyContainer
 ├── Models/                     # Core Data (Folder, VaultItem), protocols
-├── Managers/                   # Compatibility facades plus focused storage, security, web, Core Data services
+├── Managers/                   # Storage, security, web, Core Data
 ├── Services/                   # Shared vault import workflow
 ├── ViewModels/
 ├── Views/                      # Tabs: Folders, Category, Gallery, Web Upload, Settings
@@ -103,10 +103,8 @@ A broader regression list is in [docs/FEATURES.md](docs/FEATURES.md#9-upgrade-ve
 
 ## Current known gaps
 
-These are real implementation issues, not old video-player TODOs:
-
-- Screenshot and screen-recording **toggles are not persisted** across launches (they default back to on).
-- Screenshot **alert still fires** if that protection toggle is off; only the overlay is gated.
+- Screenshot and screen-recording Settings toggles are not written to UserDefaults; they default to on after relaunch.
+- Screenshot detection always shows an alert; the Settings toggle only gates the inactive-state overlay.
 - Folder tab has no search field.
 - No in-app camera capture.
 
@@ -115,4 +113,5 @@ These are real implementation issues, not old video-player TODOs:
 - Feature behavior and OS-upgrade baseline: [docs/FEATURES.md](docs/FEATURES.md)
 - Component graph: [docs/COMPONENT_GRAPH.md](docs/COMPONENT_GRAPH.md)
 - Xcode basics: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
+- Testing checklist: [docs/TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md)
 - Troubleshooting: [docs/DEVELOPER_GUIDE.md#troubleshooting](docs/DEVELOPER_GUIDE.md#troubleshooting)
