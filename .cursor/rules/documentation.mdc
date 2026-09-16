@@ -5,9 +5,9 @@ alwaysApply: true
 
 # Documentation must match the product now
 
-After any change that affects behavior, architecture, public APIs, tests, UI, auth, storage, or networking, update the relevant docs in the same work. If a doc still describes something the code no longer does, fix the doc even if the user did not ask.
+After any change that affects behavior, architecture, public APIs, tests, UI, configuration, or integrations, update the relevant existing docs in the same work. If a doc still describes something the code no longer does, fix the doc even if the user did not ask.
 
-Canonical docs: `README.md`, `docs/FEATURES.md`, `docs/DEVELOPER_GUIDE.md`, `docs/COMPONENT_GRAPH.md`, `docs/TESTING_CHECKLIST.md`. Skip `docs/ios27-baseline-warnings.txt` unless regenerating that baseline.
+Find docs that already exist in the repo (for example `README`, `docs/`, `CONTRIBUTING`, architecture or testing guides). Do not create new doc files unless the user asks. Skip generated or machine-owned artifacts (warning dumps, lockfiles, snapshots) unless the task is to regenerate them.
 
 Do not invent features, TODOs-as-docs, or “coming soon”. If nothing user- or developer-facing changed, leave docs alone.
 
@@ -17,7 +17,7 @@ Docs describe what exists today. They are not release notes, migration notes, or
 
 - Present tense. No “now”, “previously”, “we removed”, “as of this refactor”, “updated to”.
 - If a capability is gone, delete every mention of it. Do not explain that it was removed.
-- If a capability is new, document it as if it has always been part of the app.
+- If a capability is new, document it as if it has always been part of the product.
 - Search all docs for stale names, counts, options, routes, and file paths; remove leftovers.
 
 ```markdown
@@ -30,10 +30,10 @@ First-launch choice: 6-digit passcode or password (minimum 6 characters).
 
 ```markdown
 ❌ BAD
-FileStorageManager was split; EncryptedFileStore now handles ciphertext.
+The storage manager was split; a new file store now handles ciphertext.
 
 ✅ GOOD
-FileStorageManager is the FileStorageManaging facade. EncryptedFileStore reads and writes AES-GCM files under Documents/Vault/.
+The storage manager is the public facade. The encrypted file store reads and writes ciphertext on disk.
 ```
 
-When a list, table, graph, or checklist would still include the deleted thing, rewrite the list so that item is simply absent. Keep FEATURES.md as a current inventory, not an upgrade diary.
+When a list, table, diagram, or checklist would still include the deleted thing, rewrite it so that item is simply absent.
