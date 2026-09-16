@@ -10,6 +10,16 @@ import CoreData
 
 @objc(Folder)
 public class Folder: NSManagedObject {
+
+    public override func awakeFromFetch() {
+        super.awakeFromFetch()
+        VaultMetadataSealer.sealer(for: self)?.reveal(self)
+    }
+
+    public override func awake(fromSnapshotEvents flags: NSSnapshotEventType) {
+        super.awake(fromSnapshotEvents: flags)
+        VaultMetadataSealer.sealer(for: self)?.reveal(self)
+    }
     
     // MARK: - Computed Properties
     

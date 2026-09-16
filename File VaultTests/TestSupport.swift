@@ -6,21 +6,10 @@ import PhotosUI
 
 @MainActor
 enum TestCoreDataStore {
-    static let manager = CoreDataManager(inMemory: true)
-
+    /// Suites run in parallel, so every test gets its own in-memory stack rather than
+    /// sharing one store that other suites can wipe mid-test.
     static func reset() -> CoreDataManager {
-        manager.context.rollback()
-        for entityName in ["VaultItem", "Folder"] {
-            let request = NSFetchRequest<NSManagedObject>(entityName: entityName)
-            if let objects = try? manager.context.fetch(request) {
-                objects.forEach(manager.context.delete)
-            }
-        }
-        if manager.context.hasChanges {
-            try? manager.context.save()
-        }
-        manager.context.reset()
-        return manager
+        CoreDataManager(inMemory: true)
     }
 }
 
@@ -41,7 +30,8 @@ final class IsolatedTestDependencies {
         defaults = UserDefaults(suiteName: defaultsSuiteName)!
         keychainManager = KeychainManager(service: defaultsSuiteName, defaults: defaults)
         securityManager = SecurityManager(defaults: defaults)
-        coreDataManager = TestCoreDataStore.reset()
+        // A private stack per test: the metadata sealer binds to one store at a time.
+        coreDataManager = CoreDataManager(inMemory: true)
 
         rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(defaultsSuiteName, isDirectory: true)

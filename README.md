@@ -61,7 +61,7 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 - Screen recording overlay
 - Optional shake-to-lock and flip-to-lock
 
-Files in `Documents/Vault/` and `Documents/Thumbnails/` are encrypted with **AES-GCM** and stored as UUID filenames (the gallery still shows the original name). The key is **PBKDF2-HMAC-SHA256** of the real credential (random salt in Keychain). Core Data metadata uses Data Protection `completeUntilFirstUserAuthentication`. Credentials and the derivation salt use Keychain `WhenUnlockedThisDeviceOnly`.
+Files in `Documents/Vault/` and `Documents/Thumbnails/` are encrypted with **AES-GCM** and stored as UUID filenames (the gallery still shows the original name). Display names, MIME types, and sizes are sealed JSON in Core Data, decrypted into memory after unlock. The key is **PBKDF2-HMAC-SHA256** of the real credential (random salt in Keychain). Vault directories and `FileVault.sqlite` are excluded from iCloud/computer backup. Credentials and the derivation salt use Keychain `WhenUnlockedThisDeviceOnly`.
 
 ## App structure
 

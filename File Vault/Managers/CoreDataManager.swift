@@ -22,8 +22,17 @@ class CoreDataManager: CoreDataManaging {
         self.inMemory = inMemory
     }
     
+    /// One model instance for every stack, so isolated stores never claim the same entity twice.
+    private static let managedObjectModel: NSManagedObjectModel = {
+        guard let url = Bundle(for: CoreDataManager.self).url(forResource: "FileVault", withExtension: "momd"),
+              let model = NSManagedObjectModel(contentsOf: url) else {
+            fatalError("Unable to load the FileVault managed object model")
+        }
+        return model
+    }()
+
     lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "FileVault")
+        let container = NSPersistentContainer(name: "FileVault", managedObjectModel: CoreDataManager.managedObjectModel)
         
         // Configure store description
         if let storeDescription = container.persistentStoreDescriptions.first {
@@ -31,6 +40,9 @@ class CoreDataManager: CoreDataManaging {
                 storeDescription.type = NSInMemoryStoreType
                 storeDescription.url = URL(fileURLWithPath: "/dev/null")
             }
+
+            storeDescription.shouldMigrateStoreAutomatically = true
+            storeDescription.shouldInferMappingModelAutomatically = true
 
             // Use a less restrictive file protection level that allows Core Data to work properly
             storeDescription.setOption(FileProtectionType.completeUntilFirstUserAuthentication as NSObject, 
@@ -53,6 +65,11 @@ class CoreDataManager: CoreDataManaging {
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             } else {
                 print("DEBUG: Core Data store loaded successfully at: \(storeDescription.url?.path ?? "unknown")")
+                if !self.inMemory, let url = storeDescription.url {
+                    BackupExclusion.excludeFromBackup(url)
+                    BackupExclusion.excludeFromBackup(URL(fileURLWithPath: url.path + "-wal"))
+                    BackupExclusion.excludeFromBackup(URL(fileURLWithPath: url.path + "-shm"))
+                }
             }
         }
         

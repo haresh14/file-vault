@@ -468,6 +468,147 @@ struct FileStorageManagerTests {
         ))
     }
 
+    @Test func testDisplayMetadataIsSealedInStoreAndRestoredInMemory() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "meta-key")
+        let item = try manager.saveFile(
+            data: Data("named".utf8),
+            fileName: "vacation.jpg",
+            fileType: "image/jpeg"
+        )
+
+        #expect(item.fileName == "vacation.jpg")
+        #expect(item.fileType == "image/jpeg")
+        #expect(item.sealedMetadata != nil)
+
+        let stored = try storedValues("fileName", entity: "VaultItem", context: storage.coreDataManager.context)
+        #expect(stored.allSatisfy { $0 == nil })
+
+        storage.coreDataManager.context.refresh(item, mergeChanges: false)
+        #expect(item.fileName == "vacation.jpg")
+        #expect(item.fileType == "image/jpeg")
+        #expect(item.fileSize == Int64(Data("named".utf8).count))
+        #expect(item.sealedMetadata != nil)
+
+        let refetched = storage.coreDataManager.fetchAllVaultItems()
+        #expect(refetched.first?.fileName == "vacation.jpg")
+    }
+
+    @Test func testFolderNameIsSealedInStore() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "folder-meta")
+        let folder = storage.coreDataManager.createFolder(name: "Trip", parent: nil)!
+
+        #expect(folder.name == "Trip")
+        #expect(folder.sealedMetadata != nil)
+
+        let stored = try storedValues("name", entity: "Folder", context: storage.coreDataManager.context)
+        #expect(stored.allSatisfy { $0 == nil })
+
+        storage.coreDataManager.context.refresh(folder, mergeChanges: false)
+        #expect(folder.displayName == "Trip")
+        #expect(folder.sealedMetadata != nil)
+        #expect(storage.coreDataManager.fetchRootFolders().first?.displayName == "Trip")
+    }
+
+    @Test func testLegacyPlaintextMetadataSealsOnUnlock() async throws {
+        let storage = try makeStorage()
+        let item = storage.coreDataManager.createVaultItem(
+            fileName: "legacy-meta.txt",
+            fileType: "text/plain",
+            fileSize: 4
+        )
+        #expect(item.sealedMetadata == nil)
+        #expect(item.fileName == "legacy-meta.txt")
+
+        storage.fileStorageManager.setupEncryptionKey(from: "legacy-meta-key")
+        let stored = try storedValues("fileName", entity: "VaultItem", context: storage.coreDataManager.context)
+        #expect(stored.allSatisfy { $0 == nil })
+
+        storage.coreDataManager.context.refresh(item, mergeChanges: false)
+        #expect(item.fileName == "legacy-meta.txt")
+        #expect(item.sealedMetadata != nil)
+    }
+
+    /// Values decrypted at unlock must survive Core Data turning objects back into faults.
+    @Test func testSealedMetadataSurvivesFaultingAfterUnlock() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "fault-key")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "holiday.png",
+            fileType: "image/png"
+        )
+        let folder = storage.coreDataManager.createFolder(name: "Album", parent: nil)!
+
+        storage.coreDataManager.context.refreshAllObjects()
+
+        #expect(item.fileName == "holiday.png")
+        #expect(item.fileType == "image/png")
+        #expect(item.fileSize > 0)
+        #expect(folder.displayName == "Album")
+        #expect(try manager.loadFile(vaultItem: item).isEmpty == false)
+    }
+
+    /// Guards the cost of decrypting metadata for a large vault on unlock and on a cold fetch.
+    @Test func testSealedMetadataScalesToLargeVaults() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        let context = storage.coreDataManager.context
+        manager.setupEncryptionKey(from: "scale-key")
+
+        let itemCount = 2_000
+        for index in 0..<itemCount {
+            let item = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: context) as! VaultItem
+            item.id = UUID()
+            item.fileName = "photo-\(index).jpg"
+            item.fileType = "image/jpeg"
+            item.fileSize = Int64(index)
+            item.createdAt = Date()
+        }
+        let sealStart = CFAbsoluteTimeGetCurrent()
+        storage.coreDataManager.save()
+        let sealSeconds = CFAbsoluteTimeGetCurrent() - sealStart
+
+        context.reset()
+        let unlockStart = CFAbsoluteTimeGetCurrent()
+        manager.setupEncryptionKey(from: "scale-key")
+        let unlockSeconds = CFAbsoluteTimeGetCurrent() - unlockStart
+
+        let fetchStart = CFAbsoluteTimeGetCurrent()
+        let items = storage.coreDataManager.fetchAllVaultItems()
+        let names = items.compactMap { $0.fileName }
+        let fetchSeconds = CFAbsoluteTimeGetCurrent() - fetchStart
+
+        print("SEAL \(itemCount) items: \(sealSeconds)s, unlock: \(unlockSeconds)s, cold fetch+reveal: \(fetchSeconds)s")
+        #expect(names.count == itemCount)
+        #expect(fetchSeconds < 2.0)
+        #expect(unlockSeconds < 2.0)
+    }
+
+    private func storedValues(_ key: String, entity: String, context: NSManagedObjectContext) throws -> [Any?] {
+        let request = NSFetchRequest<NSDictionary>(entityName: entity)
+        request.resultType = .dictionaryResultType
+        request.propertiesToFetch = [key]
+        request.includesPendingChanges = false
+        return try context.fetch(request).map { $0[key] }
+    }
+
+    @Test func testVaultAndThumbnailDirectoriesAreExcludedFromBackup() async throws {
+        let storage = try makeStorage()
+        let vault = try storage.rootURL
+            .appendingPathComponent("Vault")
+            .resourceValues(forKeys: [.isExcludedFromBackupKey])
+        let thumbs = try storage.rootURL
+            .appendingPathComponent("Thumbnails")
+            .resourceValues(forKeys: [.isExcludedFromBackupKey])
+        #expect(vault.isExcludedFromBackup == true)
+        #expect(thumbs.isExcludedFromBackup == true)
+    }
+
     @Test func testDeleteWithTrashDisabledRemovesBlobAndThumbnail() async throws {
         let storage = try makeStorage()
         let manager = storage.fileStorageManager

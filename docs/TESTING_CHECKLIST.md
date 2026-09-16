@@ -71,6 +71,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Older vault files named after the display name still open after first unlock (they are moved to UUID)
 - [ ] Import a photo: Gallery thumbnail shows; `Documents/Thumbnails/{uuid}.thumb` is not a JPEG on disk
 - [ ] Vault that had plaintext thumbs: first unlock still shows thumbnails (files are rewritten under AES-GCM)
+- [ ] After unlock, Gallery search still matches the original filename
+- [ ] Lock the device, inspect `FileVault.sqlite` (or a Core Data dump): `fileName` / folder `name` are empty; `sealedMetadata` is present
+- [ ] `Documents/Vault`, `Documents/Thumbnails`, and `FileVault.sqlite` have “Do not back up” set
 
 ## Files and folders
 

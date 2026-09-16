@@ -26,6 +26,8 @@ class FileStorageManager: FileStorageManaging {
     private let temporarySharingService: TemporarySharingService
     private let encryptedFileStore: EncryptedFileStore
     private let encryptedThumbnailStore: EncryptedFileStore
+    private let metadataSealer: VaultMetadataSealer
+    private var saveObservers: [NSObjectProtocol] = []
     private let photoImportService = PhotoImportService()
     
     // Encryption key derived from user's passcode
@@ -75,6 +77,7 @@ class FileStorageManager: FileStorageManaging {
             vaultDirectory: thumbnailsDirectory,
             cryptoService: cryptoService
         )
+        metadataSealer = VaultMetadataSealer(cryptoService: cryptoService)
         thumbnailService = ThumbnailGenerationService(
             fileManager: fileManager,
             thumbnailStore: encryptedThumbnailStore
@@ -112,6 +115,12 @@ class FileStorageManager: FileStorageManaging {
         
         // Set file protection
         setFileProtection()
+        metadataSealer.attach(to: coreDataManager.context.persistentStoreCoordinator)
+        registerMetadataSaveHooks()
+    }
+
+    deinit {
+        saveObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
     
     private func setFileProtection() {
@@ -124,6 +133,27 @@ class FileStorageManager: FileStorageManaging {
             [.protectionKey: FileProtectionType.complete],
             ofItemAtPath: thumbnailsDirectory.path
         )
+        BackupExclusion.excludeFromBackup(vaultDirectory)
+        BackupExclusion.excludeFromBackup(thumbnailsDirectory)
+    }
+
+    private func registerMetadataSaveHooks() {
+        let center = NotificationCenter.default
+        saveObservers.append(center.addObserver(
+            forName: .NSManagedObjectContextWillSave,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let context = notification.object as? NSManagedObjectContext else { return }
+            self?.metadataSealer.prepareForSave(context)
+        })
+        saveObservers.append(center.addObserver(
+            forName: .NSManagedObjectContextDidSave,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            self?.metadataSealer.restoreAfterSave(from: notification)
+        })
     }
     
     // MARK: - Encryption Key Management
@@ -143,6 +173,12 @@ class FileStorageManager: FileStorageManaging {
                 print("DEBUG: Failed to store key derivation record: \(error)")
                 encryptionKey = cryptoService.legacySHA256Key(from: password)
             }
+        }
+        // Metadata must be readable before the on-disk migrations inspect stored names.
+        metadataSealer.key = encryptionKey
+        metadataSealer.revealLazily(in: coreDataManager.context)
+        if metadataSealer.sealLegacyPlaintext(in: coreDataManager.context) {
+            coreDataManager.save()
         }
         migrateOnDiskNamesToUUID()
         encryptPlaintextThumbnails()
@@ -182,6 +218,13 @@ class FileStorageManager: FileStorageManaging {
 
         try keyDerivationStore.saveRecord(newRecord)
         encryptionKey = newKey
+        metadataSealer.reencryptAll(
+            items: coreDataManager.fetchAllVaultItems(),
+            folders: coreDataManager.fetchAllFolders(),
+            oldKey: oldKey,
+            newKey: newKey
+        )
+        coreDataManager.save()
         
         print("DEBUG: File migration completed successfully")
     }
@@ -219,6 +262,13 @@ class FileStorageManager: FileStorageManaging {
         do {
             try keyDerivationStore.saveRecord(record)
             encryptionKey = newKey
+            metadataSealer.key = newKey
+            metadataSealer.reencryptAll(
+                items: coreDataManager.fetchAllVaultItems(),
+                folders: coreDataManager.fetchAllFolders(),
+                oldKey: oldKey,
+                newKey: newKey
+            )
             print("DEBUG: Upgraded vault key derivation to PBKDF2")
         } catch {
             print("DEBUG: Failed to save PBKDF2 derivation record: \(error)")
@@ -822,6 +872,7 @@ extension FileStorageManager {
         print("DEBUG: Clearing all stored files...")
         emptyStorageDirectories()
         encryptionKey = nil
+        metadataSealer.key = nil
         print("DEBUG: All stored files cleared")
     }
     
@@ -842,6 +893,7 @@ extension FileStorageManager {
 
         setFileProtection()
         encryptionKey = nil
+        metadataSealer.key = nil
 
         print("DEBUG: All storage directories deleted")
     }

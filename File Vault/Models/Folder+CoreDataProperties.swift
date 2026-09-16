@@ -17,6 +17,7 @@ extension Folder {
     @NSManaged public var createdAt: Date?
     @NSManaged public var id: UUID?
     @NSManaged public var name: String?
+    @NSManaged public var sealedMetadata: Data?
     @NSManaged public var updatedAt: Date?
     @NSManaged public var items: NSSet?
     @NSManaged public var parent: Folder?

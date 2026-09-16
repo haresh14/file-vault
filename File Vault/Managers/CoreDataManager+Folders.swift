@@ -72,9 +72,9 @@ extension CoreDataManager {
     private func fetchFolders(predicate: NSPredicate?) -> [Folder] {
         let request = NSFetchRequest<Folder>(entityName: "Folder")
         request.predicate = predicate
-        request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
         do {
-            return try context.fetch(request)
+            // Names are sealed in the store, so sort the decrypted values instead.
+            return try context.fetch(request).sorted { $0.displayName.localizedCompare($1.displayName) == .orderedAscending }
         } catch {
             print("Error fetching folders: \(error)")
             return []

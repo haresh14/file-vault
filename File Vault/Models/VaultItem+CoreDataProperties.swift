@@ -23,6 +23,7 @@ extension VaultItem {
     @NSManaged public var isTrashed: Bool
     @NSManaged public var trashedAt: Date?
     @NSManaged public var thumbnailFileName: String?
+    @NSManaged public var sealedMetadata: Data?
     @NSManaged public var updatedAt: Date?
     @NSManaged public var folder: Folder?
     

@@ -49,7 +49,7 @@ flowchart TB
     end
 
     subgraph Persist["Persistence"]
-        SQLite["FileVault.sqlite"]
+        SQLite["FileVault.sqlite (sealed metadata JSON)"]
         VaultDir["Documents/Vault (AES-GCM, UUID names)"]
         Thumbs["Documents/Thumbnails (AES-GCM, {uuid}.thumb)"]
         Keychain["Keychain (credential + PBKDF2 salt)"]
@@ -217,6 +217,7 @@ flowchart TB
     FSM --> Photos["PhotoImportService"]
     FSM --> Trash["TrashOperationsService"]
     FSM --> Share["TemporarySharingService"]
+    FSM --> Meta["VaultMetadataSealer"]
     Store --> Crypto
     Thumbs --> Store
     KDF --> Keychain["Keychain vaultKeyDerivation"]

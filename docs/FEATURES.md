@@ -87,19 +87,19 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 |--------------|------------|-------------------|
 | `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
 | `Documents/Thumbnails/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes named `{uuid}.thumb` (200×200 JPEG @ 0.7 before encryption) |
-| `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | No (metadata in plaintext Core Data) |
+| `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | Display names, MIME types, and sizes are AES-GCM sealed JSON on each row (`sealedMetadata`). Search uses the decrypted copies in RAM after unlock. The store, `Documents/Vault/`, and `Documents/Thumbnails/` are excluded from iCloud/computer backup. |
 | Keychain items `com.filevault.app` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
 | UserDefaults | Standard suite | Settings, auth type, lock timeout, trash flag, security logs, biometric enabled |
 
 **Encryption details**
 
 - Key = PBKDF2-HMAC-SHA256 of the real credential (210,000 iterations, 16-byte random salt, 32-byte key). Salt and parameters live in Keychain account `vaultKeyDerivation` (`WhenUnlockedThisDeviceOnly`).
-- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files and thumbnails.
-- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped.
+- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files, thumbnails, and Core Data `sealedMetadata` JSON.
+- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped. Item and folder metadata blobs are re-sealed with the new key.
 - If ciphertext exists but no derivation record is in Keychain, unlock derives a SHA-256 key long enough to open those files, then re-encrypts them with PBKDF2 and stores a salt.
-- Duplicate display names in a folder get a suffix (`name (n).ext`). Each item has its own UUID blob on disk.
+- Duplicate display names in a folder get a suffix (`name (n).ext`). Each item has its own UUID blob on disk. Display name, MIME type, and size live in sealed JSON; gallery search filters decrypted `fileName` values in memory.
 - Permanent delete removes the item's ciphertext and thumbnail from disk. Unlock also deletes vault files and thumbnails that no item claims; the sweep is skipped when the vault has no items.
-- Unlock encrypts leftover plaintext JPEG thumbnails in place with the vault key.
+- Unlock encrypts leftover plaintext JPEG thumbnails in place with the vault key, and seals leftover plaintext Core Data names into `sealedMetadata`.
 
 ---
 
@@ -376,7 +376,8 @@ Fake login: **About only**.
 | Attribute | Type |
 |-----------|------|
 | id | UUID |
-| name | String |
+| name | String (empty at rest; decrypted into RAM after unlock) |
+| sealedMetadata | Binary (AES-GCM JSON `{name}`) |
 | createdAt, updatedAt | Date |
 | items | to-many VaultItem, **cascade** delete |
 | parent | to-one Folder, **nullify** |
@@ -387,8 +388,9 @@ Fake login: **About only**.
 | Attribute | Type |
 |-----------|------|
 | id | UUID |
-| fileName, fileType, thumbnailFileName | String |
-| fileSize | Int64 |
+| fileName, fileType, thumbnailFileName | String (empty at rest; decrypted into RAM after unlock) |
+| fileSize | Int64 (0 at rest; decrypted into RAM after unlock) |
+| sealedMetadata | Binary (AES-GCM JSON of name, MIME, size, thumbnail filename) |
 | isFavorite, isTrashed | Bool (default false) |
 | createdAt, updatedAt, trashedAt | Date |
 | folder | to-one Folder, **nullify** |
@@ -526,9 +528,8 @@ If any of these are wrong, say so and this catalog will be corrected:
 
 1. **Fake vault:** Confirm it is intentionally a *UI disguise* (empty lists), not a second encrypted dataset.
 2. **Camera:** Confirm there is no in-app camera and we should not add one during OS upgrades.
-3. **iCloud Backup:** Vault lives in `Documents/`. Do you want vault files excluded from iCloud/computer backup (`isExcludedFromBackup`), or is backup OK?
-4. **Optic ID / visionOS / Mac Catalyst:** In or out of scope for upcoming upgrades?
-5. **Minimum OS after upgrade:** Keep supporting iOS 18.5, or raise the deployment target to the new OS only?
+3. **Optic ID / visionOS / Mac Catalyst:** In or out of scope for upcoming upgrades?
+4. **Minimum OS after upgrade:** Keep supporting iOS 18.5, or raise the deployment target to the new OS only?
 
 ---
 
