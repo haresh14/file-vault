@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 
 /// Protocol for managing selection state in views that support multi-selection
+@MainActor
 protocol SelectionManageable: ObservableObject {
     associatedtype SelectableItem: Hashable
     

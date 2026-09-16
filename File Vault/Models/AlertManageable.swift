@@ -89,6 +89,7 @@ struct AlertAction {
 }
 
 /// Protocol for managing alert presentation in ViewModels
+@MainActor
 protocol AlertManageable: ObservableObject {
     /// Current alert to be presented
     var currentAlert: AlertType? { get set }

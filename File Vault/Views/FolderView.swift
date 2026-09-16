@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct FolderView: View {
     @State private var navigationPath = NavigationPath()

@@ -14,6 +14,7 @@ struct FileVaultApp: App {
     let dependencies = DependencyContainer.shared
     
     init() {
+        configureUITestingStateIfNeeded()
         // Handle background URLSession events
         setupBackgroundURLSessionHandling()
     }
@@ -47,5 +48,26 @@ struct FileVaultApp: App {
         // For SwiftUI apps, we need to handle it differently
         // Initialize the BackgroundUploadManager to ensure it's ready
         _ = BackgroundUploadManager.shared
+    }
+
+    private func configureUITestingStateIfNeeded() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing") else { return }
+
+        AppDataManager.shared.clearAllAppData()
+
+        if arguments.contains("--ui-testing-first-launch") {
+            UserDefaults.standard.removeObject(forKey: "hasLaunchedBefore")
+            return
+        }
+
+        try? KeychainManager.shared.savePassword("1234")
+        KeychainManager.shared.setAuthenticationType(.passcode4)
+        KeychainManager.shared.setBiometricEnabled(false)
+        KeychainManager.shared.setLockTimeout(KeychainManager.LockTimeout.never.rawValue)
+        if arguments.contains("--ui-testing-fake-login") {
+            try? KeychainManager.shared.saveFakePassword("9876")
+        }
+        AppDataManager.shared.markAppAsLaunched()
     }
 }

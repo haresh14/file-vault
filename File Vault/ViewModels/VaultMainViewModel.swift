@@ -12,6 +12,7 @@ import PhotosUI
 import CoreData
 
 /// ViewModel for VaultMainView following MVVM architecture and protocol-oriented design
+@MainActor
 final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportManageable, MediaViewerManageable, SearchManageable {
     // MARK: - Published Properties
     
@@ -50,6 +51,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     // MARK: - Dependencies
     private let coreDataManager: CoreDataManaging
     private let fileStorageManager: FileStorageManaging
+    private let importService: VaultImportServicing
     private let loginStateManager: any LoginStateManaging
     private var cancellables = Set<AnyCancellable>()
     
@@ -86,10 +88,12 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     init(
         coreDataManager: CoreDataManaging = CoreDataManager.shared,
         fileStorageManager: FileStorageManaging = FileStorageManager.shared,
+        importService: VaultImportServicing? = nil,
         loginStateManager: any LoginStateManaging = LoginStateManager.shared
     ) {
         self.coreDataManager = coreDataManager
         self.fileStorageManager = fileStorageManager
+        self.importService = importService ?? VaultImportService(fileStorageManager: fileStorageManager)
         self.loginStateManager = loginStateManager
         
         setupBindings()
@@ -101,6 +105,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         self.init(
             coreDataManager: dependencies.coreDataManager,
             fileStorageManager: dependencies.fileStorageManager,
+            importService: dependencies.vaultImportService,
             loginStateManager: dependencies.loginStateManager
         )
     }
@@ -122,7 +127,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
             .store(in: &cancellables)
         
         // Reload when refresh notification is posted
-        NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))
+        NotificationCenter.default.publisher(for: .refreshVaultItems)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.loadVaultItems()
@@ -131,7 +136,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
             .store(in: &cancellables)
         
         // Reset selection mode when tab changes
-        NotificationCenter.default.publisher(for: Notification.Name("TabDidChange"))
+        NotificationCenter.default.publisher(for: .tabDidChange)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     if self?.isSelectionMode == true {
@@ -214,58 +219,17 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         
         showPhotoPicker = false
         startImport()
-        
-        let totalItems = Double(results.count)
-        let processedItemsQueue = DispatchQueue(label: "importProgress", attributes: .concurrent)
-        let processedItemsGroup = DispatchGroup()
-        var processedCount = 0.0
-        
-        for result in results {
-            processedItemsGroup.enter()
-            
-            // Handle images
-            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
-                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
-                    defer { processedItemsGroup.leave() }
-                    
-                    self?.processImageImport(image: image) { success in
-                        processedItemsQueue.async(flags: .barrier) {
-                            processedCount += 1
-                            DispatchQueue.main.async { [weak self] in
-                                self?.updateProgress(completed: processedCount, total: totalItems)
-                            }
-                        }
-                    }
+
+        importService.importAssets(
+            results,
+            targetFolder: nil,
+            progress: { [weak self] completed, total in
+                DispatchQueue.main.async {
+                    self?.updateProgress(completed: completed, total: total)
                 }
-            }
-            // Handle videos
-            else if result.itemProvider.hasItemConformingToTypeIdentifier("public.movie") {
-                result.itemProvider.loadFileRepresentation(forTypeIdentifier: "public.movie") { [weak self] url, error in
-                    defer { processedItemsGroup.leave() }
-                    
-                    self?.processVideoImport(url: url) { success in
-                        processedItemsQueue.async(flags: .barrier) {
-                            processedCount += 1
-                            DispatchQueue.main.async { [weak self] in
-                                self?.updateProgress(completed: processedCount, total: totalItems)
-                            }
-                        }
-                    }
-                }
-            } else {
-                processedItemsQueue.async(flags: .barrier) {
-                    processedCount += 1
-                    DispatchQueue.main.async { [weak self] in
-                        self?.updateProgress(completed: processedCount, total: totalItems)
-                    }
-                }
-                processedItemsGroup.leave()
-            }
-        }
-        
-        processedItemsGroup.notify(queue: .main) { [weak self] in
-            self?.finishImportWithDataReload()
-        }
+            },
+            completion: { [weak self] in self?.finishImportWithDataReload() }
+        )
     }
     
     func importDocuments(_ dataArray: [(Data, String)]) {
@@ -273,95 +237,23 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         
         showDocumentPicker = false
         startImport()
-        
-        let totalItems = Double(dataArray.count)
-        var processedItems = 0.0
-        
-        for (data, fileName) in dataArray {
-            do {
-                let fileType = fileStorageManager.determineFileType(from: fileName)
-                _ = try fileStorageManager.saveFile(
-                    data: data,
-                    fileName: fileName,
-                    fileType: fileType,
-                    targetFolder: nil
-                )
-                
-                print("Successfully imported file: \(fileName)")
-            } catch FileStorageError.duplicateFile {
-                print("Skipped duplicate file: \(fileName)")
-            } catch {
-                print("Error importing file \(fileName): \(error)")
-            }
-            
-            DispatchQueue.main.async { [weak self] in
-                processedItems += 1
-                self?.updateProgress(completed: processedItems, total: totalItems)
-                
-                if processedItems == totalItems {
+
+        importService.importDocuments(
+            dataArray,
+            targetFolder: nil,
+            progress: { [weak self] completed, total in
+                // Keep gallery document progress asynchronous as before.
+                DispatchQueue.main.async {
+                    self?.updateProgress(completed: completed, total: total)
+                }
+            },
+            completion: { [weak self] in
+                // Enqueued after progress callbacks to preserve completion timing.
+                DispatchQueue.main.async {
                     self?.finishImportWithDataReload()
                 }
             }
-        }
-    }
-    
-    // MARK: - Import Helper Methods
-    
-    private func processImageImport(image: Any?, completion: @escaping (Bool) -> Void) {
-        guard let uiImage = image as? UIImage else {
-            completion(false)
-            return
-        }
-        
-        guard let imageData = uiImage.jpegData(compressionQuality: 1.0) ?? uiImage.pngData() else {
-            completion(false)
-            return
-        }
-        
-        let fileName = "Photo.jpg" // Will be resolved to unique name by FileStorageManager
-        let fileType = "image/jpeg"
-        
-        do {
-            _ = try fileStorageManager.saveFile(
-                data: imageData,
-                fileName: fileName,
-                fileType: fileType,
-                targetFolder: nil
-            )
-            completion(true)
-        } catch FileStorageError.duplicateFile {
-            print("Skipped duplicate image")
-            completion(true) // Count as successful since we're skipping duplicates
-        } catch {
-            print("Error saving image: \(error)")
-            completion(false)
-        }
-    }
-    
-    private func processVideoImport(url: URL?, completion: @escaping (Bool) -> Void) {
-        guard let url = url else {
-            completion(false)
-            return
-        }
-        
-        do {
-            let data = try Data(contentsOf: url)
-            let fileName = "Video.mov" // Will be resolved to unique name by FileStorageManager
-            
-            _ = try fileStorageManager.saveFile(
-                data: data,
-                fileName: fileName,
-                fileType: "video/quicktime",
-                targetFolder: nil
-            )
-            completion(true)
-        } catch FileStorageError.duplicateFile {
-            print("Skipped duplicate video")
-            completion(true) // Count as successful since we're skipping duplicates
-        } catch {
-            print("Error saving video: \(error)")
-            completion(false)
-        }
+        )
     }
     
     func finishImportWithDataReload() {
@@ -412,7 +304,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         exitSelectionMode()
         
         // Post notification to refresh other views
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
         
         loadVaultItems()
     }
@@ -430,7 +322,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         exitSelectionMode()
         
         // Post notification to refresh other views
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
         
         loadVaultItems()
     }
@@ -491,7 +383,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
         fileStorageManager.toggleFavorite(for: item)
         
         // Post notification to refresh other views
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
         
         loadVaultItems()
     }
@@ -504,7 +396,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
     
     func toggleFavoriteSelectedItems() {
         for item in selectedItems {
-            FileStorageManager.shared.toggleFavorite(for: item)
+            fileStorageManager.toggleFavorite(for: item)
         }
         exitSelectionMode()
         loadVaultItems()

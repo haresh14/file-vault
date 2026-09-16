@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 
 /// View-model backing FolderContentView, responsible for loading folders & files,
 /// sorting, selection, CRUD, and import operations.
+@MainActor
 final class FolderViewModel: ObservableObject, SelectionManageable, ImportManageable, MediaViewerManageable, AlertManageable {
     // MARK: - Published State
     @Published private(set) var folders: [Folder] = []
@@ -58,6 +59,9 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
 
     // MARK: - Dependencies
     private let folder: Folder?
+    private let coreDataManager: CoreDataManaging
+    private let fileStorageManager: FileStorageManaging
+    private let importService: VaultImportServicing
     private let loginStateManager: any LoginStateManaging
     private var cancellables = Set<AnyCancellable>()
     
@@ -90,8 +94,17 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         )
     }
 
-    init(folder: Folder?, loginStateManager: any LoginStateManaging = LoginStateManager.shared) {
+    init(
+        folder: Folder?,
+        coreDataManager: CoreDataManaging = CoreDataManager.shared,
+        fileStorageManager: FileStorageManaging = FileStorageManager.shared,
+        importService: VaultImportServicing? = nil,
+        loginStateManager: any LoginStateManaging = LoginStateManager.shared
+    ) {
         self.folder = folder
+        self.coreDataManager = coreDataManager
+        self.fileStorageManager = fileStorageManager
+        self.importService = importService ?? VaultImportService(fileStorageManager: fileStorageManager)
         self.loginStateManager = loginStateManager
         loadContent()
 
@@ -101,7 +114,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
             .store(in: &cancellables)
         
         // Reset selection mode when tab changes
-        NotificationCenter.default.publisher(for: Notification.Name("TabDidChange"))
+        NotificationCenter.default.publisher(for: .tabDidChange)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     if self?.isSelectionMode == true {
@@ -113,6 +126,16 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     }
 
     deinit { cancellables.forEach { $0.cancel() } }
+
+    convenience init(folder: Folder?, dependencies: DependencyContainer) {
+        self.init(
+            folder: folder,
+            coreDataManager: dependencies.coreDataManager,
+            fileStorageManager: dependencies.fileStorageManager,
+            importService: dependencies.vaultImportService,
+            loginStateManager: dependencies.loginStateManager
+        )
+    }
 
     // MARK: - Derived Collections
     var sortedFolders: [Folder] {
@@ -158,10 +181,10 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
 
     func moveSelectedItems(to destination: Folder?) {
         for folder in selectedFolders {
-            CoreDataManager.shared.moveFolder(folder, to: destination)
+            coreDataManager.moveFolder(folder, to: destination)
         }
         for file in selectedFiles {
-            CoreDataManager.shared.moveVaultItem(file, to: destination)
+            coreDataManager.moveVaultItem(file, to: destination)
         }
         exitSelectionMode()
         notifyRefresh()
@@ -169,10 +192,10 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
 
     func deleteSelectedItems() {
         for folder in selectedFolders {
-            CoreDataManager.shared.deleteFolderCompletely(folder)
+            coreDataManager.deleteFolderCompletely(folder)
         }
         for file in selectedFiles {
-            try? FileStorageManager.shared.deleteFile(vaultItem: file)
+            try? fileStorageManager.deleteFile(vaultItem: file)
         }
         exitSelectionMode()
         notifyRefresh()
@@ -192,13 +215,9 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
             return
         }
         
-        do {
-            _ = CoreDataManager.shared.createFolder(name: trimmedName, parent: folder)
-            loadContent()
-            newFolderName = "" // Clear input
-        } catch {
-            showError(message: "Failed to create folder: \(error.localizedDescription)", recovery: nil)
-        }
+        _ = coreDataManager.createFolder(name: trimmedName, parent: folder)
+        loadContent()
+        newFolderName = "" // Clear input
     }
 
     func renameFolder(_ folder: Folder, to newName: String) {
@@ -215,75 +234,43 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
             return
         }
         
-        do {
-            CoreDataManager.shared.updateFolder(folder, name: trimmedName)
-            loadContent()
-            renameText = "" // Clear input
-            folderToRename = nil
-        } catch {
-            showError(message: "Failed to rename folder: \(error.localizedDescription)", recovery: nil)
-        }
+        coreDataManager.updateFolder(folder, name: trimmedName)
+        loadContent()
+        renameText = "" // Clear input
+        folderToRename = nil
     }
 
     // MARK: - Imports
     func importDocuments(_ dataArray: [(Data, String)]) {
         guard !dataArray.isEmpty else { return }
-        isImporting = true; importProgress = 0
-        let total = Double(dataArray.count)
-        var processed = 0.0
-        for (data, fileName) in dataArray {
-            do {
-                let fileType = FileStorageManager.shared.determineFileType(from: fileName)
-                _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: fileType, targetFolder: folder)
-                print("Successfully imported file: \(fileName)")
-            } catch FileStorageError.duplicateFile {
-                print("Skipped duplicate file: \(fileName)")
-            } catch {
-                print("Error importing file \(fileName): \(error)")
-            }
-            processed += 1
-            importProgress = processed / total
-        }
-        isImporting = false
-        loadContent()
+        showDocumentPicker = false
+        startImport()
+        importService.importDocuments(
+            dataArray,
+            targetFolder: folder,
+            progress: { [weak self] completed, total in
+                self?.updateProgress(completed: completed, total: total)
+            },
+            completion: { [weak self] in self?.finishImportingAssets() }
+        )
     }
 
     func importAssets(_ results: [PHPickerResult]) {
         guard !results.isEmpty else { return }
-        isImporting = true
-        importProgress = 0
-        let total = Double(results.count)
-        var processed = 0.0
-        for result in results {
-            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
-                result.itemProvider.loadObject(ofClass: UIImage.self) { image, _ in
-                    guard let uiImage = image as? UIImage else { updateProgress(); return }
-                    guard let data = uiImage.jpegData(compressionQuality: 1.0) ?? uiImage.pngData() else { updateProgress(); return }
-                    let fileName = "Photo.jpg" // Will be resolved to unique name by FileStorageManager
-                    do {
-                        _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: "image/jpeg", targetFolder: self.folder)
-                    } catch { print("Error saving image: \(error)") }
-                    updateProgress()
+        showPhotoPicker = false
+        startImport()
+        importService.importAssets(
+            results,
+            targetFolder: folder,
+            progress: { [weak self] completed, total in
+                DispatchQueue.main.async {
+                    self?.updateProgress(completed: completed, total: total)
                 }
-            } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, _ in
-                    guard let url = url else { updateProgress(); return }
-                    do {
-                        let data = try Data(contentsOf: url)
-                        let fileName = "Video.mov" // Will be resolved to unique name by FileStorageManager
-                        _ = try FileStorageManager.shared.saveFile(data: data, fileName: fileName, fileType: "video/quicktime", targetFolder: self.folder)
-                    } catch { print("Error saving video: \(error)") }
-                    updateProgress()
-                }
-            } else { updateProgress() }
-        }
-        func updateProgress() {
-            DispatchQueue.main.async {
-                processed += 1
-                self.importProgress = processed / total
-                if processed == total { self.isImporting = false; self.loadContent() }
+            },
+            completion: { [weak self] in
+                self?.finishImportingAssets()
             }
-        }
+        )
     }
 
     // Remove or adjust finishImportingAssets if no longer needed
@@ -294,7 +281,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
 
     // MARK: - Helpers
     private func notifyRefresh() {
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
         loadContent()
     }
 
@@ -310,8 +297,8 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
             folders = folder.subfoldersArray
             files = folder.itemsArray
         } else {
-            folders = CoreDataManager.shared.fetchRootFolders()
-            files = CoreDataManager.shared.fetchVaultItems(in: nil)
+            folders = coreDataManager.fetchRootFolders()
+            files = coreDataManager.fetchVaultItems(in: nil)
         }
     }
 
@@ -337,7 +324,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     // Toggle favorite for selected files
     func toggleFavoriteSelectedFiles() {
         for item in selectedFiles {
-            FileStorageManager.shared.toggleFavorite(for: item)
+            fileStorageManager.toggleFavorite(for: item)
         }
         exitSelectionMode()
         loadContent()
@@ -452,21 +439,6 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
         showRenameFolder = true
     }
     
-    /// Prepare deletion alert for selected items
-    func prepareDeleteAlert() {
-        let totalCount = selectionCount
-        let itemType = totalCount == 1 ? 
-            (selectedFolders.isEmpty ? "file" : "folder") : "items"
-        
-        showDeleteConfirmation(
-            itemCount: totalCount,
-            itemType: itemType,
-            onConfirm: { [weak self] in
-                self?.deleteSelectedItems()
-            }
-        )
-    }
-    
     /// Prepare swipe delete alert for specific items
     func prepareSwipeDeleteAlert(for items: [Any]) {
         itemsToDelete = items
@@ -485,9 +457,9 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     func performSwipeDelete() {
         for item in itemsToDelete {
             if let folder = item as? Folder {
-                CoreDataManager.shared.deleteFolderCompletely(folder)
+                coreDataManager.deleteFolderCompletely(folder)
             } else if let file = item as? VaultItem {
-                try? FileStorageManager.shared.deleteFile(vaultItem: file)
+                try? fileStorageManager.deleteFile(vaultItem: file)
             }
         }
         itemsToDelete.removeAll()

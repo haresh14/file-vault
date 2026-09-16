@@ -10,6 +10,7 @@ import SwiftUI
 import Combine
 
 /// Protocol for managing search functionality in ViewModels
+@MainActor
 protocol SearchManageable: ObservableObject {
     associatedtype SearchableItem
     

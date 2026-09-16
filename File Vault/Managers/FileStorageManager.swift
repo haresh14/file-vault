@@ -7,19 +7,24 @@
 
 import Foundation
 import CryptoKit
-import UIKit
-import AVFoundation
 import Photos
-import UniformTypeIdentifiers
 import CoreData
 
 class FileStorageManager: FileStorageManaging {
     static let shared = FileStorageManager()
     
-    private let fileManager = FileManager.default
-    private let documentsDirectory: URL
-    private let vaultDirectory: URL
-    private let thumbnailsDirectory: URL
+    let fileManager: FileManager
+    let coreDataManager: CoreDataManager
+    let documentsDirectory: URL
+    let vaultDirectory: URL
+    let thumbnailsDirectory: URL
+    private let mimeTypeMapper = MIMETypeMapper()
+    private let cryptoService = VaultCryptoService()
+    private let thumbnailService: ThumbnailGenerationService
+    private let trashService: TrashOperationsService
+    private let temporarySharingService: TemporarySharingService
+    private let encryptedFileStore: EncryptedFileStore
+    private let photoImportService = PhotoImportService()
     
     // Encryption key derived from user's passcode
     private var encryptionKey: SymmetricKey?
@@ -27,107 +32,46 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - Helper Functions
     
     func determineFileType(from fileName: String) -> String {
-        let fileExtension = (fileName as NSString).pathExtension.lowercased()
-        
-        switch fileExtension {
-        case "jpg", "jpeg":
-            return "image/jpeg"
-        case "png":
-            return "image/png"
-        case "heic", "heif":
-            return "image/heic"
-        case "gif":
-            return "image/gif"
-        case "tiff", "tif":
-            return "image/tiff"
-        case "webp":
-            return "image/webp"
-        case "mp4":
-            return "video/mp4"
-        case "mov":
-            return "video/quicktime"
-        case "m4v":
-            return "video/x-m4v"
-        case "mkv":
-            return "video/x-matroska"
-        case "avi":
-            return "video/x-msvideo"
-        case "webm":
-            return "video/webm"
-        case "flv":
-            return "video/x-flv"
-        case "wmv":
-            return "video/x-ms-wmv"
-        case "3gp":
-            return "video/3gpp"
-        case "mp3":
-            return "audio/mpeg"
-        case "wav":
-            return "audio/wav"
-        case "m4a":
-            return "audio/mp4"
-        case "aac":
-            return "audio/aac"
-        case "pdf":
-            return "application/pdf"
-        case "txt":
-            return "text/plain"
-        case "doc":
-            return "application/msword"
-        case "docx":
-            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        default:
-            return "application/octet-stream"
-        }
+        mimeTypeMapper.mimeType(forFileName: fileName)
     }
     
     private func convertUTIToMimeType(_ uti: String) -> String {
-        print("DEBUG: Converting UTI: \(uti)")
-        
-        // Handle common image UTIs
-        switch uti {
-        case "public.jpeg", "public.jpg":
-            return "image/jpeg"
-        case "public.png":
-            return "image/png"
-        case "public.heic", "public.heif":
-            return "image/heic"
-        case "public.tiff":
-            return "image/tiff"
-        case "public.gif":
-            return "image/gif"
-        case "public.mpeg-4", "public.mp4":
-            return "video/mp4"
-        case "public.quicktime-movie", "public.mov":
-            return "video/quicktime"
-        default:
-            // Try to use UniformTypeIdentifiers if available
-            if #available(iOS 14.0, *) {
-                if let type = UTType(uti),
-                   let mimeType = type.preferredMIMEType {
-                    print("DEBUG: Converted to MIME type: \(mimeType)")
-                    return mimeType
-                }
-            }
-            
-            // Fallback based on common patterns
-            if uti.contains("image") {
-                return "image/jpeg"
-            } else if uti.contains("video") {
-                return "video/quicktime"
-            }
-            
-            return uti
-        }
+        mimeTypeMapper.mimeType(forUTI: uti)
     }
     
-    private init() {
-        // Get documents directory
-        documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+    private convenience init() {
+        self.init(
+            fileManager: .default,
+            documentsDirectory: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!,
+            coreDataManager: .shared
+        )
+    }
+
+    /// Creates isolated file and metadata storage for tests.
+    init(fileManager: FileManager = .default, documentsDirectory: URL, coreDataManager: CoreDataManager) {
+        self.fileManager = fileManager
+        self.documentsDirectory = documentsDirectory
+        self.coreDataManager = coreDataManager
         
         // Create vault directory
         vaultDirectory = documentsDirectory.appendingPathComponent("Vault", isDirectory: true)
         thumbnailsDirectory = documentsDirectory.appendingPathComponent("Thumbnails", isDirectory: true)
+        thumbnailService = ThumbnailGenerationService(
+            fileManager: fileManager,
+            thumbnailsDirectory: thumbnailsDirectory
+        )
+        trashService = TrashOperationsService(
+            fileManager: fileManager,
+            coreDataManager: coreDataManager,
+            vaultDirectory: vaultDirectory,
+            thumbnailsDirectory: thumbnailsDirectory
+        )
+        temporarySharingService = TemporarySharingService(fileManager: fileManager)
+        encryptedFileStore = EncryptedFileStore(
+            fileManager: fileManager,
+            vaultDirectory: vaultDirectory,
+            cryptoService: cryptoService
+        )
         
         print("DEBUG: Documents directory: \(documentsDirectory.path)")
         print("DEBUG: Vault directory: \(vaultDirectory.path)")
@@ -172,9 +116,7 @@ class FileStorageManager: FileStorageManaging {
     
     func setupEncryptionKey(from password: String) {
         // Derive encryption key from password using SHA256
-        let passwordData = Data(password.utf8)
-        let hashed = SHA256.hash(data: passwordData)
-        encryptionKey = SymmetricKey(data: hashed)
+        encryptionKey = cryptoService.key(from: password)
     }
     
     /// Re-encrypt all vault files with a new encryption key
@@ -183,16 +125,11 @@ class FileStorageManager: FileStorageManaging {
         print("DEBUG: Starting file migration from old key to new key")
         
         // Create old and new encryption keys
-        let oldPasswordData = Data(oldPassword.utf8)
-        let oldHashed = SHA256.hash(data: oldPasswordData)
-        let oldKey = SymmetricKey(data: oldHashed)
-        
-        let newPasswordData = Data(newPassword.utf8)
-        let newHashed = SHA256.hash(data: newPasswordData)
-        let newKey = SymmetricKey(data: newHashed)
+        let oldKey = cryptoService.key(from: oldPassword)
+        let newKey = cryptoService.key(from: newPassword)
         
         // Get all vault items
-        let allItems = CoreDataManager.shared.fetchAllVaultItems()
+        let allItems = coreDataManager.fetchAllVaultItems()
         let totalItems = allItems.count
         
         print("DEBUG: Found \(totalItems) items to migrate")
@@ -243,10 +180,10 @@ class FileStorageManager: FileStorageManaging {
         do {
             // Load and decrypt with old key
             let encryptedData = try Data(contentsOf: fileURL)
-            let decryptedData = try decryptData(encryptedData, using: oldKey)
+            let decryptedData = try cryptoService.decrypt(encryptedData, using: oldKey)
             
             // Re-encrypt with new key
-            let newEncryptedData = try encryptData(decryptedData, using: newKey)
+            let newEncryptedData = try cryptoService.encrypt(decryptedData, using: newKey)
             
             // Write back to file
             try newEncryptedData.write(to: fileURL)
@@ -275,16 +212,13 @@ class FileStorageManager: FileStorageManaging {
     
     /// Move item to trash instead of deleting permanently
     func moveToTrash(vaultItem: VaultItem) {
-        vaultItem.isTrashed = true
-        vaultItem.trashedAt = Date()
-        CoreDataManager.shared.save()
+        trashService.moveToTrash(vaultItem)
     }
     
     // MARK: - File Operations
     
     /// Check if a file with the same content (size and type) already exists
     internal func isDuplicateContent(fileSize: Int64, fileType: String, targetFolder: Folder?) -> Bool {
-        let coreDataManager = CoreDataManager.shared
         let existingFiles: [VaultItem]
         
         if let folder = targetFolder {
@@ -302,7 +236,6 @@ class FileStorageManager: FileStorageManaging {
     
     /// Generate a unique filename if conflicts exist
     private func resolveFilenameConflicts(fileName: String, targetFolder: Folder?) -> String {
-        let coreDataManager = CoreDataManager.shared
         let existingFiles: [VaultItem]
         
         if let folder = targetFolder {
@@ -359,16 +292,12 @@ class FileStorageManager: FileStorageManaging {
         
         // Resolve filename conflicts (add suffix if needed)
         let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
-        let fileURL = vaultDirectory.appendingPathComponent(uniqueFileName)
+        let fileURL = encryptedFileStore.url(for: uniqueFileName)
         print("DEBUG: Resolved filename: \(uniqueFileName)")
         print("DEBUG: Will save file to: \(fileURL.path)")
         
         // Encrypt data
-        let encryptedData = try encryptData(data, using: key)
-        print("DEBUG: Data encrypted, size: \(encryptedData.count)")
-        
-        // Save encrypted file
-        try encryptedData.write(to: fileURL)
+        try encryptedFileStore.write(data, fileName: uniqueFileName, key: key)
         print("DEBUG: Encrypted file saved")
         
         // Generate thumbnail if it's an image or video
@@ -382,7 +311,7 @@ class FileStorageManager: FileStorageManaging {
         if fileType.hasPrefix("image/") {
             print("DEBUG: Generating image thumbnail...")
             do {
-                thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
+                thumbnailFileName = try thumbnailService.generateImageThumbnail(from: data, originalFileName: uniqueFileName)
                 print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
             } catch {
                 print("DEBUG: Failed to generate image thumbnail: \(error)")
@@ -391,7 +320,7 @@ class FileStorageManager: FileStorageManaging {
         } else if fileType.hasPrefix("video/") {
             print("DEBUG: Generating video thumbnail...")
             do {
-                thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
+                thumbnailFileName = try thumbnailService.generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
                 print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
             } catch {
                 print("DEBUG: Failed to generate video thumbnail: \(error)")
@@ -402,7 +331,7 @@ class FileStorageManager: FileStorageManaging {
         }
         
         // Create Core Data entry using synchronous method for direct calls
-        let vaultItem = CoreDataManager.shared.createVaultItem(
+        let vaultItem = coreDataManager.createVaultItem(
             fileName: uniqueFileName,
             fileType: fileType,
             fileSize: Int64(data.count),
@@ -436,17 +365,13 @@ class FileStorageManager: FileStorageManaging {
         
         // Resolve filename conflicts (add suffix if needed)
         let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
-        let fileURL = vaultDirectory.appendingPathComponent(uniqueFileName)
+        let fileURL = encryptedFileStore.url(for: uniqueFileName)
         print("DEBUG: Resolved filename: \(uniqueFileName)")
         print("DEBUG: Will save file to: \(fileURL.path)")
         
         do {
             // Encrypt data
-            let encryptedData = try encryptData(data, using: key)
-            print("DEBUG: Data encrypted, size: \(encryptedData.count)")
-            
-            // Save encrypted file
-            try encryptedData.write(to: fileURL)
+            try encryptedFileStore.write(data, fileName: uniqueFileName, key: key)
             print("DEBUG: Encrypted file saved")
             
             // Generate thumbnail if it's an image or video
@@ -460,7 +385,7 @@ class FileStorageManager: FileStorageManaging {
             if fileType.hasPrefix("image/") {
                 print("DEBUG: Generating image thumbnail...")
                 do {
-                    thumbnailFileName = try generateImageThumbnail(from: data, originalFileName: uniqueFileName)
+                    thumbnailFileName = try thumbnailService.generateImageThumbnail(from: data, originalFileName: uniqueFileName)
                     print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
                 } catch {
                     print("DEBUG: Failed to generate image thumbnail: \(error)")
@@ -469,7 +394,7 @@ class FileStorageManager: FileStorageManaging {
             } else if fileType.hasPrefix("video/") {
                 print("DEBUG: Generating video thumbnail...")
                 do {
-                    thumbnailFileName = try generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
+                    thumbnailFileName = try thumbnailService.generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
                     print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
                 } catch {
                     print("DEBUG: Failed to generate video thumbnail: \(error)")
@@ -480,7 +405,7 @@ class FileStorageManager: FileStorageManaging {
             }
             
             // Create Core Data entry using background context
-            CoreDataManager.shared.createVaultItemInBackground(
+            coreDataManager.createVaultItemInBackground(
                 fileName: uniqueFileName,
                 fileType: fileType,
                 fileSize: Int64(data.count),
@@ -510,11 +435,7 @@ class FileStorageManager: FileStorageManaging {
             throw FileStorageError.invalidFileName
         }
         
-        let fileURL = vaultDirectory.appendingPathComponent(fileName)
-        let encryptedData = try Data(contentsOf: fileURL)
-        
-        // Decrypt data
-        return try decryptData(encryptedData, using: key)
+        return try encryptedFileStore.read(fileName: fileName, key: key)
     }
     
     func deleteFile(vaultItem: VaultItem) throws {
@@ -543,7 +464,7 @@ class FileStorageManager: FileStorageManaging {
         }
         
         // Delete Core Data entry first
-        CoreDataManager.shared.deleteVaultItem(vaultItem)
+        coreDataManager.deleteVaultItem(vaultItem)
         
         // Then delete physical files only if no other references exist
         if shouldDeleteMainFile, let fileName = vaultItem.fileName {
@@ -560,40 +481,12 @@ class FileStorageManager: FileStorageManaging {
     /// Permanently delete a vault item, bypassing trash settings
     /// This is used for items that are already in trash and need to be permanently removed
     func permanentlyDeleteFile(vaultItem: VaultItem) throws {
-        // Before deleting physical files, check if other VaultItems reference the same files
-        let shouldDeleteMainFile: Bool
-        let shouldDeleteThumbnail: Bool
-        
-        if let fileName = vaultItem.fileName {
-            shouldDeleteMainFile = !hasOtherReferences(to: fileName, excluding: vaultItem)
-        } else {
-            shouldDeleteMainFile = false
-        }
-        
-        if let thumbnailFileName = vaultItem.thumbnailFileName {
-            shouldDeleteThumbnail = !hasOtherReferences(toThumbnail: thumbnailFileName, excluding: vaultItem)
-        } else {
-            shouldDeleteThumbnail = false
-        }
-        
-        // Delete Core Data entry first
-        CoreDataManager.shared.deleteVaultItem(vaultItem)
-        
-        // Then delete physical files only if no other references exist
-        if shouldDeleteMainFile, let fileName = vaultItem.fileName {
-            let fileURL = vaultDirectory.appendingPathComponent(fileName)
-            try? fileManager.removeItem(at: fileURL)
-        }
-        
-        if shouldDeleteThumbnail, let thumbnailFileName = vaultItem.thumbnailFileName {
-            let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-            try? fileManager.removeItem(at: thumbnailURL)
-        }
+        trashService.permanentlyDelete(vaultItem)
     }
     
     /// Check if any other VaultItems reference the same filename (excluding the specified item)
     private func hasOtherReferences(to fileName: String, excluding excludeItem: VaultItem) -> Bool {
-        let allItems = CoreDataManager.shared.fetchAllVaultItems()
+        let allItems = coreDataManager.fetchAllVaultItems()
         return allItems.contains { item in
             item.objectID != excludeItem.objectID && item.fileName == fileName
         }
@@ -601,7 +494,7 @@ class FileStorageManager: FileStorageManaging {
     
     /// Check if any other VaultItems reference the same thumbnail filename (excluding the specified item)
     private func hasOtherReferences(toThumbnail thumbnailFileName: String, excluding excludeItem: VaultItem) -> Bool {
-        let allItems = CoreDataManager.shared.fetchAllVaultItems()
+        let allItems = coreDataManager.fetchAllVaultItems()
         return allItems.contains { item in
             item.objectID != excludeItem.objectID && item.thumbnailFileName == thumbnailFileName
         }
@@ -624,11 +517,11 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - Favorites Management
     
     func toggleFavorite(for vaultItem: VaultItem) {
-        CoreDataManager.shared.toggleFavorite(for: vaultItem)
+        coreDataManager.toggleFavorite(for: vaultItem)
     }
     
     func fetchFavoriteItems() -> [VaultItem] {
-        return CoreDataManager.shared.fetchFavoriteVaultItems()
+        return coreDataManager.fetchFavoriteVaultItems()
     }
     
     // MARK: - File Rename Management
@@ -640,14 +533,12 @@ class FileStorageManager: FileStorageManaging {
         }
         
         // Check if the new filename already exists
-        let newFileURL = vaultDirectory.appendingPathComponent(newFileName)
-        if fileManager.fileExists(atPath: newFileURL.path) {
+        if encryptedFileStore.exists(fileName: newFileName) {
             throw FileStorageError.fileAlreadyExists
         }
         
         // Rename the main file
-        let oldFileURL = vaultDirectory.appendingPathComponent(oldFileName)
-        try fileManager.moveItem(at: oldFileURL, to: newFileURL)
+        try encryptedFileStore.move(from: oldFileName, to: newFileName)
         
         // Rename the thumbnail file if it exists
         if let thumbnailFileName = vaultItem.thumbnailFileName {
@@ -670,7 +561,7 @@ class FileStorageManager: FileStorageManaging {
         vaultItem.updatedAt = Date()
         
         // Save the context
-        CoreDataManager.shared.save()
+        coreDataManager.save()
         
         print("DEBUG: Successfully renamed file from \(oldFileName) to \(newFileName)")
     }
@@ -692,212 +583,12 @@ class FileStorageManager: FileStorageManaging {
         let decryptedData = try loadFile(vaultItem: vaultItem)
         
         // Create a temporary file URL
-        let tempDirectory = FileManager.default.temporaryDirectory
-        let tempFileURL = tempDirectory.appendingPathComponent(fileName)
-        
-        // Remove any existing file at this location
-        try? FileManager.default.removeItem(at: tempFileURL)
-        
-        // Write the decrypted data to the temporary file
-        try decryptedData.write(to: tempFileURL)
-        
-        return tempFileURL
+        return try temporarySharingService.prepare(data: decryptedData, fileName: fileName)
     }
     
     /// Clean up temporary sharing files
     func cleanupTemporaryFile(at url: URL) {
-        try? FileManager.default.removeItem(at: url)
-    }
-    
-    // MARK: - Encryption/Decryption
-    
-    private func encryptData(_ data: Data, using key: SymmetricKey) throws -> Data {
-        let sealedBox = try AES.GCM.seal(data, using: key)
-        guard let encryptedData = sealedBox.combined else {
-            throw FileStorageError.encryptionFailed
-        }
-        return encryptedData
-    }
-    
-    private func decryptData(_ data: Data, using key: SymmetricKey) throws -> Data {
-        let sealedBox = try AES.GCM.SealedBox(combined: data)
-        return try AES.GCM.open(sealedBox, using: key)
-    }
-    
-    // MARK: - Thumbnail Generation
-    
-    private func generateImageThumbnail(from imageData: Data, originalFileName: String) throws -> String? {
-        print("DEBUG: Generating image thumbnail for \(originalFileName)")
-        guard let image = UIImage(data: imageData) else { 
-            print("DEBUG: Failed to create UIImage from data")
-            return nil 
-        }
-        
-        let thumbnailSize = CGSize(width: 200, height: 200)
-        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
-        
-        let thumbnail = renderer.image { context in
-            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-        }
-        
-        guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else {
-            print("DEBUG: Failed to create JPEG data from thumbnail")
-            return nil
-        }
-        
-        let thumbnailFileName = "thumb_\(originalFileName).jpg"
-        let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-        
-        do {
-            try thumbnailData.write(to: thumbnailURL)
-            print("DEBUG: Thumbnail saved successfully at \(thumbnailURL.path)")
-            print("DEBUG: Thumbnail file exists: \(fileManager.fileExists(atPath: thumbnailURL.path))")
-            return thumbnailFileName
-        } catch {
-            print("DEBUG: Error saving thumbnail: \(error)")
-            throw error
-        }
-    }
-    
-    private func generateVideoThumbnail(from videoData: Data, originalFileName: String) throws -> String? {
-        print("DEBUG: Generating video thumbnail for \(originalFileName)")
-        
-        // Save video temporarily to generate thumbnail - use original extension
-        let originalExtension = (originalFileName as NSString).pathExtension
-        let tempFileName = UUID().uuidString + (originalExtension.isEmpty ? ".mov" : ".\(originalExtension)")
-        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(tempFileName)
-        try videoData.write(to: tempURL)
-        defer { try? fileManager.removeItem(at: tempURL) }
-        
-        let asset = AVURLAsset(url: tempURL)
-        
-        // First check if the asset is readable by AVFoundation
-        let tracks = asset.tracks(withMediaType: .video)
-        if tracks.isEmpty {
-            print("DEBUG: No video tracks found in asset, format may not be supported by AVFoundation")
-            return generateGenericVideoThumbnail(originalFileName: originalFileName)
-        }
-        
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 200, height: 200)
-        
-        // Try multiple time positions to find a good frame
-        let times = [
-            CMTime(seconds: 1, preferredTimescale: 60),
-            CMTime(seconds: 0.5, preferredTimescale: 60),
-            CMTime(seconds: 2, preferredTimescale: 60),
-            CMTime.zero
-        ]
-        
-        for time in times {
-            do {
-                let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
-                let thumbnail = UIImage(cgImage: cgImage)
-                
-                guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else {
-                    print("DEBUG: Failed to create JPEG data from video thumbnail")
-                    continue
-                }
-                
-                let thumbnailFileName = "thumb_\(originalFileName).jpg"
-                let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-                
-                try thumbnailData.write(to: thumbnailURL)
-                print("DEBUG: Video thumbnail saved successfully at \(thumbnailURL.path)")
-                return thumbnailFileName
-            } catch {
-                print("DEBUG: Error generating video thumbnail at time \(time.seconds): \(error)")
-                continue
-            }
-        }
-        
-        print("DEBUG: Failed to generate video thumbnail for all attempted times, creating generic video thumbnail")
-        return generateGenericVideoThumbnail(originalFileName: originalFileName)
-    }
-    
-    private func generateGenericVideoThumbnail(originalFileName: String) -> String? {
-        print("DEBUG: Generating generic video thumbnail for \(originalFileName)")
-        
-        // Create a generic video icon thumbnail
-        let thumbnailSize = CGSize(width: 200, height: 200)
-        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
-        
-        let thumbnail = renderer.image { context in
-            let cgContext = context.cgContext
-            
-            // Set background color (dark gray)
-            cgContext.setFillColor(UIColor.systemGray2.cgColor)
-            cgContext.fill(CGRect(origin: .zero, size: thumbnailSize))
-            
-            // Draw play button in center
-            let playButtonSize: CGFloat = 60
-            let playButtonRect = CGRect(
-                x: (thumbnailSize.width - playButtonSize) / 2,
-                y: (thumbnailSize.height - playButtonSize) / 2,
-                width: playButtonSize,
-                height: playButtonSize
-            )
-            
-            // Draw play button background circle
-            cgContext.setFillColor(UIColor.white.withAlphaComponent(0.9).cgColor)
-            cgContext.fillEllipse(in: playButtonRect)
-            
-            // Draw play triangle
-            let triangleSize: CGFloat = 20
-            let triangleRect = CGRect(
-                x: playButtonRect.midX - triangleSize / 2 + 2, // Offset slightly to center visually
-                y: playButtonRect.midY - triangleSize / 2,
-                width: triangleSize,
-                height: triangleSize
-            )
-            
-            cgContext.setFillColor(UIColor.systemBlue.cgColor)
-            cgContext.beginPath()
-            cgContext.move(to: CGPoint(x: triangleRect.minX, y: triangleRect.minY))
-            cgContext.addLine(to: CGPoint(x: triangleRect.maxX, y: triangleRect.midY))
-            cgContext.addLine(to: CGPoint(x: triangleRect.minX, y: triangleRect.maxY))
-            cgContext.closePath()
-            cgContext.fillPath()
-            
-            // Add file extension text if available
-            let fileExtension = (originalFileName as NSString).pathExtension.uppercased()
-            if !fileExtension.isEmpty {
-                let font = UIFont.systemFont(ofSize: 14, weight: .medium)
-                let attributes: [NSAttributedString.Key: Any] = [
-                    .font: font,
-                    .foregroundColor: UIColor.white
-                ]
-                
-                let text = fileExtension
-                let textSize = text.size(withAttributes: attributes)
-                let textRect = CGRect(
-                    x: (thumbnailSize.width - textSize.width) / 2,
-                    y: thumbnailSize.height - textSize.height - 10,
-                    width: textSize.width,
-                    height: textSize.height
-                )
-                
-                text.draw(in: textRect, withAttributes: attributes)
-            }
-        }
-        
-        guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else {
-            print("DEBUG: Failed to create JPEG data from generic video thumbnail")
-            return nil
-        }
-        
-        let thumbnailFileName = "thumb_\(originalFileName).jpg"
-        let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-        
-        do {
-            try thumbnailData.write(to: thumbnailURL)
-            print("DEBUG: Generic video thumbnail saved successfully at \(thumbnailURL.path)")
-            return thumbnailFileName
-        } catch {
-            print("DEBUG: Error saving generic video thumbnail: \(error)")
-            return nil
-        }
+        temporarySharingService.cleanup(at: url)
     }
     
     func loadThumbnail(for vaultItem: VaultItem) -> Data? {
@@ -935,9 +626,9 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - Storage Info
     
     func getStorageInfo() -> (fileCount: Int, usedSpace: Int64) {
-        let context = CoreDataManager.shared.persistentContainer.viewContext
+        let context = coreDataManager.persistentContainer.viewContext
         
-        let request: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let request = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         
         do {
             let items = try context.fetch(request)
@@ -976,94 +667,32 @@ class FileStorageManager: FileStorageManaging {
     
     func importFromPhotoLibrary(asset: PHAsset, targetFolder: Folder? = nil, completion: @escaping (Result<VaultItem, Error>) -> Void) {
         print("DEBUG: Starting import for asset: \(asset.localIdentifier)")
-        
-        if asset.mediaType == .image {
-            let options = PHImageRequestOptions()
-            options.version = .original
-            options.isNetworkAccessAllowed = true
-            options.deliveryMode = .highQualityFormat
-            options.isSynchronous = false
-            
-            PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, uti, _, info in
-                print("DEBUG: Image data received: \(data?.count ?? 0) bytes")
-                print("DEBUG: UTI: \(uti ?? "unknown")")
-                
-                if let error = info?[PHImageErrorKey] as? Error {
-                    print("DEBUG: PHImageManager error: \(error)")
-                    completion(.failure(error))
-                    return
-                }
-                
-                guard let data = data else {
-                    print("DEBUG: No image data received")
-                    completion(.failure(FileStorageError.importFailed))
-                    return
-                }
-                
-                let fileName = asset.value(forKey: "filename") as? String ?? "IMG_\(Date().timeIntervalSince1970).jpg"
-                let fileType = self.convertUTIToMimeType(uti ?? "image/jpeg")
-                
-                print("DEBUG: About to save image file")
-                print("DEBUG: fileName: \(fileName)")
-                print("DEBUG: fileType from UTI: \(uti ?? "nil")")
-                print("DEBUG: fileType being used: \(fileType)")
-                
+        photoImportService.importAsset(
+            asset,
+            imageHandler: { data, fileName, uti in
                 do {
-                    let vaultItem = try self.saveFile(data: data, fileName: fileName, fileType: fileType, targetFolder: targetFolder)
-                    print("DEBUG: Image saved successfully: \(vaultItem.fileName ?? "")")
-                    completion(.success(vaultItem))
+                    let item = try self.saveFile(
+                        data: data,
+                        fileName: fileName,
+                        fileType: self.convertUTIToMimeType(uti),
+                        targetFolder: targetFolder
+                    )
+                    completion(.success(item))
                 } catch {
-                    print("DEBUG: Error saving image: \(error)")
                     completion(.failure(error))
                 }
-            }
-        } else if asset.mediaType == .video {
-            let videoOptions = PHVideoRequestOptions()
-            videoOptions.version = .original
-            videoOptions.isNetworkAccessAllowed = true
-            videoOptions.deliveryMode = .automatic
-            
-            PHImageManager.default().requestAVAsset(forVideo: asset, options: videoOptions) { avAsset, _, info in
-                print("DEBUG: Video asset received: \(avAsset != nil)")
-                
-                if let error = info?[PHImageErrorKey] as? Error {
-                    print("DEBUG: PHImageManager video error: \(error)")
-                    completion(.failure(error))
-                    return
-                }
-                
-                guard let urlAsset = avAsset as? AVURLAsset else {
-                    print("DEBUG: Could not get AVURLAsset")
-                    completion(.failure(FileStorageError.importFailed))
-                    return
-                }
-                
-                do {
-                    let data = try Data(contentsOf: urlAsset.url)
-                    print("DEBUG: Video data loaded: \(data.count) bytes")
-                    let fileName = asset.value(forKey: "filename") as? String ?? "VID_\(Date().timeIntervalSince1970).mov"
-                    let fileType = "video/quicktime"
-                    
-                    // Use background save for videos to prevent Core Data recursive save errors
-                    self.saveFileInBackground(data: data, fileName: fileName, fileType: fileType, targetFolder: targetFolder) { result in
-                        switch result {
-                        case .success(let vaultItem):
-                            print("DEBUG: Video saved successfully: \(vaultItem.fileName ?? "")")
-                            completion(.success(vaultItem))
-                        case .failure(let error):
-                            print("DEBUG: Error saving video: \(error)")
-                            completion(.failure(error))
-                        }
-                    }
-                } catch {
-                    print("DEBUG: Error loading video data: \(error)")
-                    completion(.failure(error))
-                }
-            }
-        } else {
-            print("DEBUG: Unsupported media type: \(asset.mediaType.rawValue)")
-            completion(.failure(FileStorageError.importFailed))
-        }
+            },
+            videoHandler: { data, fileName, fileType in
+                self.saveFileInBackground(
+                    data: data,
+                    fileName: fileName,
+                    fileType: fileType,
+                    targetFolder: targetFolder,
+                    completion: completion
+                )
+            },
+            completion: completion
+        )
     }
 }
 

@@ -159,6 +159,8 @@ struct VaultToolbarView: ToolbarContent {
             Image(systemName: "ellipsis.circle")
                 .foregroundColor(.blue)
         }
+        .accessibilityIdentifier("vault.actions")
+        .accessibilityLabel("Vault actions")
     }
 }
 

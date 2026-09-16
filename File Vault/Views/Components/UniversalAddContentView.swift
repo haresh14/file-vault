@@ -108,6 +108,15 @@ struct UniversalActionButton: View {
             .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier("add.\(accessibilityName)")
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
+    }
+
+    private var accessibilityName: String {
+        title.lowercased()
+            .replacingOccurrences(of: " & ", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
     }
 }
 

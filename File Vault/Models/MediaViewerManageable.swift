@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 
 /// Protocol for managing media viewer presentation in views that display media
+@MainActor
 protocol MediaViewerManageable: ObservableObject {
     /// Whether the unified media viewer is currently shown
     var showUnifiedMediaViewer: Bool { get set }

@@ -44,13 +44,23 @@ enum AuthenticationType: String, CaseIterable {
 class KeychainManager: KeychainManaging {
     static let shared = KeychainManager()
     
-    private let service = "com.filevault.app"
+    private let service: String
+    private let defaults: UserDefaults
     private let passwordKey = "userPassword"
     private let fakePasswordKey = "fakePassword"
     private let biometricEnabledKey = "biometricEnabled"
     private let authTypeKey = "authenticationType"
     
-    private init() {}
+    private init() {
+        service = "com.filevault.app"
+        defaults = .standard
+    }
+
+    /// Creates isolated Keychain and defaults namespaces for tests.
+    init(service: String, defaults: UserDefaults) {
+        self.service = service
+        self.defaults = defaults
+    }
     
     // MARK: - Password Management
     
@@ -234,11 +244,11 @@ class KeychainManager: KeychainManaging {
     // MARK: - Authentication Type Management
     
     func setAuthenticationType(_ type: AuthenticationType) {
-        UserDefaults.standard.set(type.rawValue, forKey: authTypeKey)
+        defaults.set(type.rawValue, forKey: authTypeKey)
     }
     
     func getAuthenticationType() -> AuthenticationType {
-        guard let rawValue = UserDefaults.standard.string(forKey: authTypeKey),
+        guard let rawValue = defaults.string(forKey: authTypeKey),
               let type = AuthenticationType(rawValue: rawValue) else {
             return .passcode4 // Default to 4-digit passcode
         }
@@ -246,17 +256,17 @@ class KeychainManager: KeychainManaging {
     }
     
     func isAuthenticationTypeSet() -> Bool {
-        return UserDefaults.standard.string(forKey: authTypeKey) != nil
+        return defaults.string(forKey: authTypeKey) != nil
     }
     
     // MARK: - Biometric Settings
     
     func setBiometricEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: biometricEnabledKey)
+        defaults.set(enabled, forKey: biometricEnabledKey)
     }
     
     func isBiometricEnabled() -> Bool {
-        return UserDefaults.standard.bool(forKey: biometricEnabledKey)
+        return defaults.bool(forKey: biometricEnabledKey)
     }
     
     // MARK: - App Lock State
@@ -289,20 +299,20 @@ class KeychainManager: KeychainManaging {
     }
     
     func setLockTimeout(_ timeout: Int) {
-        UserDefaults.standard.set(timeout, forKey: lockTimeoutKey)
+        defaults.set(timeout, forKey: lockTimeoutKey)
     }
     
     func getLockTimeout() -> Int {
-        let rawValue = UserDefaults.standard.integer(forKey: lockTimeoutKey)
+        let rawValue = defaults.integer(forKey: lockTimeoutKey)
         // Check if key exists in UserDefaults - if not, default to 30 seconds
-        if UserDefaults.standard.object(forKey: lockTimeoutKey) == nil {
+        if defaults.object(forKey: lockTimeoutKey) == nil {
             return LockTimeout.thirtySeconds.rawValue
         }
         return rawValue
     }
     
     func setLastBackgroundTime() {
-        UserDefaults.standard.set(Date(), forKey: lastBackgroundTimeKey)
+        defaults.set(Date(), forKey: lastBackgroundTimeKey)
     }
     
     func shouldRequireAuthentication() -> Bool {
@@ -318,7 +328,7 @@ class KeychainManager: KeychainManaging {
             return true
         }
         
-        guard let lastBackgroundTime = UserDefaults.standard.object(forKey: lastBackgroundTimeKey) as? Date else {
+        guard let lastBackgroundTime = defaults.object(forKey: lastBackgroundTimeKey) as? Date else {
             return true // First launch
         }
         
@@ -327,7 +337,7 @@ class KeychainManager: KeychainManaging {
     }
     
     func clearLastBackgroundTime() {
-        UserDefaults.standard.removeObject(forKey: lastBackgroundTimeKey)
+        defaults.removeObject(forKey: lastBackgroundTimeKey)
     }
     
     // MARK: - Data Cleanup
@@ -348,19 +358,19 @@ class KeychainManager: KeychainManaging {
         print("DEBUG: Clearing all UserDefaults data...")
         
         // Clear authentication settings
-        UserDefaults.standard.removeObject(forKey: authTypeKey)
-        UserDefaults.standard.removeObject(forKey: biometricEnabledKey)
+        defaults.removeObject(forKey: authTypeKey)
+        defaults.removeObject(forKey: biometricEnabledKey)
         
         // Clear lock timeout settings
-        UserDefaults.standard.removeObject(forKey: lockTimeoutKey)
-        UserDefaults.standard.removeObject(forKey: lastBackgroundTimeKey)
+        defaults.removeObject(forKey: lockTimeoutKey)
+        defaults.removeObject(forKey: lastBackgroundTimeKey)
         
         // Clear biometric failure data (from BiometricAuthManager)
-        UserDefaults.standard.removeObject(forKey: "biometricFailureCount")
-        UserDefaults.standard.removeObject(forKey: "lastBiometricFailureTime")
+        defaults.removeObject(forKey: "biometricFailureCount")
+        defaults.removeObject(forKey: "lastBiometricFailureTime")
         
         // Synchronize to ensure changes are written
-        UserDefaults.standard.synchronize()
+        defaults.synchronize()
         
         print("DEBUG: UserDefaults data cleared")
     }

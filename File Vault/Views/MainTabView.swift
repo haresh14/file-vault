@@ -18,6 +18,7 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: "folder")
                     Text("Folder")
+                        .accessibilityIdentifier("tab.folder")
                 }
                 .tag(0)
             
@@ -25,6 +26,7 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: "square.grid.2x2")
                     Text("Category")
+                        .accessibilityIdentifier("tab.category")
                 }
                 .tag(1)
             
@@ -32,6 +34,7 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: "photo.on.rectangle")
                     Text("Gallery")
+                        .accessibilityIdentifier("tab.gallery")
                 }
                 .tag(2)
             
@@ -39,6 +42,7 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: webServer.isRunning ? "globe.badge.chevron.backward" : "globe")
                     Text("Web Upload")
+                        .accessibilityIdentifier("tab.webUpload")
                 }
                 .badge(webServer.isRunning ? "●" : nil)
                 .tag(3)
@@ -48,13 +52,14 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: "gear")
                     Text("Settings")
+                        .accessibilityIdentifier("tab.settings")
                 }
                 .tag(4)
         }
         .tint(.blue)
         .onChange(of: selectedTab) { _, _ in
             // Send notification to reset selection modes when tab changes
-            NotificationCenter.default.post(name: Notification.Name("TabDidChange"), object: nil)
+            NotificationCenter.default.post(name: .tabDidChange, object: nil)
         }
     }
 }

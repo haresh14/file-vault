@@ -33,6 +33,8 @@ struct PlayerControlsView: View {
                             .font(.system(size: 30, weight: .semibold))
                             .foregroundColor(.white)
                     }
+                    .accessibilityIdentifier("media.seekBackward")
+                    .accessibilityLabel("Rewind 15 seconds")
 
                     Button(action: {
                         if isPlaying {
@@ -47,6 +49,8 @@ struct PlayerControlsView: View {
                             .font(.system(size: 60, weight: .thin))
                             .foregroundColor(.white)
                     }
+                    .accessibilityIdentifier("media.playPause")
+                    .accessibilityLabel(isPlaying ? "Pause" : "Play")
 
                     Button(action: {
                         seek(by: 15)
@@ -56,6 +60,8 @@ struct PlayerControlsView: View {
                             .font(.system(size: 30, weight: .semibold))
                             .foregroundColor(.white)
                     }
+                    .accessibilityIdentifier("media.seekForward")
+                    .accessibilityLabel("Forward 15 seconds")
                 }
                 .transition(.opacity)
             }
@@ -105,6 +111,9 @@ struct PlayerControlsView: View {
                                 .frame(minWidth: 44, minHeight: 44)
                                 .contentShape(Rectangle())
                         }
+                        .accessibilityIdentifier("media.playbackRate")
+                        .accessibilityLabel("Playback speed")
+                        .accessibilityValue("\(String(format: "%.2g", playbackRate))x")
                     }
                     .padding()
                     .transition(.opacity)
@@ -221,6 +230,9 @@ struct CustomScrubberView: View {
             }
         }
         .frame(height: 44)
+        .accessibilityIdentifier("media.scrubber")
+        .accessibilityLabel("Playback position")
+        .accessibilityValue("\(Int(progress * 100)) percent")
     }
 }
 

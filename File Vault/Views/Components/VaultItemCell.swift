@@ -119,6 +119,10 @@ struct VaultItemCell: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("file.\(item.id?.uuidString ?? item.fileName ?? "unknown")")
+        .accessibilityLabel(item.fileName ?? "Unnamed file")
+        .accessibilityValue(isSelected ? "Selected" : item.fileType ?? "File")
         .onTapGesture {
             onTap()
         }

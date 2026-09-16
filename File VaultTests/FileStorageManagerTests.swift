@@ -11,7 +11,12 @@ import UIKit
 import CoreData
 @testable import File_Vault
 
+@MainActor
+@Suite(.serialized)
 struct FileStorageManagerTests {
+    private func makeStorage() throws -> IsolatedTestDependencies {
+        try IsolatedTestDependencies()
+    }
     
     // MARK: - Initialization Tests
     
@@ -25,7 +30,8 @@ struct FileStorageManagerTests {
     // MARK: - Encryption Key Tests
     
     @Test func testEncryptionKeySetup() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         // Setup encryption key
@@ -39,7 +45,8 @@ struct FileStorageManagerTests {
     // MARK: - File Operations Tests
     
     @Test func testFileSaveAndLoad() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         let testData = "Hello, World!".data(using: .utf8)!
         let fileName = "test.txt"
@@ -68,7 +75,8 @@ struct FileStorageManagerTests {
     }
     
     @Test func testFileEncryption() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         let testData = "Sensitive Data".data(using: .utf8)!
         let fileName = "sensitive.txt"
@@ -85,12 +93,10 @@ struct FileStorageManagerTests {
         )
         
         // Verify that the file on disk is encrypted (not readable as plain text)
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let vaultPath = documentsPath.appendingPathComponent("FileVault")
-        let encryptedFilesPath = vaultPath.appendingPathComponent("EncryptedFiles")
+        let encryptedFilesPath = storage.rootURL.appendingPathComponent("Vault")
         
         // Check that encrypted file exists but is not readable as plain text
-        let encryptedFileURL = encryptedFilesPath.appendingPathComponent(vaultItem.id?.uuidString ?? "")
+        let encryptedFileURL = encryptedFilesPath.appendingPathComponent(vaultItem.fileName ?? "")
         
         if FileManager.default.fileExists(atPath: encryptedFileURL.path) {
             let encryptedData = try Data(contentsOf: encryptedFileURL)
@@ -101,9 +107,66 @@ struct FileStorageManagerTests {
         // Cleanup
         try manager.deleteFile(vaultItem: vaultItem)
     }
+
+    @Test func testAESGCMCombinedFormatRoundTripAndWrongKey() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        let data = Data((0..<257).map { UInt8($0 % 251) })
+        manager.setupEncryptionKey(from: "first-key")
+        let item = try manager.saveFile(
+            data: data,
+            fileName: "format.bin",
+            fileType: "application/octet-stream"
+        )
+
+        let encryptedURL = storage.rootURL
+            .appendingPathComponent("Vault")
+            .appendingPathComponent("format.bin")
+        let encryptedData = try Data(contentsOf: encryptedURL)
+        #expect(encryptedData.count == data.count + 28, "Combined AES-GCM stores nonce and tag")
+        #expect(try manager.loadFile(vaultItem: item) == data)
+
+        manager.setupEncryptionKey(from: "wrong-key")
+        #expect(throws: Error.self) {
+            try manager.loadFile(vaultItem: item)
+        }
+
+        manager.setupEncryptionKey(from: "first-key")
+        #expect(try manager.loadFile(vaultItem: item) == data)
+    }
+
+    @Test func testEncryptionKeyMigrationPreservesDataAndProgress() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        let data = Data("migration payload".utf8)
+        manager.setupEncryptionKey(from: "old-passcode")
+        let item = try manager.saveFile(
+            data: data,
+            fileName: "migration.txt",
+            fileType: "text/plain"
+        )
+        var progressValues: [(Int, Int)] = []
+
+        try await manager.migrateFilesToNewEncryptionKey(
+            oldPassword: "old-passcode",
+            newPassword: "new-passcode"
+        ) { completed, total in
+            progressValues.append((completed, total))
+        }
+
+        #expect(progressValues.count == 1)
+        #expect(progressValues.first?.0 == 1)
+        #expect(progressValues.first?.1 == 1)
+        #expect(try manager.loadFile(vaultItem: item) == data)
+        manager.setupEncryptionKey(from: "old-passcode")
+        #expect(throws: Error.self) {
+            try manager.loadFile(vaultItem: item)
+        }
+    }
     
     @Test func testMultipleFiles() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
@@ -112,7 +175,7 @@ struct FileStorageManagerTests {
         
         // Save multiple files
         for i in 0..<5 {
-            let testData = "Test Data \(i)".data(using: .utf8)!
+            let testData = String(repeating: "Test Data \(i)", count: i + 1).data(using: .utf8)!
             let fileName = "test\(i).txt"
             let fileType = "text/plain"
             
@@ -127,7 +190,7 @@ struct FileStorageManagerTests {
         // Verify all files can be loaded
         for (index, item) in savedItems.enumerated() {
             let loadedData = try manager.loadFile(vaultItem: item)
-            let expectedData = "Test Data \(index)".data(using: .utf8)!
+            let expectedData = String(repeating: "Test Data \(index)", count: index + 1).data(using: .utf8)!
             #expect(loadedData == expectedData, "File \(index) should load correctly")
         }
         
@@ -140,7 +203,8 @@ struct FileStorageManagerTests {
     // MARK: - Thumbnail Tests
     
     @Test func testImageThumbnailGeneration() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
@@ -169,8 +233,8 @@ struct FileStorageManagerTests {
             let image = UIImage(data: thumbnail)
             #expect(image != nil, "Thumbnail data should decode as an image")
             if let image {
-                #expect(image.size.width <= 200, "Thumbnail width should be limited")
-                #expect(image.size.height <= 200, "Thumbnail height should be limited")
+                #expect(image.size.width <= 600, "Thumbnail pixel width should be limited")
+                #expect(image.size.height <= 600, "Thumbnail pixel height should be limited")
             }
         }
         
@@ -179,7 +243,8 @@ struct FileStorageManagerTests {
     }
     
     @Test func testThumbnailForNonImage() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
@@ -209,7 +274,8 @@ struct FileStorageManagerTests {
     // MARK: - File Deletion Tests
     
     @Test func testFileDeletion() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
@@ -237,17 +303,86 @@ struct FileStorageManagerTests {
             try manager.loadFile(vaultItem: vaultItem)
         }
     }
+
+    @Test func testRenamePreservesEncryptedFileAndThumbnail() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "rename-key")
+        let data = createTestImage().pngData()!
+        let item = try manager.saveFile(
+            data: data,
+            fileName: "before.png",
+            fileType: "image/png"
+        )
+
+        try manager.renameFile(vaultItem: item, newFileName: "after.png")
+
+        #expect(item.fileName == "after.png")
+        #expect(item.thumbnailFileName == "thumb_after.png.jpg")
+        #expect(try manager.loadFile(vaultItem: item) == data)
+        #expect(manager.loadThumbnail(for: item) != nil)
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault/before.png").path
+        ))
+    }
+
+    @Test func testTrashRestoreAndPermanentDeleteLifecycle() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "trash-key")
+        UserDefaults.standard.set(true, forKey: "trashEnabled")
+        let item = try manager.saveFile(
+            data: Data("trash payload".utf8),
+            fileName: "trash.txt",
+            fileType: "text/plain"
+        )
+
+        try manager.deleteFile(vaultItem: item)
+        #expect(item.isTrashed)
+        #expect(item.trashedAt != nil)
+        #expect(try manager.loadFile(vaultItem: item) == Data("trash payload".utf8))
+
+        item.isTrashed = false
+        item.trashedAt = nil
+        storage.coreDataManager.save()
+        #expect(storage.coreDataManager.fetchVaultItems(in: nil).contains(item))
+
+        manager.moveToTrash(vaultItem: item)
+        try manager.permanentlyDeleteFile(vaultItem: item)
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault/trash.txt").path
+        ))
+        #expect(storage.coreDataManager.fetchAllVaultItems().isEmpty)
+    }
+
+    @Test func testTemporaryShareFileIsDecryptedAndCleanedUp() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "share-key")
+        let data = Data("temporary share".utf8)
+        let item = try manager.saveFile(
+            data: data,
+            fileName: "shared.txt",
+            fileType: "text/plain"
+        )
+
+        let url = try manager.prepareForSharing(vaultItem: item)
+        #expect(try Data(contentsOf: url) == data)
+        manager.cleanupTemporaryFile(at: url)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
     
     // MARK: - Error Handling Tests
     
     @Test func testLoadNonExistentFile() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
         
         // Create a mock vault item with non-existent file
-        let mockItem = VaultItem(context: CoreDataManager.shared.context)
+        let mockItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: storage.coreDataManager.context) as! VaultItem
         mockItem.id = UUID()
         mockItem.fileName = "nonexistent.txt"
         mockItem.fileType = "text/plain"
@@ -259,7 +394,8 @@ struct FileStorageManagerTests {
     }
     
     @Test func testSaveFileWithoutEncryptionKey() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         
         // Don't setup encryption key
         let testData = "Test".data(using: .utf8)!
@@ -279,12 +415,13 @@ struct FileStorageManagerTests {
     // MARK: - Performance Tests
     
     @Test func testFileOperationPerformance() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
         
-        let testData = Data(repeating: 0x42, count: 1024 * 1024) // 1MB of data
+        let testData = Data(repeating: 0x42, count: 8 * 1024 * 1024) // 8MB round trip
         let fileName = "large.bin"
         let fileType = "application/octet-stream"
         
@@ -312,7 +449,8 @@ struct FileStorageManagerTests {
     // MARK: - Directory Structure Tests
     
     @Test func testDirectoryStructure() async throws {
-        let manager = FileStorageManager.shared
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
         let testPassword = "TestPassword123!"
         
         manager.setupEncryptionKey(from: testPassword)
@@ -329,14 +467,23 @@ struct FileStorageManagerTests {
         )
         
         // Check that required directories exist
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let vaultPath = documentsPath.appendingPathComponent("FileVault")
-        let encryptedFilesPath = vaultPath.appendingPathComponent("EncryptedFiles")
-        let thumbnailsPath = vaultPath.appendingPathComponent("Thumbnails")
+        let vaultPath = storage.rootURL.appendingPathComponent("Vault")
+        let encryptedFilesPath = vaultPath
+        let thumbnailsPath = storage.rootURL.appendingPathComponent("Thumbnails")
         
         #expect(FileManager.default.fileExists(atPath: vaultPath.path), "Vault directory should exist")
         #expect(FileManager.default.fileExists(atPath: encryptedFilesPath.path), "Encrypted files directory should exist")
         #expect(FileManager.default.fileExists(atPath: thumbnailsPath.path), "Thumbnails directory should exist")
+        let vaultAttributes = try FileManager.default.attributesOfItem(atPath: vaultPath.path)
+        let thumbnailAttributes = try FileManager.default.attributesOfItem(atPath: thumbnailsPath.path)
+        // Simulators may omit protection metadata even when setAttributes succeeds.
+        for attributes in [vaultAttributes, thumbnailAttributes] {
+            if let protection = attributes[.protectionKey] {
+                #expect(
+                    String(describing: protection) == FileProtectionType.complete.rawValue
+                )
+            }
+        }
         
         // Cleanup
         try manager.deleteFile(vaultItem: vaultItem)

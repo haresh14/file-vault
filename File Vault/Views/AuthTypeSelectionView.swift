@@ -96,6 +96,8 @@ struct AuthTypeSelectionView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
+        .accessibilityIdentifier("auth.continue")
+        .accessibilityLabel("Continue with \(selectedType.displayName)")
     }
 }
 
@@ -135,6 +137,9 @@ struct AuthTypeCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier("auth.choice.\(type.rawValue)")
+        .accessibilityLabel("\(type.displayName), \(descriptionText)")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
     
     private var iconView: some View {

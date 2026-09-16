@@ -10,7 +10,12 @@ import Foundation
 import CoreData
 @testable import File_Vault
 
+@MainActor
+@Suite(.serialized)
 struct CoreDataManagerTests {
+    private func makeManager() -> CoreDataManager {
+        TestCoreDataStore.reset()
+    }
     
     // MARK: - Initialization Tests
     
@@ -22,14 +27,14 @@ struct CoreDataManagerTests {
     }
     
     @Test func testPersistentContainer() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         #expect(manager.persistentContainer.name == "FileVault", "Persistent container should be initialized with correct name")
         #expect(manager.persistentContainer.name == "FileVault", "Container should have correct name")
     }
     
     @Test func testManagedObjectContext() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         #expect(manager.context.concurrencyType == .mainQueueConcurrencyType, "Context should use main queue concurrency")
         #expect(manager.context.concurrencyType == .mainQueueConcurrencyType, "Context should use main queue")
@@ -38,10 +43,10 @@ struct CoreDataManagerTests {
     // MARK: - VaultItem CRUD Tests
     
     @Test func testCreateVaultItem() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create a test VaultItem
-        let vaultItem = VaultItem(context: manager.context)
+        let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
         vaultItem.id = UUID()
         vaultItem.fileName = "test.txt"
         vaultItem.fileType = "text/plain"
@@ -52,7 +57,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify item was saved
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "id == %@", vaultItem.id! as CVarArg)
         
         let results = try manager.context.fetch(fetchRequest)
@@ -65,12 +70,12 @@ struct CoreDataManagerTests {
     }
     
     @Test func testFetchVaultItems() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create test items
         var testItems: [VaultItem] = []
         for i in 0..<3 {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "test\(i).txt"
             vaultItem.fileType = "text/plain"
@@ -82,7 +87,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Fetch all items
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         let allItems = try manager.context.fetch(fetchRequest)
         
         #expect(allItems.count >= 3, "Should have at least 3 items")
@@ -103,10 +108,10 @@ struct CoreDataManagerTests {
     }
     
     @Test func testUpdateVaultItem() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create a test VaultItem
-        let vaultItem = VaultItem(context: manager.context)
+        let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
         vaultItem.id = UUID()
         vaultItem.fileName = "original.txt"
         vaultItem.fileType = "text/plain"
@@ -122,7 +127,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify update
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "id == %@", vaultItem.id! as CVarArg)
         
         let results = try manager.context.fetch(fetchRequest)
@@ -136,10 +141,10 @@ struct CoreDataManagerTests {
     }
     
     @Test func testDeleteVaultItem() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create a test VaultItem
-        let vaultItem = VaultItem(context: manager.context)
+        let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
         vaultItem.id = UUID()
         vaultItem.fileName = "delete_me.txt"
         vaultItem.fileType = "text/plain"
@@ -149,7 +154,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify item exists
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "id == %@", vaultItem.id! as CVarArg)
         
         var results = try manager.context.fetch(fetchRequest)
@@ -167,10 +172,10 @@ struct CoreDataManagerTests {
     // MARK: - Folder CRUD Tests
     
     @Test func testCreateFolder() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create a test Folder
-        let folder = Folder(context: manager.context)
+        let folder = NSEntityDescription.insertNewObject(forEntityName: "Folder", into: manager.context) as! Folder
         folder.id = UUID()
         folder.name = "Test Folder"
         folder.createdAt = Date()
@@ -178,7 +183,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify folder was saved
-        let fetchRequest: NSFetchRequest<Folder> = Folder.fetchRequest()
+        let fetchRequest = NSFetchRequest<Folder>(entityName: "Folder")
         fetchRequest.predicate = NSPredicate(format: "id == %@", folder.id! as CVarArg)
         
         let results = try manager.context.fetch(fetchRequest)
@@ -191,10 +196,10 @@ struct CoreDataManagerTests {
     }
     
     @Test func testFolderVaultItemRelationship() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create a test Folder
-        let folder = Folder(context: manager.context)
+        let folder = NSEntityDescription.insertNewObject(forEntityName: "Folder", into: manager.context) as! Folder
         folder.id = UUID()
         folder.name = "Test Folder"
         folder.createdAt = Date()
@@ -202,7 +207,7 @@ struct CoreDataManagerTests {
         // Create test VaultItems
         var vaultItems: [VaultItem] = []
         for i in 0..<3 {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "test\(i).txt"
             vaultItem.fileType = "text/plain"
@@ -232,10 +237,10 @@ struct CoreDataManagerTests {
     // MARK: - Context Management Tests
     
     @Test func testSaveContext() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create a test item
-        let vaultItem = VaultItem(context: manager.context)
+        let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
         vaultItem.id = UUID()
         vaultItem.fileName = "save_test.txt"
         vaultItem.fileType = "text/plain"
@@ -246,7 +251,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify item was saved by fetching it
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "id == %@", vaultItem.id! as CVarArg)
         
         let results = try manager.context.fetch(fetchRequest)
@@ -258,7 +263,7 @@ struct CoreDataManagerTests {
     }
     
     @Test func testSaveContextWithoutChanges() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Test saving context without any changes
         manager.save()
@@ -270,12 +275,12 @@ struct CoreDataManagerTests {
     // MARK: - Batch Operations Tests
     
     @Test func testBatchInsert() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create multiple test items
         var testItems: [VaultItem] = []
         for i in 0..<10 {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "batch_test\(i).txt"
             vaultItem.fileType = "text/plain"
@@ -288,7 +293,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify all items were saved
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "fileName BEGINSWITH %@", "batch_test")
         
         let results = try manager.context.fetch(fetchRequest)
@@ -302,12 +307,12 @@ struct CoreDataManagerTests {
     }
     
     @Test func testBatchDelete() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create test items
         var testItems: [VaultItem] = []
         for i in 0..<5 {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "delete_batch\(i).txt"
             vaultItem.fileType = "text/plain"
@@ -326,7 +331,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Verify all items were deleted
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "fileName BEGINSWITH %@", "delete_batch")
         
         let results = try manager.context.fetch(fetchRequest)
@@ -336,14 +341,14 @@ struct CoreDataManagerTests {
     // MARK: - Query Tests
     
     @Test func testFetchWithSortDescriptor() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create test items with different dates
         var testItems: [VaultItem] = []
         let baseDate = Date()
         
         for i in 0..<3 {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "sort_test\(i).txt"
             vaultItem.fileType = "text/plain"
@@ -355,7 +360,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Fetch with sort descriptor
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "fileName BEGINSWITH %@", "sort_test")
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
         
@@ -375,16 +380,64 @@ struct CoreDataManagerTests {
         }
         manager.save()
     }
+
+    @Test func testFacadeFetchOrderingAndTrashFiltering() async throws {
+        let manager = makeManager()
+        let older = manager.createVaultItem(
+            fileName: "older.txt",
+            fileType: "text/plain",
+            fileSize: 1
+        )
+        older.createdAt = Date(timeIntervalSince1970: 100)
+        let newer = manager.createVaultItem(
+            fileName: "newer.txt",
+            fileType: "text/plain",
+            fileSize: 2
+        )
+        newer.createdAt = Date(timeIntervalSince1970: 200)
+        let trashed = manager.createVaultItem(
+            fileName: "trashed.txt",
+            fileType: "text/plain",
+            fileSize: 3
+        )
+        trashed.createdAt = Date(timeIntervalSince1970: 300)
+        trashed.isTrashed = true
+        manager.save()
+
+        #expect(manager.fetchAllVaultItems().map(\.fileName) == [
+            "trashed.txt", "newer.txt", "older.txt"
+        ])
+        #expect(manager.fetchVaultItems(in: nil).map(\.fileName) == [
+            "newer.txt", "older.txt"
+        ])
+    }
+
+    @Test func testBackgroundCreateCompletesOnMainThread() async throws {
+        let manager = makeManager()
+        let item = await withCheckedContinuation { continuation in
+            manager.createVaultItemInBackground(
+                fileName: "background.txt",
+                fileType: "text/plain",
+                fileSize: 42
+            ) { item in
+                #expect(Thread.isMainThread)
+                continuation.resume(returning: item)
+            }
+        }
+
+        #expect(item?.fileName == "background.txt")
+        #expect(manager.fetchAllVaultItems().contains { $0.objectID == item?.objectID })
+    }
     
     @Test func testFetchWithPredicate() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create test items with different file types
         var testItems: [VaultItem] = []
         let fileTypes = ["image/jpeg", "image/png", "text/plain"]
         
         for (i, fileType) in fileTypes.enumerated() {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "predicate_test\(i).txt"
             vaultItem.fileType = fileType
@@ -396,7 +449,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Fetch only image files
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "fileType BEGINSWITH %@", "image/")
         
         let results = try manager.context.fetch(fetchRequest)
@@ -417,10 +470,10 @@ struct CoreDataManagerTests {
     // MARK: - Error Handling Tests
     
     @Test func testInvalidSave() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         // Create an invalid VaultItem (missing required fields)
-        let vaultItem = VaultItem(context: manager.context)
+        let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
         // Don't set required fields
         
         // Try to save - this might not throw in this case, but we test the mechanism
@@ -438,14 +491,14 @@ struct CoreDataManagerTests {
     // MARK: - Performance Tests
     
     @Test func testPerformance() async throws {
-        let manager = CoreDataManager.shared
+        let manager = makeManager()
         
         let startTime = CFAbsoluteTimeGetCurrent()
         
         // Create many items
         var testItems: [VaultItem] = []
         for i in 0..<100 {
-            let vaultItem = VaultItem(context: manager.context)
+            let vaultItem = NSEntityDescription.insertNewObject(forEntityName: "VaultItem", into: manager.context) as! VaultItem
             vaultItem.id = UUID()
             vaultItem.fileName = "perf_test\(i).txt"
             vaultItem.fileType = "text/plain"
@@ -458,7 +511,7 @@ struct CoreDataManagerTests {
         manager.save()
         
         // Fetch all
-        let fetchRequest: NSFetchRequest<VaultItem> = VaultItem.fetchRequest()
+        let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
         fetchRequest.predicate = NSPredicate(format: "fileName BEGINSWITH %@", "perf_test")
         
         let results = try manager.context.fetch(fetchRequest)

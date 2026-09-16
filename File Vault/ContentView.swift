@@ -8,78 +8,59 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var isAuthenticated = false
-    @State private var isPasswordSet = false
-    @State private var isAuthTypeSet = false
-    @State private var selectedAuthType: AuthenticationType?
-    @State private var isInBackground = false
-    @State private var isCheckingBiometric = false
-    @State private var shouldShowPasscode = false
-    @State private var shouldShowPrivacyOverlay = false
+    @StateObject private var authenticationCoordinator = AuthenticationCoordinator()
     @StateObject private var securityManager = SecurityManager.shared
     @Environment(\.scenePhase) var scenePhase
-    
-    // Check if password is already set
-    private var hasPassword: Bool {
-        return KeychainManager.shared.isPasswordSet()
-    }
-    
-    // Check if auth type is already set
-    private var hasAuthType: Bool {
-        return KeychainManager.shared.isAuthenticationTypeSet()
-    }
-    
+
     var body: some View {
         ZStack {
             mainContent
             
             // Only show privacy overlay if user is fully registered and authenticated
-            if shouldShowPrivacyOverlay && isPasswordSet {
+            if authenticationCoordinator.shouldShowPrivacyOverlay && authenticationCoordinator.isPasswordSet {
                 EnhancedPrivacyOverlay()
             }
         }
-        .onAppear(perform: handleOnAppear)
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            handleScenePhaseChange(from: oldPhase, to: newPhase)
+        .onAppear(perform: authenticationCoordinator.handleOnAppear)
+        .onChange(of: scenePhase) { _, newPhase in
+            authenticationCoordinator.handleScenePhaseChange(to: newPhase)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            handleWillResignActive()
+            authenticationCoordinator.handleWillResignActive()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            handleDidBecomeActive()
+            authenticationCoordinator.handleDidBecomeActive()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            handleWillEnterForeground()
+            authenticationCoordinator.handleWillEnterForeground()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-            handleDidEnterBackground()
+            authenticationCoordinator.handleDidEnterBackground()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TriggerSecurityLock"))) { _ in
-            handleSecurityLockTrigger()
+        .onReceive(NotificationCenter.default.publisher(for: .triggerSecurityLock)) { _ in
+            authenticationCoordinator.handleSecurityLockTrigger()
         }
     }
     
     @ViewBuilder
     private var mainContent: some View {
-        if !isAuthTypeSet {
+        if !authenticationCoordinator.isAuthTypeSet {
             // First time setup - choose auth type with native navigation
             AuthTypeSelectionView { authType in
-                selectedAuthType = authType
-                isAuthTypeSet = true
-                handleAuthTypeSelected(authType)
+                authenticationCoordinator.handleAuthTypeSelected(authType)
             }
-        } else if !isPasswordSet {
+        } else if !authenticationCoordinator.isPasswordSet {
             // This should not happen with the new flow, but keeping as fallback
             PasscodeView(isSettingPasscode: true) {
-                handlePasscodeSet()
+                authenticationCoordinator.handlePasscodeSet()
             }
-        } else if !isAuthenticated {
-            if isCheckingBiometric {
+        } else if !authenticationCoordinator.isAuthenticated {
+            if authenticationCoordinator.isCheckingBiometric {
                 // Show loading state while checking biometric
                 BiometricCheckView()
-            } else if shouldShowPasscode {
+            } else if authenticationCoordinator.shouldShowPasscode {
                 PasscodeView(isSettingPasscode: false) {
-                    handleAuthentication()
+                    authenticationCoordinator.handleAuthentication()
                 }
             }
         } else {
@@ -91,188 +72,6 @@ struct ContentView: View {
                 
                 // Upload progress overlay
                 UploadProgressOverlayView()
-            }
-        }
-    }
-    
-    private func handleAuthTypeSelected(_ authType: AuthenticationType) {
-        // The setup is now handled within the AuthTypeSelectionView navigation
-        // When setup is complete, this callback will be triggered
-        handlePasscodeSet()
-    }
-    
-    private func handleOnAppear() {
-        isPasswordSet = KeychainManager.shared.isPasswordSet()
-        isAuthTypeSet = KeychainManager.shared.isAuthenticationTypeSet()
-        
-        // For existing users who have password but no auth type set, default to password
-        if isPasswordSet && !isAuthTypeSet {
-            KeychainManager.shared.setAuthenticationType(.password)
-            isAuthTypeSet = true
-            selectedAuthType = .password
-        }
-        
-        // If auth type is set but no selected type, get it from storage
-        if isAuthTypeSet && selectedAuthType == nil {
-            selectedAuthType = KeychainManager.shared.getAuthenticationType()
-        }
-        
-        // ContentView appeared - checking authentication state
-        
-        // No need to request photo library permission when using PHPickerViewController
-        // The system picker handles permissions internally
-        
-        // If password is set but not authenticated, check if we should show biometric
-        if isPasswordSet && !isAuthenticated {
-            checkBiometricAuthentication()
-        }
-    }
-    
-    private func handleWillResignActive() {
-        // Only activate privacy protection if registration is complete
-        if isPasswordSet {
-            shouldShowPrivacyOverlay = true
-            KeychainManager.shared.setLastBackgroundTime()
-        }
-        isInBackground = true
-    }
-    
-    private func handleDidBecomeActive() {
-        shouldShowPrivacyOverlay = false
-        isInBackground = false
-    }
-    
-    private func handleWillEnterForeground() {
-        shouldShowPrivacyOverlay = false
-        
-        if KeychainManager.shared.shouldRequireAuthentication() {
-            isAuthenticated = false
-            isCheckingBiometric = false
-            shouldShowPasscode = false
-            
-            // Reset login state when authentication is required
-            LoginStateManager.shared.resetLoginState()
-            
-            // Check biometric when coming from background
-            if isPasswordSet && !isAuthenticated {
-                checkBiometricAuthentication()
-            }
-        }
-    }
-    
-    private func handleDidEnterBackground() {
-        // Only activate privacy protection if registration is complete
-        if isPasswordSet {
-            shouldShowPrivacyOverlay = true
-            print("DEBUG: App entered background, showing enhanced privacy overlay")
-        }
-    }
-    
-    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
-        if newPhase == .background {
-            handleWillResignActive()
-        } else if newPhase == .active {
-            handleDidBecomeActive()
-        }
-    }
-    
-    private func checkBiometricAuthentication() {
-        // Check if biometric is enabled and available
-        if KeychainManager.shared.isBiometricEnabled() && BiometricAuthManager.shared.canUseBiometrics() {
-            isCheckingBiometric = true
-            shouldShowPasscode = false
-            
-            // Small delay to ensure UI is ready
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                BiometricAuthManager.shared.authenticateWithBiometrics(reason: "Unlock your vault") { success, error in
-                    DispatchQueue.main.async {
-                        if success {
-                            KeychainManager.shared.clearLastBackgroundTime()
-                            isAuthenticated = true
-                            isCheckingBiometric = false
-                            // Biometric authentication successful
-                            
-                            // Biometric authentication is always real login (not fake)
-                            LoginStateManager.shared.setLoginState(isFakeLogin: false)
-                            
-                            // Setup encryption key for file storage
-                            if let password = try? KeychainManager.shared.getPassword() {
-                                FileStorageManager.shared.setupEncryptionKey(from: password)
-                            }
-                        } else {
-                            // Show passcode screen on failure or cancel
-                            isCheckingBiometric = false
-                            shouldShowPasscode = true
-                            
-                            if let error = error {
-                                print("DEBUG: Biometric authentication failed: \(error.localizedDescription)")
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // No biometric available, show passcode immediately
-            shouldShowPasscode = true
-        }
-    }
-    
-    private func handlePasscodeSet() {
-        // Passcode set successfully
-        isPasswordSet = true
-        isAuthenticated = true
-        
-        // Setup encryption key for file storage
-        if let password = try? KeychainManager.shared.getPassword() {
-            FileStorageManager.shared.setupEncryptionKey(from: password)
-        }
-    }
-    
-    private func handlePasswordSet() {
-        // Password set successfully
-        isPasswordSet = true
-        isAuthenticated = true
-        
-        // Setup encryption key for file storage
-        if let password = try? KeychainManager.shared.getPassword() {
-            FileStorageManager.shared.setupEncryptionKey(from: password)
-        }
-    }
-    
-    private func handleAuthentication() {
-        // Authentication successful
-        isAuthenticated = true
-        shouldShowPasscode = false
-        
-        // Reset biometric failure count after successful passcode entry
-        BiometricAuthManager.shared.resetFailureCount()
-        
-        // Setup encryption key for file storage
-        if let password = try? KeychainManager.shared.getPassword() {
-            FileStorageManager.shared.setupEncryptionKey(from: password)
-        }
-    }
-    
-    private func handleSecurityLockTrigger() {
-        // Only lock if user is currently authenticated
-        if isAuthenticated {
-            isAuthenticated = false
-            
-            // Reset login state when app is locked
-            LoginStateManager.shared.resetLoginState()
-            
-            // Set background time to ensure authentication is required
-            KeychainManager.shared.setLastBackgroundTime()
-            
-            // Show a brief feedback to user
-            DispatchQueue.main.async {
-                let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
-                impactFeedback.impactOccurred()
-            }
-            
-            // Trigger proper authentication flow
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                checkBiometricAuthentication()
             }
         }
     }

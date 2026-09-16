@@ -45,34 +45,17 @@ extension WebServerManager {
         }
         
         let breadcrumbPath = folder.breadcrumbPath
-        var breadcrumbs = "<a onclick=\"navigateToFolder('')\">📁 Root</a>"
-        
-        for (_, pathFolder) in breadcrumbPath.enumerated() {
-            let folderIdString = pathFolder.id?.uuidString ?? ""
-            breadcrumbs += " > <a onclick=\"navigateToFolder('\(folderIdString)')\">\(pathFolder.displayName)</a>"
-        }
-        
-        return breadcrumbs
+        return WebHTMLBreadcrumbBuilder.render(breadcrumbPath.map {
+            WebBreadcrumbFixture(id: $0.id?.uuidString ?? "", name: $0.displayName)
+        })
     }
     
     func getFileIcon(fileType: String) -> String {
-        if fileType.hasPrefix("image/") { return "🖼️" }
-        if fileType.hasPrefix("video/") { return "🎥" }
-        if fileType.hasPrefix("audio/") { return "🎵" }
-        if fileType.contains("pdf") { return "📄" }
-        if fileType.contains("word") || fileType.contains("document") { return "📝" }
-        if fileType.contains("spreadsheet") || fileType.contains("excel") { return "📊" }
-        if fileType.contains("zip") || fileType.contains("rar") { return "📦" }
-        return "📄"
+        WebHTMLRowBuilder.fileIcon(for: fileType)
     }
     
     func formatFileSize(size: Int64) -> String {
-        if size == 0 { return "0 Bytes" }
-        let k: Double = 1024
-        let sizes = ["Bytes", "KB", "MB", "GB"]
-        let i = Int(floor(log(Double(size)) / log(k)))
-        let formattedSize = Double(size) / pow(k, Double(i))
-        return String(format: "%.1f %@", formattedSize, sizes[i])
+        WebHTMLRowBuilder.formattedFileSize(size)
     }
     
     func generateUploadHTML(currentFolderId: String? = nil, downloadEnabled: Bool = false) -> String {
@@ -81,65 +64,27 @@ extension WebServerManager {
         
         var folderItems = ""
         for folder in folders {
-            let itemCount = folder.totalItemCount
-            let folderIdString = folder.id?.uuidString ?? ""
-            let escapedFolderName = folder.displayName.replacingOccurrences(of: "'", with: "\\'")
-            folderItems += """
-                <div class="file-item folder-item" data-type="folder" data-id="\(folderIdString)" data-name="\(escapedFolderName)">
-                    <div class="item-checkbox">
-                        <input type="checkbox" class="item-select" onchange="updateSelectionState()">
-                    </div>
-                    <div class="file-icon">📁</div>
-                    <div class="file-info" onclick="navigateToFolder('\(folderIdString)')" style="cursor: pointer; flex: 1;">
-                        <div class="file-name">\(folder.displayName)</div>
-                        <div class="file-meta">\(itemCount) items</div>
-                    </div>
-                    <div class="file-actions">
-                        \(downloadEnabled ? """
-                        <button class="action-btn download-btn" onclick="event.stopPropagation(); downloadFolder('\(folderIdString)')" title="Download folder as ZIP">
-                            📥
-                        </button>
-                        """ : "")
-                        <button class="action-btn rename-btn" onclick="event.stopPropagation(); showRenameDialog('\(folderIdString)', '\(escapedFolderName)')" title="Rename folder">
-                            ✏️
-                        </button>
-                        <button class="action-btn delete-btn" onclick="event.stopPropagation(); showDeleteConfirmation('folder', '\(folderIdString)', '\(escapedFolderName)')" title="Delete folder">
-                            🗑️
-                        </button>
-                    </div>
-                </div>
-            """
+            folderItems += WebHTMLRowBuilder.folderRow(
+                WebFolderRowFixture(
+                    id: folder.id?.uuidString ?? "",
+                    name: folder.displayName,
+                    itemCount: folder.totalItemCount
+                ),
+                downloadEnabled: downloadEnabled
+            )
         }
         
         var fileItems = ""
         for file in files {
-            let fileIcon = getFileIcon(fileType: file.fileType ?? "")
-            let fileSize = formatFileSize(size: file.fileSize)
-            let fileName = file.fileName ?? "Unknown"
-            let fileIdString = file.id?.uuidString ?? ""
-            let escapedFileName = fileName.replacingOccurrences(of: "'", with: "\\'")
-            fileItems += """
-                <div class="file-item" data-type="file" data-id="\(fileIdString)" data-name="\(escapedFileName)">
-                    <div class="item-checkbox">
-                        <input type="checkbox" class="item-select" onchange="updateSelectionState()">
-                    </div>
-                    <div class="file-icon">\(fileIcon)</div>
-                    <div class="file-info" style="flex: 1;">
-                        <div class="file-name">\(fileName)</div>
-                        <div class="file-meta">\(fileSize)</div>
-                    </div>
-                    <div class="file-actions">
-                        \(downloadEnabled ? """
-                        <button class="action-btn download-btn" onclick="downloadFile('\(fileIdString)')" title="Download file">
-                            📥
-                        </button>
-                        """ : "")
-                        <button class="action-btn delete-btn" onclick="showDeleteConfirmation('file', '\(fileIdString)', '\(escapedFileName)')" title="Delete file">
-                            🗑️
-                        </button>
-                    </div>
-                </div>
-            """
+            fileItems += WebHTMLRowBuilder.fileRow(
+                WebFileRowFixture(
+                    id: file.id?.uuidString ?? "",
+                    name: file.fileName ?? "Unknown",
+                    fileType: file.fileType ?? "",
+                    fileSize: file.fileSize
+                ),
+                downloadEnabled: downloadEnabled
+            )
         }
         
         let emptyState = (folders.isEmpty && files.isEmpty) ? """

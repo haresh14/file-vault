@@ -5,6 +5,7 @@ import SwiftUI
 /// View model that powers `CategoryFilesView`, encapsulating loading, sorting,
 /// selection, move and delete logic so the SwiftUI view can remain purely
 /// declarative.
+@MainActor
 final class CategoryFilesViewModel: ObservableObject, SearchManageable {
     // MARK: - Published State
     @Published private(set) var items: [VaultItem] = []
@@ -50,15 +51,25 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
     // MARK: - Private
     private let categoryType: CategoryType
     private var cancellables = Set<AnyCancellable>()
-    private let loginStateManager = LoginStateManager.shared
+    private let coreDataManager: CoreDataManaging
+    private let fileStorageManager: FileStorageManaging
+    private let loginStateManager: any LoginStateManaging
 
     // MARK: - Init
-    init(categoryType: CategoryType) {
+    init(
+        categoryType: CategoryType,
+        coreDataManager: CoreDataManaging = CoreDataManager.shared,
+        fileStorageManager: FileStorageManaging = FileStorageManager.shared,
+        loginStateManager: any LoginStateManaging = LoginStateManager.shared
+    ) {
         self.categoryType = categoryType
+        self.coreDataManager = coreDataManager
+        self.fileStorageManager = fileStorageManager
+        self.loginStateManager = loginStateManager
 
         loadItems()
 
-        NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))
+        NotificationCenter.default.publisher(for: .refreshVaultItems)
             .merge(with: NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave))
             .sink { [weak self] _ in
                 self?.loadItems()
@@ -66,7 +77,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
             .store(in: &cancellables)
         
         // Reset selection mode when tab changes
-        NotificationCenter.default.publisher(for: Notification.Name("TabDidChange"))
+        NotificationCenter.default.publisher(for: .tabDidChange)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     if self?.isSelectionMode == true {
@@ -78,6 +89,15 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
     }
 
     deinit { cancellables.forEach { $0.cancel() } }
+
+    convenience init(categoryType: CategoryType, dependencies: DependencyContainer) {
+        self.init(
+            categoryType: categoryType,
+            coreDataManager: dependencies.coreDataManager,
+            fileStorageManager: dependencies.fileStorageManager,
+            loginStateManager: dependencies.loginStateManager
+        )
+    }
 
     // MARK: - Public API
 
@@ -105,7 +125,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
 
     func moveSelectedItems(to destinationFolder: Folder?) {
         for item in selectedItems {
-            CoreDataManager.shared.moveVaultItem(item, to: destinationFolder)
+            coreDataManager.moveVaultItem(item, to: destinationFolder)
         }
         exitSelectionMode()
         notifyGlobalRefresh()
@@ -113,7 +133,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
 
     func toggleFavoriteSelectedItems() {
         for item in selectedItems {
-            FileStorageManager.shared.toggleFavorite(for: item)
+            fileStorageManager.toggleFavorite(for: item)
         }
         exitSelectionMode()
         notifyGlobalRefresh()
@@ -122,7 +142,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
     func deleteSelectedItems() {
         for item in selectedItems {
             do {
-                try FileStorageManager.shared.deleteFile(vaultItem: item)
+                try fileStorageManager.deleteFile(vaultItem: item)
             } catch {
                 print("Error deleting item: \(error)")
             }
@@ -167,7 +187,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
     // MARK: - Favorites Management
     
     func toggleFavorite(for item: VaultItem) {
-        FileStorageManager.shared.toggleFavorite(for: item)
+        fileStorageManager.toggleFavorite(for: item)
         // Refresh the view to reflect the change
         notifyGlobalRefresh()
     }
@@ -202,7 +222,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
         // Check if trash is enabled
         if UserDefaults.standard.bool(forKey: "trashEnabled") {
             // Move to trash without confirmation
-            try? FileStorageManager.shared.deleteFile(vaultItem: item)
+            try? fileStorageManager.deleteFile(vaultItem: item)
             notifyGlobalRefresh()
         } else {
             // Show confirmation alert
@@ -215,7 +235,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
 
     // MARK: - Private helpers
     private func notifyGlobalRefresh() {
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
     }
 
     private func loadItems() {
@@ -225,7 +245,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
             return
         }
 
-        let allItems = CoreDataManager.shared.fetchVaultItemsFromAllFolders()
+        let allItems = coreDataManager.fetchVaultItemsFromAllFolders()
         switch categoryType {
         case .favorites:
             items = allItems.filter { $0.isFavorite }

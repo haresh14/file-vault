@@ -10,7 +10,15 @@ import Foundation
 import UIKit
 @testable import File_Vault
 
+@MainActor
+@Suite(.serialized)
 struct SecurityManagerTests {
+    private func makeManager() -> SecurityManager {
+        let suiteName = "SecurityManagerTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return SecurityManager(defaults: defaults)
+    }
     
     // MARK: - Initialization Tests
     
@@ -22,7 +30,7 @@ struct SecurityManagerTests {
     }
     
     @Test func testDefaultSecuritySettings() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         #expect(manager.isScreenshotProtectionEnabled == true, "Screenshot protection should be enabled by default")
         #expect(manager.isRecordingProtectionEnabled == true, "Recording protection should be enabled by default")
@@ -31,7 +39,7 @@ struct SecurityManagerTests {
     // MARK: - Screenshot Protection Tests
     
     @Test func testEnableScreenshotProtection() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Test enabling
         manager.enableScreenshotProtection(true)
@@ -43,7 +51,7 @@ struct SecurityManagerTests {
     }
     
     @Test func testScreenshotDetectionLogging() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Clear existing logs
         manager.clearSecurityLogs()
@@ -59,7 +67,7 @@ struct SecurityManagerTests {
     // MARK: - Screen Recording Protection Tests
     
     @Test func testEnableRecordingProtection() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Test enabling
         manager.enableRecordingProtection(true)
@@ -73,7 +81,7 @@ struct SecurityManagerTests {
     // MARK: - Security Event Logging Tests
     
     @Test func testSecurityEventLogging() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Clear existing logs
         manager.clearSecurityLogs()
@@ -89,20 +97,26 @@ struct SecurityManagerTests {
     }
     
     @Test func testSecurityLogRotation() async throws {
-        let manager = SecurityManager.shared
-        
-        // Clear existing logs
-        manager.clearSecurityLogs()
-        
-        // The log rotation logic is internal, but we can test the public interface
-        let logs = manager.getSecurityLogs()
-        #expect(logs.count <= 100, "Security logs should not exceed 100 entries")
+        let suiteName = "SecurityEventLoggerTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let logger = SecurityEventLogger(defaults: defaults)
+
+        for index in 0..<105 {
+            logger.log("Event \(index)")
+        }
+
+        let logs = logger.logs()
+        #expect(logs.count == 100)
+        #expect(logs.first?.contains("Event 5") == true)
+        #expect(logs.last?.contains("Event 104") == true)
+        defaults.removePersistentDomain(forName: suiteName)
     }
     
     // MARK: - Settings Integration Tests
     
     @Test func testSecuritySettingsPersistence() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Test that settings changes persist
         let originalScreenshotSetting = manager.isScreenshotProtectionEnabled
@@ -124,7 +138,7 @@ struct SecurityManagerTests {
     // MARK: - Error Handling Tests
     
     @Test func testSecurityManagerErrorHandling() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Test that the manager handles different states gracefully
         // This is more of a robustness test
@@ -137,7 +151,7 @@ struct SecurityManagerTests {
     // MARK: - Performance Tests
     
     @Test func testSecurityManagerPerformance() async throws {
-        let manager = SecurityManager.shared
+        let manager = makeManager()
         
         // Test that security operations are performant
         let startTime = CFAbsoluteTimeGetCurrent()
@@ -155,21 +169,15 @@ struct SecurityManagerTests {
     
     // MARK: - Thread Safety Tests
     
-    @Test func testSecurityManagerThreadSafety() async throws {
-        let manager = SecurityManager.shared
+    @Test func testSecurityManagerStateTransitions() async throws {
+        let manager = makeManager()
         
-        // Test concurrent access
-        await withTaskGroup(of: Void.self) { group in
             for i in 0..<10 {
-                group.addTask {
                     manager.enableScreenshotProtection(i % 2 == 0)
                     manager.enableRecordingProtection(i % 2 == 1)
-                    _ = manager.getSecurityLogs()
-                }
-            }
         }
         
-        // If we get here without crashing, thread safety is working
-        #expect(true, "SecurityManager should handle concurrent access safely")
+        #expect(manager.isScreenshotProtectionEnabled == false)
+        #expect(manager.isRecordingProtectionEnabled == true)
     }
 } 

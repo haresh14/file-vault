@@ -139,7 +139,7 @@ extension BackgroundUploadManager: URLSessionDelegate {
 // MARK: - URLSessionTaskDelegate
 extension BackgroundUploadManager: URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let uploadTask = task as? URLSessionUploadTask,
+        guard task is URLSessionUploadTask,
               let taskInfo = uploadTasks[task.taskIdentifier] else { return }
         
         // Clean up temporary file
@@ -149,14 +149,14 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
         if let error = error {
             print("Upload failed for \(taskInfo.fileName): \(error)")
             NotificationCenter.default.post(
-                name: Notification.Name("BackgroundUploadFailed"),
+                name: .backgroundUploadFailed,
                 object: nil,
                 userInfo: ["uploadId": taskInfo.uploadId, "error": error]
             )
         } else {
             print("Upload completed for \(taskInfo.fileName)")
             NotificationCenter.default.post(
-                name: Notification.Name("BackgroundUploadCompleted"),
+                name: .backgroundUploadCompleted,
                 object: nil,
                 userInfo: ["uploadId": taskInfo.uploadId]
             )
@@ -168,7 +168,7 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
         
         let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
         NotificationCenter.default.post(
-            name: Notification.Name("BackgroundUploadProgress"),
+            name: .backgroundUploadProgress,
             object: nil,
             userInfo: [
                 "uploadId": taskInfo.uploadId,

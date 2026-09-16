@@ -49,6 +49,13 @@ struct DependencyContainerTests {
         #expect(testContainer.webServerManager != nil, "Test container should have WebServerManager")
         #expect(testContainer.appDataManager != nil, "Test container should have AppDataManager")
     }
+
+    @Test @MainActor func testInjectedImportServiceIsRetained() {
+        let importer = FakeVaultImportService()
+        let container = DependencyContainer.createForTesting(vaultImportService: importer)
+
+        #expect(container.vaultImportService as AnyObject === importer)
+    }
     
     @Test func testProtocolConformance() async throws {
         let container = DependencyContainer.shared

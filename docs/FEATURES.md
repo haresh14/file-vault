@@ -234,7 +234,7 @@ MIME detection: `FileStorageManager.determineFileType(from:)` by extension; UTI 
 | O3 | Favorite | Toggle `isFavorite`; heart in viewer and lists | Core Data |
 | O4 | Share / export | Decrypt to temp file → share sheet | `UIActivityViewController`, `ShareManager`, `prepareForSharing` |
 | O5 | Delete | Trash if enabled; else permanent delete with reference counting | Core Data + FileStorage |
-| O6 | Search | **Gallery** and **Category files** use SwiftUI `.searchable` and filter `fileName` immediately (no debounce). Folder browser has **no** search field. `SearchViewModel` (0.2–0.3s debounce, recent searches) exists and is unit-tested but **not wired** to those screens | SwiftUI searchable |
+| O6 | Search | **Gallery** and **Category files** use SwiftUI `.searchable` and filter `fileName` immediately (no debounce). Folder browser has **no** search field. | SwiftUI searchable |
 | O7 | Sort files | User Default, Name, Size, Date, Kind, Favorites | `SortOption` / `FolderSortOption` |
 | O8 | Multi-select | Long-press or “Select”; Select All; Favorite, Share, Move, Delete | Selection toolbars / floating bar |
 | O9 | Context menu (file) | Select, Favorite/Unfavorite, Rename, Move, Share, Delete | SwiftUI contextMenu |
@@ -435,8 +435,8 @@ These are confirmed absences. Do not treat them as regressions unless product ad
 
 | Target | Coverage (current files) |
 |--------|---------------------------|
-| File VaultTests | Keychain, Core Data, FileStorage, Security, Biometric, SearchViewModel (isolated), VaultMain ViewModel, WebServer, DI, EmptyState, SimpleTests |
-| File VaultUITests | Launch tests |
+| File VaultTests | Keychain, Core Data, storage/crypto/thumbnails/trash, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
+| File VaultUITests | First-launch authentication, tab/navigation, fake-vault restrictions, add controls, and launch smoke tests |
 
 Upgrade work should run unit tests on the new SDK simulator and a smoke pass of UI tests. Tests are not a substitute for the checklist below.
 
@@ -508,10 +508,8 @@ Recorded so upgrades do not “fix” the wrong thing:
 4. Thumbnails are **not** AES-encrypted (filenames can leak that a file exists).
 5. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
 6. Screenshot/recording Settings toggles are not persisted (see §4.3).
-7. `SearchViewModel` / `VaultItemSearchViewModel` / `FolderSearchViewModel` are unused by app screens.
-8. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
-9. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
-10. `VaultMainViewModelTests.swift` references removed ViewModel members and prevents the unit-test target from compiling.
+7. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
+8. Screenshot **alert** still fires when screenshot protection is toggled off; only the inactive-state overlay is gated.
 
 ---
 

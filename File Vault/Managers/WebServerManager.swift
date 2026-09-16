@@ -316,99 +316,41 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     private func processHTTPRequest(data: Data, connection: NWConnection) {
         print("DEBUG: processHTTPRequest called with \(data.count) bytes")
-        
-        // Find the end of HTTP headers (double CRLF)
-        let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
-        guard let headerEndRange = data.range(of: headerEndMarker) else {
-            print("DEBUG: No HTTP header end marker found")
+        guard let request = WebHTTPRequest.parse(data) else {
+            print("DEBUG: Invalid HTTP request")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
-        
-        // Extract headers (safe to convert to UTF-8)
-        let headerData = data.subdata(in: data.startIndex..<headerEndRange.lowerBound)
-        guard let headerString = String(data: headerData, encoding: .utf8) else {
-            print("DEBUG: Failed to convert header data to UTF-8 string")
-            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
-            return
-        }
-        
-        print("DEBUG: Header string length: \(headerString.count)")
-        print("DEBUG: Header preview: \(headerString.prefix(500))")
-        
-        // Parse request line
-        let lines = headerString.components(separatedBy: "\r\n")
-        guard let requestLine = lines.first, !requestLine.isEmpty else {
-            print("DEBUG: No request line found")
-            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
-            return
-        }
-        
-        print("DEBUG: Request line: \(requestLine)")
-        
-        let components = requestLine.components(separatedBy: " ")
-        guard components.count >= 3 else {
-            print("DEBUG: Invalid request line format")
-            sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
-            return
-        }
-        
-        let method = components[0]
-        let path = components[1]
-        print("DEBUG: Method: \(method), Path: \(path)")
-        
-        // Block all web access when in fake login mode
-        if LoginStateManager.shared.shouldShowEmptyVault {
-            print("DEBUG: Fake login active - blocking web server request")
-            sendHTTPResponse(connection: connection, statusCode: 403, body: "<html><body><h2>Access disabled</h2><p>Web access is disabled in fake login mode.</p></body></html>")
-            return
-        }
-        
-        // Route the request
-        switch (method, path) {
-        case ("GET", "/"):
-            print("DEBUG: Serving upload page for /")
-            serveUploadPage(connection: connection, path: path)
-        case ("GET", let p) where p.hasPrefix("/upload"):
-            print("DEBUG: Serving upload page for \(p)")
-            serveUploadPage(connection: connection, path: p)
-        case ("GET", "/test"):
-            print("DEBUG: Serving test page")
+
+        print("DEBUG: Method: \(request.method), Path: \(request.path)")
+        switch WebRequestRouter.route(request, fakeLoginActive: LoginStateManager.shared.shouldShowEmptyVault) {
+        case .fakeLoginForbidden:
+            sendPreparedResponse(connection: connection, response: WebRequestRouter.fakeLoginResponse)
+        case .uploadPage:
+            serveUploadPage(connection: connection, path: request.path)
+        case .testPage:
             sendHTTPResponse(connection: connection, statusCode: 200, body: "<html><body><h1>Test Page</h1><p>Server is working!</p></body></html>")
-        case ("POST", "/upload"):
-            print("DEBUG: ⬆️ POST /upload request received - Handling file upload")
-            print("DEBUG: ⬆️ Request data size: \(data.count) bytes")
+        case .upload:
             handleFileUpload(requestData: data, connection: connection)
-        case ("POST", "/upload/stream"):
-            print("DEBUG: 🌊 POST /upload/stream request received - Handling streaming file upload")
-            print("DEBUG: 🌊 Request data size: \(data.count) bytes")
+        case .streamUpload:
             handleStreamingFileUpload(requestData: data, connection: connection)
-        case ("POST", "/api/folder/create"):
-            print("DEBUG: 📁 POST /api/folder/create - Creating folder")
+        case .createFolder:
             handleCreateFolder(requestData: data, connection: connection)
-        case ("POST", "/api/folder/rename"):
-            print("DEBUG: ✏️ POST /api/folder/rename - Renaming folder")
+        case .renameFolder:
             handleRenameFolder(requestData: data, connection: connection)
-        case ("POST", "/api/folder/delete"):
-            print("DEBUG: 🗑️ POST /api/folder/delete - Deleting folder")
+        case .deleteFolder:
             handleDeleteFolder(requestData: data, connection: connection)
-        case ("POST", "/api/file/delete"):
-            print("DEBUG: 🗑️ POST /api/file/delete - Deleting file")
+        case .deleteFile:
             handleDeleteFile(requestData: data, connection: connection)
-        case ("POST", "/api/bulk/delete"):
-            print("DEBUG: 🗑️ POST /api/bulk/delete - Bulk deleting items")
+        case .bulkDelete:
             handleBulkDelete(requestData: data, connection: connection)
-        case ("GET", let p) where p.hasPrefix("/download/file/"):
-            print("DEBUG: 📥 GET /download/file/ - Downloading file")
-            handleFileDownload(path: p, connection: connection)
-        case ("GET", let p) where p.hasPrefix("/download/folder/"):
-            print("DEBUG: 📥 GET /download/folder/ - Downloading folder as ZIP")
-            handleFolderDownload(path: p, connection: connection)
-        case ("GET", "/status"):
-            print("DEBUG: Serving status page")
+        case .fileDownload:
+            handleFileDownload(path: request.path, connection: connection)
+        case .folderDownload:
+            handleFolderDownload(path: request.path, connection: connection)
+        case .status:
             serveStatusPage(connection: connection)
-        default:
-            print("DEBUG: Unknown request: \(method) \(path)")
+        case .notFound:
             sendHTTPResponse(connection: connection, statusCode: 404, body: "Not Found")
         }
     }
@@ -416,35 +358,17 @@ class WebServerManager: ObservableObject, WebServerManaging {
     // MARK: - HTTP Response Helpers
     
     private func sendHTTPResponse(connection: NWConnection, statusCode: Int, contentType: String = "text/html; charset=utf-8", body: String) {
-        let statusText = HTTPStatusText.text(for: statusCode)
-        let bodyData = body.data(using: .utf8) ?? Data()
-        
-        let response = """
-        HTTP/1.1 \(statusCode) \(statusText)\r
-        Content-Type: \(contentType)\r
-        Content-Length: \(bodyData.count)\r
-        Connection: close\r
-        Cache-Control: no-cache\r
-        \r
-        \(body)
-        """
-        
-        guard let responseData = response.data(using: .utf8) else {
-            print("DEBUG: Failed to create response data")
-            connection.cancel()
-            return
-        }
-        
-        print("DEBUG: Sending HTTP response: \(statusCode) \(statusText), body length: \(bodyData.count)")
-        
-        connection.send(content: responseData, completion: .contentProcessed { error in
+        sendPreparedResponse(
+            connection: connection,
+            response: WebHTTPResponse.text(statusCode: statusCode, contentType: contentType, body: body)
+        )
+    }
+
+    private func sendPreparedResponse(connection: NWConnection, response: WebHTTPResponse) {
+        connection.send(content: response.serializedData, completion: .contentProcessed { error in
             if let error = error {
                 print("DEBUG: Error sending response: \(error)")
-            } else {
-                print("DEBUG: Response sent successfully")
             }
-            
-            // Give a small delay before closing to ensure data is sent
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
                 connection.cancel()
             }
@@ -800,11 +724,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
             CoreDataManager.shared.save()
             
             // Post multiple notifications to ensure all UI components refresh
-            NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+            NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: CoreDataManager.shared.context)
             
             // Also trigger a general refresh notification
-            NotificationCenter.default.post(name: Notification.Name("VaultDataChanged"), object: nil)
+            NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
         }
     }
     
@@ -918,9 +842,9 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 // Notify UI to refresh
                 DispatchQueue.main.async {
                     CoreDataManager.shared.save()
-                    NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                    NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
                     NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: CoreDataManager.shared.context)
-                    NotificationCenter.default.post(name: Notification.Name("VaultDataChanged"), object: nil)
+                    NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
                 }
                 
             } catch FileStorageError.duplicateFile {
@@ -1005,7 +929,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             // Notify UI to refresh
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             }
             
         } catch {
@@ -1045,7 +969,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             // Notify UI to refresh
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             }
             
         } catch {
@@ -1083,7 +1007,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             // Notify UI to refresh
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             }
             
         } catch {
@@ -1121,7 +1045,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             // Notify UI to refresh
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             }
             
         } catch {
@@ -1212,7 +1136,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             // Notify UI to refresh
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+                NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             }
             
         } catch {
@@ -1233,12 +1157,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             return
         }
         
-        // Extract file ID from path: /download/file/{fileId}
-        let pathComponents = path.components(separatedBy: "/")
-        guard pathComponents.count >= 4,
-              pathComponents[1] == "download",
-              pathComponents[2] == "file",
-              let fileId = UUID(uuidString: pathComponents[3]) else {
+        guard let fileId = WebDownloadPathResolver.fileID(from: path) else {
             print("DEBUG: ❌ Invalid file download path: \(path)")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Invalid file ID")
             return
@@ -1284,12 +1203,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             return
         }
         
-        // Extract folder ID from path: /download/folder/{folderId}
-        let pathComponents = path.components(separatedBy: "/")
-        guard pathComponents.count >= 4,
-              pathComponents[1] == "download",
-              pathComponents[2] == "folder",
-              let folderId = UUID(uuidString: pathComponents[3]) else {
+        guard let folderId = WebDownloadPathResolver.folderID(from: path) else {
             print("DEBUG: ❌ Invalid folder download path: \(path)")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Invalid folder ID")
             return
@@ -1324,30 +1238,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
     }
     
     private func sendFileResponse(connection: NWConnection, data: Data, fileName: String, contentType: String) {
-        let statusText = HTTPStatusText.text(for: 200)
-        let encodedFileName = fileName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fileName
-        
-        let response = """
-        HTTP/1.1 200 \(statusText)\r
-        Content-Type: \(contentType)\r
-        Content-Length: \(data.count)\r
-        Content-Disposition: attachment; filename="\(encodedFileName)"\r
-        Cache-Control: no-cache\r
-        Connection: close\r
-        \r
-
-        """
-        
-        guard let responseHeaderData = response.data(using: .utf8) else {
-            print("DEBUG: Failed to create response header data")
-            connection.cancel()
-            return
-        }
-        
+        let response = WebHTTPResponse.download(data: data, fileName: fileName, contentType: contentType)
         print("DEBUG: Sending file response: \(fileName), size: \(data.count) bytes")
         
         // Send headers first
-        connection.send(content: responseHeaderData, completion: .contentProcessed { error in
+        connection.send(content: response.headerData, completion: .contentProcessed { error in
             if let error = error {
                 print("DEBUG: Error sending file headers: \(error)")
                 connection.cancel()
@@ -1355,7 +1250,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
             
             // Then send file data
-            connection.send(content: data, completion: .contentProcessed { error in
+            connection.send(content: response.bodyData, completion: .contentProcessed { error in
                 if let error = error {
                     print("DEBUG: Error sending file data: \(error)")
                 } else {
@@ -1534,91 +1429,14 @@ class WebServerManager: ObservableObject, WebServerManaging {
 
 }
 
-// MARK: - HTTP Status Codes
-
-struct HTTPStatusText {
-    static func text(for code: Int) -> String {
-        switch code {
-        case 200: return "OK"
-        case 400: return "Bad Request"
-        case 404: return "Not Found"
-        case 500: return "Internal Server Error"
-        default: return "Unknown"
-        }
-    }
-}
-
-// MARK: - Multipart Data Parsing
-
-struct MultipartPart {
-    let headers: [String: String]
-    let data: Data?
-    
-    var fieldName: String? {
-        guard let contentDisposition = headers["content-disposition"] else { return nil }
-        
-        // Extract field name from Content-Disposition header
-        let components = contentDisposition.components(separatedBy: ";")
-        for component in components {
-            let trimmed = component.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("name=") {
-                let fieldName = trimmed.replacingOccurrences(of: "name=", with: "")
-                return fieldName.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-            }
-        }
-        return nil
-    }
-    
-    var fileName: String? {
-        guard let contentDisposition = headers["content-disposition"] else { return nil }
-        
-        // Extract filename from Content-Disposition header
-        let components = contentDisposition.components(separatedBy: ";")
-        for component in components {
-            let trimmed = component.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("filename=") {
-                let filename = trimmed.replacingOccurrences(of: "filename=", with: "")
-                return filename.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-            }
-        }
-        return nil
-    }
-}
-
 extension WebServerManager {
     
     private func extractBoundary(from requestString: String) -> String {
-        let lines = requestString.components(separatedBy: "\r\n")
-        for line in lines {
-            if line.lowercased().hasPrefix("content-type:") && line.contains("boundary=") {
-                let components = line.components(separatedBy: "boundary=")
-                if components.count > 1 {
-                    return components[1].trimmingCharacters(in: .whitespaces)
-                }
-            }
-        }
-        return ""
+        WebHTTPHeaderParser.boundary(from: requestString) ?? ""
     }
     
     private func extractContentLength(from data: Data) -> Int {
-        guard let headerEndRange = data.range(of: "\r\n\r\n".data(using: .utf8)!) else {
-            return 0
-        }
-        
-        let headerData = data.subdata(in: data.startIndex..<headerEndRange.lowerBound)
-        guard let headerString = String(data: headerData, encoding: .utf8) else {
-            return 0
-        }
-        
-        let lines = headerString.components(separatedBy: "\r\n")
-        for line in lines {
-            if line.lowercased().hasPrefix("content-length:") {
-                let lengthString = line.replacingOccurrences(of: "content-length:", with: "", options: .caseInsensitive)
-                    .trimmingCharacters(in: .whitespaces)
-                return Int(lengthString) ?? 0
-            }
-        }
-        return 0
+        WebHTTPHeaderParser.contentLength(from: data)
     }
     
     /// Creates folder structure based on file path and returns the target folder for the file
@@ -1627,26 +1445,17 @@ extension WebServerManager {
             return baseFolder
         }
         
-        // Split the path into components (folders)
-        let pathComponents = filePath.components(separatedBy: "/")
-        
-        // Remove the last component (filename) to get folder path
-        guard pathComponents.count > 1 else {
-            return baseFolder // File is in root of selected folder
+        guard let folderComponents = WebUploadPathResolver.folderComponents(
+            for: filePath,
+            mode: folderUploadMode
+        ) else {
+            throw NSError(
+                domain: "InvalidUploadPath",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unsafe upload path"]
+            )
         }
-        
-        var folderComponents = Array(pathComponents.dropLast())
-        
-        // If folder upload mode is "contents", skip the first folder component (the selected folder itself)
-        if folderUploadMode == "contents" && !folderComponents.isEmpty {
-            folderComponents.removeFirst()
-            print("DEBUG: Folder upload mode is 'contents', skipping root folder. Remaining path: \(folderComponents.joined(separator: "/"))")
-            
-            // If no components left after removing root folder, upload to base folder
-            if folderComponents.isEmpty {
-                return baseFolder
-            }
-        }
+        guard !folderComponents.isEmpty else { return baseFolder }
         
         print("DEBUG: Creating folder structure for path: \(folderComponents.joined(separator: "/"))")
         
@@ -1860,143 +1669,7 @@ extension WebServerManager {
     }
     
     private func parseMultipartData(data: Data, boundary: String) -> [MultipartPart] {
-        print("DEBUG: parseMultipartData called with boundary: '\(boundary)', data size: \(data.count)")
-        
-        let boundaryData = "--\(boundary)".data(using: .utf8)!
-        let endBoundaryData = "--\(boundary)--".data(using: .utf8)!
-        
-        print("DEBUG: Looking for boundary data: \(boundaryData.count) bytes")
-        print("DEBUG: Boundary string: '--\(boundary)'")
-        print("DEBUG: End boundary string: '--\(boundary)--'")
-        
-        var parts: [MultipartPart] = []
-        
-        // Find all boundary positions first
-        var boundaryPositions: [Range<Data.Index>] = []
-        var tempSearchRange = data.startIndex..<data.endIndex
-        
-        // First, find all regular boundaries
-        while let boundaryRange = data.range(of: boundaryData, in: tempSearchRange) {
-            boundaryPositions.append(boundaryRange)
-            tempSearchRange = boundaryRange.upperBound..<data.endIndex
-        }
-        
-        // Then, find the end boundary (but don't add it if it's too close to the last regular boundary)
-        if let endBoundaryRange = data.range(of: endBoundaryData, in: data.startIndex..<data.endIndex) {
-            // Check if this end boundary is different from the last regular boundary
-            if let lastBoundary = boundaryPositions.last {
-                if endBoundaryRange.lowerBound > lastBoundary.upperBound {
-                    boundaryPositions.append(endBoundaryRange)
-                } else {
-                    print("DEBUG: End boundary overlaps with last regular boundary, using end boundary instead")
-                    boundaryPositions[boundaryPositions.count - 1] = endBoundaryRange
-                }
-            } else {
-                boundaryPositions.append(endBoundaryRange)
-            }
-        }
-        
-        // Sort boundaries by position to ensure proper order
-        boundaryPositions.sort { $0.lowerBound < $1.lowerBound }
-        
-        print("DEBUG: Found \(boundaryPositions.count) total boundaries")
-        
-        // Debug: Print all boundary positions
-        for (index, boundary) in boundaryPositions.enumerated() {
-            print("DEBUG: Boundary \(index): \(boundary)")
-        }
-        
-        // Process each part between boundaries
-        for i in 0..<boundaryPositions.count - 1 {
-            let currentBoundary = boundaryPositions[i]
-            let nextBoundary = boundaryPositions[i + 1]
-            
-            print("DEBUG: Processing part \(i) between boundaries at \(currentBoundary) and \(nextBoundary)")
-            
-            // Validate that we have a valid range
-            if currentBoundary.upperBound >= nextBoundary.lowerBound {
-                print("DEBUG: ❌ Invalid range detected: currentBoundary.upperBound (\(currentBoundary.upperBound)) >= nextBoundary.lowerBound (\(nextBoundary.lowerBound))")
-                print("DEBUG: Skipping part \(i) due to invalid range")
-                continue
-            }
-            
-            let partData = data.subdata(in: currentBoundary.upperBound..<nextBoundary.lowerBound)
-            print("DEBUG: Part \(i) raw data size: \(partData.count)")
-            
-            if let part = parseMultipartPart(data: partData) {
-                parts.append(part)
-                print("DEBUG: ✅ Successfully parsed part \(i + 1), fieldName: '\(part.fieldName ?? "nil")', filename: '\(part.fileName ?? "nil")', dataSize: \(part.data?.count ?? 0)")
-            } else {
-                print("DEBUG: ❌ Failed to parse part \(i)")
-            }
-        }
-        
-        print("DEBUG: parseMultipartData completed, found \(parts.count) parts")
-        return parts
-    }
-    
-    private func parseMultipartPart(data: Data) -> MultipartPart? {
-        print("DEBUG: parseMultipartPart called with data size: \(data.count)")
-        
-        // Show first 200 bytes of raw data for debugging
-        let previewData = data.prefix(200)
-        if let previewString = String(data: previewData, encoding: .utf8) {
-            print("DEBUG: Part data preview: \(previewString.replacingOccurrences(of: "\r\n", with: "\\r\\n"))")
-        }
-        
-        // Find the double CRLF that separates headers from body
-        let headerBodySeparator = "\r\n\r\n".data(using: .utf8)!
-        
-        guard let separatorRange = data.range(of: headerBodySeparator) else { 
-            print("DEBUG: No header-body separator found")
-            // Try single CRLF as fallback
-            let singleCRLF = "\r\n".data(using: .utf8)!
-            if let singleSeparatorRange = data.range(of: singleCRLF) {
-                print("DEBUG: Found single CRLF at position \(singleSeparatorRange)")
-                let headerData = data.subdata(in: data.startIndex..<singleSeparatorRange.lowerBound)
-                let bodyData = data.subdata(in: singleSeparatorRange.upperBound..<data.endIndex)
-                
-                if let headerString = String(data: headerData, encoding: .utf8) {
-                    print("DEBUG: Single CRLF header: \(headerString)")
-                    print("DEBUG: Body data size after single CRLF: \(bodyData.count)")
-                }
-            }
-            return nil 
-        }
-        
-        let headerData = data.subdata(in: data.startIndex..<separatorRange.lowerBound)
-        let bodyData = data.subdata(in: separatorRange.upperBound..<data.endIndex)
-        
-        print("DEBUG: Header data size: \(headerData.count), Body data size: \(bodyData.count)")
-        
-        // Parse headers as string
-        guard let headerString = String(data: headerData, encoding: .utf8) else { 
-            print("DEBUG: Failed to convert header data to string")
-            return nil 
-        }
-        
-        print("DEBUG: Header string: \(headerString)")
-        
-        var headers: [String: String] = [:]
-        let headerLines = headerString.components(separatedBy: "\r\n")
-        
-        for line in headerLines {
-            if line.contains(":") {
-                let parts = line.components(separatedBy: ":")
-                if parts.count >= 2 {
-                    let key = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
-                    let value = parts.dropFirst().joined(separator: ":").trimmingCharacters(in: .whitespaces)
-                    headers[key] = value
-                }
-            }
-        }
-        
-        print("DEBUG: Parsed headers: \(headers)")
-        
-        // Keep body as binary data
-        let part = MultipartPart(headers: headers, data: bodyData)
-        print("DEBUG: Created part with filename: \(part.fileName ?? "none"), fieldName: \(part.fieldName ?? "none")")
-        return part
+        WebMultipartParser.parse(data: data, boundary: boundary)
     }
     
     // MARK: - Batch Upload Processing

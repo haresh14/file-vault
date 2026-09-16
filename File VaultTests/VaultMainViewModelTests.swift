@@ -73,4 +73,57 @@ struct VaultMainViewModelTests {
         #expect(viewModel.allItems.isEmpty, "All items should be empty initially")
         #expect(viewModel.filteredItems.isEmpty, "Filtered items should be empty initially")
     }
+
+    @Test func testOrderingSearchSelectionAndMediaIndexParity() {
+        let coreData = TestCoreDataStore.reset()
+        let storage = FakeFileStorageManager(coreDataManager: coreData)
+        let login = FakeLoginStateManager()
+        let first = coreData.createVaultItem(fileType: "image/jpeg", fileName: "Bravo.jpg", folder: nil)!
+        first.createdAt = Date(timeIntervalSince1970: 1)
+        let second = coreData.createVaultItem(fileType: "video/quicktime", fileName: "Alpha.mov", folder: nil)!
+        second.createdAt = Date(timeIntervalSince1970: 2)
+        _ = coreData.createVaultItem(fileType: "application/pdf", fileName: "Ignored.pdf", folder: nil)
+        coreData.save()
+
+        let viewModel = VaultMainViewModel(
+            coreDataManager: coreData,
+            fileStorageManager: storage,
+            loginStateManager: login
+        )
+        viewModel.sortOption = .name
+        #expect(viewModel.filteredItems.map(\.fileName) == ["Alpha.mov", "Bravo.jpg"])
+
+        viewModel.searchText = "bravo"
+        #expect(viewModel.filteredItems == [first])
+        viewModel.selectAll(from: viewModel.filteredItems)
+        #expect(viewModel.selectedItems == [first])
+
+        viewModel.searchText = ""
+        viewModel.showMediaViewerForItem(first)
+        #expect(viewModel.mediaViewerIndex == 1)
+    }
+
+    @Test func testFakeVaultFilteringAndInjectedImport() async {
+        let coreData = TestCoreDataStore.reset()
+        _ = coreData.createVaultItem(fileType: "image/jpeg", fileName: "Hidden.jpg", folder: nil)
+        let login = FakeLoginStateManager()
+        login.setLoginState(isFakeLogin: true)
+        let importer = FakeVaultImportService()
+        let viewModel = VaultMainViewModel(
+            coreDataManager: coreData,
+            fileStorageManager: FakeFileStorageManager(coreDataManager: coreData),
+            importService: importer,
+            loginStateManager: login
+        )
+
+        #expect(viewModel.vaultItems.isEmpty)
+        viewModel.showDocumentPicker = true
+        viewModel.importDocuments([(Data(), "test.pdf")])
+        await Task.yield()
+        await Task.yield()
+
+        #expect(importer.documentTargetFolder == nil)
+        #expect(viewModel.showDocumentPicker == false)
+        #expect(viewModel.isImporting == false)
+    }
 }

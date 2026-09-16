@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreData
 
 // `CategoryType` has been moved to Models/CategoryType.swift
 struct CategoryView: View {

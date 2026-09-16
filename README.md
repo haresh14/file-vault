@@ -69,22 +69,30 @@ Files in `Documents/Vault/` are encrypted with **AES-GCM** (key = SHA256 of the 
 File Vault/
 ├── FileVaultApp.swift          # App entry, first-launch cleanup, background session init
 ├── ContentView.swift           # Auth gates → MainTabView
+├── Coordinators/               # Authentication and lock orchestration
 ├── Dependencies/               # DependencyContainer
 ├── Models/                     # Core Data (Folder, VaultItem), protocols
-├── Managers/                   # Storage, security, web server, Core Data, notifications
+├── Managers/                   # Compatibility facades plus focused storage, security, web, Core Data services
+├── Services/                   # Shared vault import workflow
 ├── ViewModels/
 ├── Views/                      # Tabs: Folders, Category, Gallery, Web Upload, Settings
-├── Utilities/                  # Keychain, share, rename
+├── Utilities/                  # Keychain, sharing, notification names
 docs/FEATURES.md                # Canonical feature catalog
 File VaultTests/                # Unit tests
-File VaultUITests/              # Launch tests
+File VaultUITests/              # Launch and navigation smoke tests
 ```
 
 Five tabs after unlock: **Folder**, **Category**, **Gallery**, **Web Upload**, **Settings**.
 
 ## Testing
 
-Unit tests: **⌘U** in Xcode (`File VaultTests`).
+Unit tests: **⌘U** in Xcode (`File VaultTests`). For deterministic command-line runs, disable parallel testing:
+
+```sh
+xcodebuild -project "File Vault.xcodeproj" -scheme "File Vault" \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  test -only-testing:"File VaultTests" -parallel-testing-enabled NO
+```
 
 Auth smoke test:
 1. Launch and choose 4-digit, 6-digit, or password.
@@ -101,7 +109,6 @@ These are real implementation issues, not old video-player TODOs:
 - Screenshot **alert still fires** if that protection toggle is off; only the overlay is gated.
 - Folder tab has no search field.
 - No in-app camera capture.
-- `VaultMainViewModelTests.swift` references removed ViewModel members and currently prevents the unit-test target from compiling.
 
 ## Need help?
 

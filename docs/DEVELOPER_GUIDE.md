@@ -107,17 +107,20 @@ The app needs Face ID permission to work properly.
 
 ```
 File Vault (Blue folder icon) - Main app folder
-├── Models/ - Data structures
-├── Managers/ - Business logic handlers
+├── Coordinators/ - Authentication and lock orchestration
+├── Dependencies/ - Dependency container
+├── Models/ - Data structures and protocols
+├── Managers/ - Compatibility facades and focused infrastructure services
+├── Services/ - Shared import workflow
 ├── Utilities/ - Helper classes
 ├── Views/ - UI components
 ├── Assets.xcassets - Images and colors
 ├── ContentView.swift - Main view
-└── File_VaultApp.swift - App entry point
+└── FileVaultApp.swift - App entry point
 
 File Vault.xcodeproj - Project configuration
 File VaultTests/ - Unit tests
-File VaultUITests/ - UI tests
+File VaultUITests/ - Launch and navigation smoke tests
 ```
 
 ### Key Files for Beginners
@@ -155,6 +158,18 @@ File VaultUITests/ - UI tests
 1. When app is running, bottom area shows console
 2. Use it to see print() statements and errors
 3. If hidden, View → Debug Area → Show Debug Area
+
+### Running Tests
+
+- In Xcode, press Cmd+U to run the selected scheme's tests.
+- Keep unit tests serial when diagnosing shared-state failures:
+
+  ```sh
+  xcodebuild -project "File Vault.xcodeproj" -scheme "File Vault" \
+    -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+    test -only-testing:"File VaultTests" -parallel-testing-enabled NO
+  ```
+- Run `File VaultUITests` on both an iPhone and iPad simulator for authentication, tab, fake-vault, and add-control smoke coverage.
 
 ### Keyboard Shortcuts
 

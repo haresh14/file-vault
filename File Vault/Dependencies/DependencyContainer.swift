@@ -18,6 +18,8 @@ protocol CoreDataManaging {
     func createFolder(name: String, parent: Folder?) -> Folder?
     func updateFolder(_ folder: Folder, name: String)
     func deleteFolder(_ folder: Folder)
+    func deleteFolderCompletely(_ folder: Folder)
+    func moveFolder(_ folder: Folder, to parent: Folder?)
     func createVaultItem(fileType: String, fileName: String, folder: Folder?) -> VaultItem?
     func deleteVaultItem(_ item: VaultItem)
     func fetchAllVaultItems() -> [VaultItem]
@@ -133,6 +135,7 @@ final class DependencyContainer: ObservableObject {
     // MARK: - Manager Instances
     private let _coreDataManager: CoreDataManaging
     private let _fileStorageManager: FileStorageManaging
+    private let _vaultImportService: VaultImportServicing
     private let _keychainManager: KeychainManaging
     private let _biometricAuthManager: any BiometricAuthManaging
     private let _loginStateManager: any LoginStateManaging
@@ -144,6 +147,7 @@ final class DependencyContainer: ObservableObject {
     private init(
         coreDataManager: CoreDataManaging? = nil,
         fileStorageManager: FileStorageManaging? = nil,
+        vaultImportService: VaultImportServicing? = nil,
         keychainManager: KeychainManaging? = nil,
         biometricAuthManager: (any BiometricAuthManaging)? = nil,
         loginStateManager: (any LoginStateManaging)? = nil,
@@ -154,6 +158,8 @@ final class DependencyContainer: ObservableObject {
         // Use provided dependencies or fall back to concrete implementations
         self._coreDataManager = coreDataManager ?? CoreDataManager.shared
         self._fileStorageManager = fileStorageManager ?? FileStorageManager.shared
+        self._vaultImportService = vaultImportService
+            ?? VaultImportService(fileStorageManager: self._fileStorageManager)
         self._keychainManager = keychainManager ?? KeychainManager.shared
         self._biometricAuthManager = biometricAuthManager ?? BiometricAuthManager.shared
         self._loginStateManager = loginStateManager ?? LoginStateManager.shared
@@ -165,6 +171,7 @@ final class DependencyContainer: ObservableObject {
     // MARK: - Dependency Access
     var coreDataManager: CoreDataManaging { _coreDataManager }
     var fileStorageManager: FileStorageManaging { _fileStorageManager }
+    var vaultImportService: VaultImportServicing { _vaultImportService }
     var keychainManager: KeychainManaging { _keychainManager }
     var biometricAuthManager: any BiometricAuthManaging { _biometricAuthManager }
     var loginStateManager: any LoginStateManaging { _loginStateManager }
@@ -176,6 +183,7 @@ final class DependencyContainer: ObservableObject {
     static func createForTesting(
         coreDataManager: CoreDataManaging? = nil,
         fileStorageManager: FileStorageManaging? = nil,
+        vaultImportService: VaultImportServicing? = nil,
         keychainManager: KeychainManaging? = nil,
         biometricAuthManager: (any BiometricAuthManaging)? = nil,
         loginStateManager: (any LoginStateManaging)? = nil,
@@ -186,6 +194,7 @@ final class DependencyContainer: ObservableObject {
         return DependencyContainer(
             coreDataManager: coreDataManager,
             fileStorageManager: fileStorageManager,
+            vaultImportService: vaultImportService,
             keychainManager: keychainManager,
             biometricAuthManager: biometricAuthManager,
             loginStateManager: loginStateManager,

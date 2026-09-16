@@ -28,7 +28,7 @@ final class CategoryViewModel: ObservableObject {
 
         // Observe refresh notifications so that data stays in sync with the
         // rest of the app.
-        NotificationCenter.default.publisher(for: Notification.Name("RefreshVaultItems"))
+        NotificationCenter.default.publisher(for: .refreshVaultItems)
             .merge(with: NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave))
             .sink { [weak self] _ in
                 self?.loadVaultItems()

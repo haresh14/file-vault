@@ -103,7 +103,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
         loadDeletedItems()
         
         // Notify other views to refresh
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
     }
     
     func permanentlyDeleteSelected() {
@@ -119,7 +119,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
         loadDeletedItems()
         
         // Notify other views to refresh
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
     }
     
     func emptyAllTrash() {
@@ -134,7 +134,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
         loadDeletedItems()
         
         // Notify other views to refresh
-        NotificationCenter.default.post(name: Notification.Name("RefreshVaultItems"), object: nil)
+        NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
     }
     
     // MARK: - MediaViewerManageable Protocol Support

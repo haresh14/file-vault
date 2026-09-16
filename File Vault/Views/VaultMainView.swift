@@ -8,12 +8,13 @@
 
 import SwiftUI
 import PhotosUI
+import CoreData
 
 /// Main gallery view displaying vault items with MVVM architecture
 struct VaultMainView: View {
     // MARK: - ViewModels
     
-    @StateObject private var viewModel = VaultMainViewModel()
+    @StateObject private var viewModel: VaultMainViewModel
     @StateObject private var importProgressViewModel = ImportProgressViewModel()
     @StateObject private var loginStateManager = LoginStateManager.shared
     
@@ -26,6 +27,10 @@ struct VaultMainView: View {
     // MARK: - Environment
     
     @Environment(\.managedObjectContext) var context
+
+    init(dependencies: DependencyContainer = .shared) {
+        _viewModel = StateObject(wrappedValue: VaultMainViewModel(dependencies: dependencies))
+    }
     
     // MARK: - Body
     

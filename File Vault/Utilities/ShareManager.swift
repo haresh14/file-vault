@@ -127,31 +127,3 @@ class ShareManager {
         FileStorageManager.shared.cleanupTemporaryFile(at: url)
     }
 }
-
-/// SwiftUI wrapper for sharing functionality
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    let onCompletion: (() -> Void)?
-    
-    init(items: [Any], onCompletion: (() -> Void)? = nil) {
-        self.items = items
-        self.onCompletion = onCompletion
-    }
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let activityViewController = UIActivityViewController(
-            activityItems: items,
-            applicationActivities: nil
-        )
-        
-        activityViewController.completionWithItemsHandler = { _, _, _, _ in
-            onCompletion?()
-        }
-        
-        return activityViewController
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
-        // No updates needed
-    }
-}

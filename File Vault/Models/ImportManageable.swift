@@ -10,6 +10,7 @@ import PhotosUI
 import SwiftUI
 
 /// Protocol for managing import functionality in views that support file imports
+@MainActor
 protocol ImportManageable: ObservableObject {
     /// Whether an import operation is currently in progress
     var isImporting: Bool { get set }
@@ -47,22 +48,5 @@ extension ImportManageable {
     
     func updateProgress(completed: Double, total: Double) {
         importProgress = completed / total
-    }
-}
-
-/// Import result for handling completion
-enum ImportResult {
-    case success(fileName: String)
-    case failure(fileName: String, error: Error)
-}
-
-/// Import operation context
-struct ImportContext {
-    let targetFolder: Folder?
-    let onCompletion: (() -> Void)?
-    
-    init(targetFolder: Folder? = nil, onCompletion: (() -> Void)? = nil) {
-        self.targetFolder = targetFolder
-        self.onCompletion = onCompletion
     }
 }

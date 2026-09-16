@@ -78,6 +78,8 @@ struct NumberPadButton: View {
             }
         }
         .buttonStyle(NumberPadButtonStyle())
+        .accessibilityIdentifier(text == "⌫" ? "keypad.delete" : text == "?" ? "keypad.help" : "keypad.\(text)")
+        .accessibilityLabel(text == "⌫" ? "Delete" : text == "?" ? "Help" : text)
     }
 }
 
