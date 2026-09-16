@@ -23,13 +23,14 @@ extension CoreDataManager {
         fileType: String,
         fileSize: Int64,
         thumbnailFileName: String? = nil,
-        in folder: Folder? = nil
+        in folder: Folder? = nil,
+        id: UUID? = nil
     ) -> VaultItem {
         let item = NSEntityDescription.insertNewObject(
             forEntityName: "VaultItem",
             into: context
         ) as! VaultItem
-        item.id = UUID()
+        item.id = id ?? UUID()
         item.fileName = fileName
         item.fileType = fileType
         item.fileSize = fileSize

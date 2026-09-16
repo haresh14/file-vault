@@ -50,8 +50,8 @@ flowchart TB
 
     subgraph Persist["Persistence"]
         SQLite["FileVault.sqlite"]
-        VaultDir["Documents/Vault (AES-GCM)"]
-        Thumbs["Documents/Thumbnails (JPEG)"]
+        VaultDir["Documents/Vault (AES-GCM, UUID names)"]
+        Thumbs["Documents/Thumbnails ({uuid}.thumb JPEG)"]
         Keychain["Keychain (credential + PBKDF2 salt)"]
         Defaults["UserDefaults"]
     end

@@ -125,23 +125,21 @@ class FileStorageManager: FileStorageManaging {
     func setupEncryptionKey(from password: String) {
         if let record = keyDerivationStore.loadRecord() {
             encryptionKey = try? cryptoService.key(from: password, record: record)
-            return
-        }
-
-        if vaultContainsCiphertext() {
+        } else if vaultContainsCiphertext() {
             encryptionKey = cryptoService.legacySHA256Key(from: password)
             upgradeLegacySHA256KeyIfNeeded(password: password)
-            return
+        } else {
+            let record = cryptoService.makeRecord()
+            do {
+                try keyDerivationStore.saveRecord(record)
+                encryptionKey = try cryptoService.key(from: password, record: record)
+            } catch {
+                print("DEBUG: Failed to store key derivation record: \(error)")
+                encryptionKey = cryptoService.legacySHA256Key(from: password)
+            }
         }
-
-        let record = cryptoService.makeRecord()
-        do {
-            try keyDerivationStore.saveRecord(record)
-            encryptionKey = try cryptoService.key(from: password, record: record)
-        } catch {
-            print("DEBUG: Failed to store key derivation record: \(error)")
-            encryptionKey = cryptoService.legacySHA256Key(from: password)
-        }
+        migrateOnDiskNamesToUUID()
+        removeOrphanedFiles()
     }
     
     /// Re-encrypt all vault files with a new encryption key
@@ -221,32 +219,143 @@ class FileStorageManager: FileStorageManaging {
     }
 
     private func reencryptVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) {
-        guard let fileName = vaultItem.fileName else {
-            print("DEBUG: Skipping item with no filename")
+        guard let sourceName = existingVaultFileName(for: vaultItem) else {
+            print("DEBUG: Skipping item with no on-disk file")
             return
         }
 
-        if fileName.hasPrefix(".") || fileName == ".DS_Store" {
-            print("DEBUG: Skipping system file: \(fileName)")
+        if sourceName.hasPrefix(".") || sourceName == ".DS_Store" {
+            print("DEBUG: Skipping system file: \(sourceName)")
             return
         }
 
-        let fileURL = vaultDirectory.appendingPathComponent(fileName)
-        guard fileManager.fileExists(atPath: fileURL.path) else {
-            print("DEBUG: File \(fileName) does not exist, skipping")
-            return
-        }
+        let fileURL = vaultDirectory.appendingPathComponent(sourceName)
+        let destinationName = vaultItem.storedBlobName ?? sourceName
+        let destinationURL = vaultDirectory.appendingPathComponent(destinationName)
 
         do {
             let encryptedData = try Data(contentsOf: fileURL)
             let decryptedData = try cryptoService.decrypt(encryptedData, using: oldKey)
             let newEncryptedData = try cryptoService.encrypt(decryptedData, using: newKey)
-            try newEncryptedData.write(to: fileURL)
-            print("DEBUG: Successfully migrated file: \(fileName)")
+            try newEncryptedData.write(to: destinationURL)
+            if destinationURL != fileURL {
+                try? fileManager.removeItem(at: fileURL)
+            }
+            print("DEBUG: Successfully migrated file: \(sourceName)")
         } catch {
-            print("DEBUG: Failed to migrate file \(fileName): \(error)")
+            print("DEBUG: Failed to migrate file \(sourceName): \(error)")
         }
     }
+
+    private func existingVaultFileName(for item: VaultItem) -> String? {
+        if let blob = item.storedBlobName, encryptedFileStore.exists(fileName: blob) {
+            return blob
+        }
+        if let display = item.fileName, encryptedFileStore.exists(fileName: display) {
+            return display
+        }
+        return nil
+    }
+
+    private func migrateOnDiskNamesToUUID() {
+        var didChange = false
+        for item in coreDataManager.fetchAllVaultItems() {
+            if migrateItemOnDisk(item) {
+                didChange = true
+            }
+        }
+        if didChange {
+            coreDataManager.save()
+        }
+    }
+
+    @discardableResult
+    private func migrateItemOnDisk(_ item: VaultItem) -> Bool {
+        guard let blob = item.storedBlobName else { return false }
+        var changed = false
+        let dest = vaultDirectory.appendingPathComponent(blob)
+        if !fileManager.fileExists(atPath: dest.path),
+           let display = item.fileName,
+           display != blob {
+            let src = vaultDirectory.appendingPathComponent(display)
+            if fileManager.fileExists(atPath: src.path) {
+                try? fileManager.moveItem(at: src, to: dest)
+                changed = true
+            }
+        }
+
+        guard let thumbDestName = item.storedThumbnailName else { return changed }
+        let thumbDest = thumbnailsDirectory.appendingPathComponent(thumbDestName)
+        if !fileManager.fileExists(atPath: thumbDest.path) {
+            var candidates: [String] = []
+            if let old = item.thumbnailFileName { candidates.append(old) }
+            if let display = item.fileName {
+                candidates.append("thumb_\(display).jpg")
+            }
+            for name in Set(candidates) {
+                let src = thumbnailsDirectory.appendingPathComponent(name)
+                if fileManager.fileExists(atPath: src.path) {
+                    try? fileManager.moveItem(at: src, to: thumbDest)
+                    changed = true
+                    break
+                }
+            }
+        }
+        if item.thumbnailFileName != nil,
+           item.thumbnailFileName != thumbDestName,
+           fileManager.fileExists(atPath: thumbDest.path) {
+            item.thumbnailFileName = thumbDestName
+            changed = true
+        }
+        return changed
+    }
+
+    /// Drop ciphertext and thumbnails that no item claims. Skipped while the vault has
+    /// no items, so an empty fetch can never clear a populated Vault directory.
+    private func removeOrphanedFiles() {
+        let items = coreDataManager.fetchAllVaultItems()
+        guard !items.isEmpty else { return }
+
+        var blobs: Set<String> = []
+        var thumbnails: Set<String> = []
+        for item in items {
+            blobs.formUnion(item.storedBlobCandidates)
+            thumbnails.formUnion(item.storedThumbnailCandidates)
+        }
+
+        removeUnreferencedFiles(in: vaultDirectory, keeping: blobs)
+        removeUnreferencedFiles(in: thumbnailsDirectory, keeping: thumbnails)
+    }
+
+    private func removeUnreferencedFiles(in directory: URL, keeping referenced: Set<String>) {
+        let urls = (try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        )) ?? []
+        for url in urls {
+            let name = url.lastPathComponent
+            guard !name.hasPrefix("."), !referenced.contains(name) else { continue }
+            try? fileManager.removeItem(at: url)
+            print("DEBUG: Removed orphaned file: \(name)")
+        }
+    }
+
+    private func removeStoredFiles(for item: VaultItem) {
+        removeStoredFiles(
+            blobs: item.storedBlobCandidates,
+            thumbnails: item.storedThumbnailCandidates
+        )
+    }
+
+    private func removeStoredFiles(blobs: Set<String>, thumbnails: Set<String>) {
+        for name in blobs {
+            try? fileManager.removeItem(at: vaultDirectory.appendingPathComponent(name))
+        }
+        for name in thumbnails {
+            try? fileManager.removeItem(at: thumbnailsDirectory.appendingPathComponent(name))
+        }
+    }
+
     
     // MARK: - Trash Operations
     
@@ -335,53 +444,17 @@ class FileStorageManager: FileStorageManaging {
             throw FileStorageError.duplicateFile
         }
         
-        // Resolve filename conflicts (add suffix if needed)
+        // Resolve display-name conflicts (add suffix if needed). Disk blobs use a UUID.
         let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
-        let fileURL = encryptedFileStore.url(for: uniqueFileName)
-        print("DEBUG: Resolved filename: \(uniqueFileName)")
-        print("DEBUG: Will save file to: \(fileURL.path)")
+        let persisted = try persistNewBlob(data: data, displayName: uniqueFileName, fileType: fileType, key: key)
         
-        // Encrypt data
-        try encryptedFileStore.write(data, fileName: uniqueFileName, key: key)
-        print("DEBUG: Encrypted file saved")
-        
-        // Generate thumbnail if it's an image or video
-        var thumbnailFileName: String? = nil
-        
-        print("DEBUG: Checking fileType for thumbnail generation")
-        print("DEBUG: fileType = '\(fileType)'")
-        print("DEBUG: fileType.hasPrefix(\"image/\") = \(fileType.hasPrefix("image/"))")
-        print("DEBUG: fileType.hasPrefix(\"video/\") = \(fileType.hasPrefix("video/"))")
-        
-        if fileType.hasPrefix("image/") {
-            print("DEBUG: Generating image thumbnail...")
-            do {
-                thumbnailFileName = try thumbnailService.generateImageThumbnail(from: data, originalFileName: uniqueFileName)
-                print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
-            } catch {
-                print("DEBUG: Failed to generate image thumbnail: \(error)")
-                // Continue without thumbnail - don't fail the entire import
-            }
-        } else if fileType.hasPrefix("video/") {
-            print("DEBUG: Generating video thumbnail...")
-            do {
-                thumbnailFileName = try thumbnailService.generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
-                print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
-            } catch {
-                print("DEBUG: Failed to generate video thumbnail: \(error)")
-                // Continue without thumbnail - don't fail the entire import
-            }
-        } else {
-            print("DEBUG: Skipping thumbnail generation for non-media fileType: \(fileType)")
-        }
-        
-        // Create Core Data entry using synchronous method for direct calls
         let vaultItem = coreDataManager.createVaultItem(
             fileName: uniqueFileName,
             fileType: fileType,
             fileSize: Int64(data.count),
-            thumbnailFileName: thumbnailFileName,
-            in: targetFolder
+            thumbnailFileName: persisted.thumbnailFileName,
+            in: targetFolder,
+            id: persisted.blobID
         )
         
         print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
@@ -408,54 +481,19 @@ class FileStorageManager: FileStorageManaging {
             return
         }
         
-        // Resolve filename conflicts (add suffix if needed)
+        // Resolve display-name conflicts (add suffix if needed)
         let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
-        let fileURL = encryptedFileStore.url(for: uniqueFileName)
-        print("DEBUG: Resolved filename: \(uniqueFileName)")
-        print("DEBUG: Will save file to: \(fileURL.path)")
         
         do {
-            // Encrypt data
-            try encryptedFileStore.write(data, fileName: uniqueFileName, key: key)
-            print("DEBUG: Encrypted file saved")
+            let persisted = try persistNewBlob(data: data, displayName: uniqueFileName, fileType: fileType, key: key)
             
-            // Generate thumbnail if it's an image or video
-            var thumbnailFileName: String? = nil
-            
-            print("DEBUG: Checking fileType for thumbnail generation")
-            print("DEBUG: fileType = '\(fileType)'")
-            print("DEBUG: fileType.hasPrefix(\"image/\") = \(fileType.hasPrefix("image/"))")
-            print("DEBUG: fileType.hasPrefix(\"video/\") = \(fileType.hasPrefix("video/"))")
-            
-            if fileType.hasPrefix("image/") {
-                print("DEBUG: Generating image thumbnail...")
-                do {
-                    thumbnailFileName = try thumbnailService.generateImageThumbnail(from: data, originalFileName: uniqueFileName)
-                    print("DEBUG: Image thumbnail result: \(thumbnailFileName ?? "nil")")
-                } catch {
-                    print("DEBUG: Failed to generate image thumbnail: \(error)")
-                    // Continue without thumbnail - don't fail the entire import
-                }
-            } else if fileType.hasPrefix("video/") {
-                print("DEBUG: Generating video thumbnail...")
-                do {
-                    thumbnailFileName = try thumbnailService.generateVideoThumbnail(from: data, originalFileName: uniqueFileName)
-                    print("DEBUG: Video thumbnail result: \(thumbnailFileName ?? "nil")")
-                } catch {
-                    print("DEBUG: Failed to generate video thumbnail: \(error)")
-                    // Continue without thumbnail - don't fail the entire import
-                }
-            } else {
-                print("DEBUG: Skipping thumbnail generation for non-media fileType: \(fileType)")
-            }
-            
-            // Create Core Data entry using background context
             coreDataManager.createVaultItemInBackground(
                 fileName: uniqueFileName,
                 fileType: fileType,
                 fileSize: Int64(data.count),
-                thumbnailFileName: thumbnailFileName,
-                in: targetFolder
+                thumbnailFileName: persisted.thumbnailFileName,
+                in: targetFolder,
+                id: persisted.blobID
             ) { vaultItem in
                 if let vaultItem = vaultItem {
                     print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
@@ -471,12 +509,37 @@ class FileStorageManager: FileStorageManaging {
         }
     }
     
+    private func persistNewBlob(
+        data: Data,
+        displayName: String,
+        fileType: String,
+        key: SymmetricKey
+    ) throws -> (blobID: UUID, thumbnailFileName: String?) {
+        let blobID = UUID()
+        let blobName = blobID.uuidString
+        try encryptedFileStore.write(data, fileName: blobName, key: key)
+
+        var thumbnailFileName: String?
+        if fileType.hasPrefix("image/") {
+            thumbnailFileName = try? thumbnailService.generateImageThumbnail(from: data, storageKey: blobName)
+        } else if fileType.hasPrefix("video/") {
+            thumbnailFileName = try? thumbnailService.generateVideoThumbnail(
+                from: data,
+                storageKey: blobName,
+                displayFileName: displayName
+            )
+        }
+        return (blobID, thumbnailFileName)
+    }
+
     func loadFile(vaultItem: VaultItem) throws -> Data {
+        if migrateItemOnDisk(vaultItem) {
+            coreDataManager.save()
+        }
         guard let key = encryptionKey else {
             throw FileStorageError.noEncryptionKey
         }
-        
-        guard let fileName = vaultItem.fileName else {
+        guard let fileName = existingVaultFileName(for: vaultItem) else {
             throw FileStorageError.invalidFileName
         }
         
@@ -491,36 +554,11 @@ class FileStorageManager: FileStorageManaging {
             return
         }
         
-        // Permanent delete logic (when trash is disabled)
-        // Before deleting physical files, check if other VaultItems reference the same files
-        let shouldDeleteMainFile: Bool
-        let shouldDeleteThumbnail: Bool
-        
-        if let fileName = vaultItem.fileName {
-            shouldDeleteMainFile = !hasOtherReferences(to: fileName, excluding: vaultItem)
-        } else {
-            shouldDeleteMainFile = false
-        }
-        
-        if let thumbnailFileName = vaultItem.thumbnailFileName {
-            shouldDeleteThumbnail = !hasOtherReferences(toThumbnail: thumbnailFileName, excluding: vaultItem)
-        } else {
-            shouldDeleteThumbnail = false
-        }
-        
-        // Delete Core Data entry first
+        // Permanent delete: each item has a unique UUID blob.
+        let blobs = vaultItem.storedBlobCandidates
+        let thumbnails = vaultItem.storedThumbnailCandidates
         coreDataManager.deleteVaultItem(vaultItem)
-        
-        // Then delete physical files only if no other references exist
-        if shouldDeleteMainFile, let fileName = vaultItem.fileName {
-            let fileURL = vaultDirectory.appendingPathComponent(fileName)
-            try? fileManager.removeItem(at: fileURL)
-        }
-        
-        if shouldDeleteThumbnail, let thumbnailFileName = vaultItem.thumbnailFileName {
-            let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-            try? fileManager.removeItem(at: thumbnailURL)
-        }
+        removeStoredFiles(blobs: blobs, thumbnails: thumbnails)
     }
     
     /// Permanently delete a vault item, bypassing trash settings
@@ -529,34 +567,8 @@ class FileStorageManager: FileStorageManaging {
         trashService.permanentlyDelete(vaultItem)
     }
     
-    /// Check if any other VaultItems reference the same filename (excluding the specified item)
-    private func hasOtherReferences(to fileName: String, excluding excludeItem: VaultItem) -> Bool {
-        let allItems = coreDataManager.fetchAllVaultItems()
-        return allItems.contains { item in
-            item.objectID != excludeItem.objectID && item.fileName == fileName
-        }
-    }
-    
-    /// Check if any other VaultItems reference the same thumbnail filename (excluding the specified item)
-    private func hasOtherReferences(toThumbnail thumbnailFileName: String, excluding excludeItem: VaultItem) -> Bool {
-        let allItems = coreDataManager.fetchAllVaultItems()
-        return allItems.contains { item in
-            item.objectID != excludeItem.objectID && item.thumbnailFileName == thumbnailFileName
-        }
-    }
-    
     func cleanupFileStorage(vaultItem: VaultItem) {
-        // Delete main file storage only (no Core Data deletion)
-        if let fileName = vaultItem.fileName {
-            let fileURL = vaultDirectory.appendingPathComponent(fileName)
-            try? fileManager.removeItem(at: fileURL)
-        }
-        
-        // Delete thumbnail storage only
-        if let thumbnailFileName = vaultItem.thumbnailFileName {
-            let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-            try? fileManager.removeItem(at: thumbnailURL)
-        }
+        removeStoredFiles(for: vaultItem)
     }
     
     // MARK: - Favorites Management
@@ -573,47 +585,13 @@ class FileStorageManager: FileStorageManaging {
     
     /// Rename a vault item's physical file and update Core Data
     func renameFile(vaultItem: VaultItem, newFileName: String) throws {
-        guard let oldFileName = vaultItem.fileName else {
+        guard vaultItem.fileName != nil else {
             throw FileStorageError.invalidFileName
         }
-        
-        // Check if the new filename already exists
-        if encryptedFileStore.exists(fileName: newFileName) {
-            throw FileStorageError.fileAlreadyExists
-        }
-        
-        // Rename the main file
-        try encryptedFileStore.move(from: oldFileName, to: newFileName)
-        
-        // Rename the thumbnail file if it exists
-        if let thumbnailFileName = vaultItem.thumbnailFileName {
-            let oldThumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-            
-            if fileManager.fileExists(atPath: oldThumbnailURL.path) {
-                // Generate new thumbnail filename based on new main filename
-                let newThumbnailFileName = generateThumbnailFileName(for: newFileName)
-                let newThumbnailURL = thumbnailsDirectory.appendingPathComponent(newThumbnailFileName)
-                
-                try fileManager.moveItem(at: oldThumbnailURL, to: newThumbnailURL)
-                
-                // Update the thumbnail filename in Core Data
-                vaultItem.thumbnailFileName = newThumbnailFileName
-            }
-        }
-        
-        // Update the filename in Core Data
+
         vaultItem.fileName = newFileName
         vaultItem.updatedAt = Date()
-        
-        // Save the context
         coreDataManager.save()
-        
-        print("DEBUG: Successfully renamed file from \(oldFileName) to \(newFileName)")
-    }
-    
-    /// Generate thumbnail filename based on original filename
-    private func generateThumbnailFileName(for fileName: String) -> String {
-        return "thumb_\(fileName).jpg"
     }
     
     // MARK: - Share Management
@@ -637,22 +615,13 @@ class FileStorageManager: FileStorageManaging {
     }
     
     func loadThumbnail(for vaultItem: VaultItem) -> Data? {
-        guard let thumbnailFileName = vaultItem.thumbnailFileName else { 
-            print("DEBUG: No thumbnail filename for item \(vaultItem.fileName ?? "")")
-            return nil 
+        if migrateItemOnDisk(vaultItem) {
+            coreDataManager.save()
         }
-        
-        let thumbnailURL = thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-        print("DEBUG: Loading thumbnail from \(thumbnailURL.path)")
-        print("DEBUG: Thumbnail exists: \(fileManager.fileExists(atPath: thumbnailURL.path))")
-        
-        guard let data = try? Data(contentsOf: thumbnailURL) else { 
-            print("DEBUG: Failed to load thumbnail data")
-            return nil 
-        }
-        
-        print("DEBUG: Thumbnail data loaded: \(data.count) bytes")
-        return data
+        let name = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName
+        guard let name else { return nil }
+        let thumbnailURL = thumbnailsDirectory.appendingPathComponent(name)
+        return try? Data(contentsOf: thumbnailURL)
     }
     
     func loadImage(for vaultItem: VaultItem) async throws -> Data {
@@ -682,8 +651,8 @@ class FileStorageManager: FileStorageManaging {
             // Calculate used space by summing file sizes
             var usedSpace: Int64 = 0
             for item in items {
-                if let fileName = item.fileName {
-                    let fileURL = vaultDirectory.appendingPathComponent(fileName)
+                if let name = existingVaultFileName(for: item) {
+                    let fileURL = vaultDirectory.appendingPathComponent(name)
                     if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
                        let fileSize = attributes[FileAttributeKey.size] as? Int64 {
                         usedSpace += fileSize

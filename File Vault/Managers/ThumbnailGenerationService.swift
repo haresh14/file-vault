@@ -12,17 +12,17 @@ final class ThumbnailGenerationService {
         self.thumbnailsDirectory = thumbnailsDirectory
     }
 
-    func generateImageThumbnail(from data: Data, originalFileName: String) throws -> String? {
+    func generateImageThumbnail(from data: Data, storageKey: String) throws -> String? {
         guard let image = UIImage(data: data) else { return nil }
         let thumbnail = UIGraphicsImageRenderer(size: thumbnailSize).image { _ in
             image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
         }
         guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else { return nil }
-        return try write(thumbnailData, originalFileName: originalFileName)
+        return try write(thumbnailData, storageKey: storageKey)
     }
 
-    func generateVideoThumbnail(from data: Data, originalFileName: String) throws -> String? {
-        let originalExtension = (originalFileName as NSString).pathExtension
+    func generateVideoThumbnail(from data: Data, storageKey: String, displayFileName: String) throws -> String? {
+        let originalExtension = (displayFileName as NSString).pathExtension
         let tempFileName = UUID().uuidString
             + (originalExtension.isEmpty ? ".mov" : ".\(originalExtension)")
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(tempFileName)
@@ -32,7 +32,7 @@ final class ThumbnailGenerationService {
         let asset = AVURLAsset(url: tempURL)
         // Intentionally retained for behavior compatibility; modernization is a later wave.
         guard !asset.tracks(withMediaType: .video).isEmpty else {
-            return generateGenericVideoThumbnail(originalFileName: originalFileName)
+            return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName)
         }
 
         let generator = AVAssetImageGenerator(asset: asset)
@@ -51,16 +51,16 @@ final class ThumbnailGenerationService {
                 let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
                 let thumbnail = UIImage(cgImage: cgImage)
                 if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) {
-                    return try write(thumbnailData, originalFileName: originalFileName)
+                    return try write(thumbnailData, storageKey: storageKey)
                 }
             } catch {
                 print("DEBUG: Error generating video thumbnail at time \(time.seconds): \(error)")
             }
         }
-        return generateGenericVideoThumbnail(originalFileName: originalFileName)
+        return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName)
     }
 
-    private func generateGenericVideoThumbnail(originalFileName: String) -> String? {
+    private func generateGenericVideoThumbnail(storageKey: String, displayFileName: String) -> String? {
         let thumbnail = UIGraphicsImageRenderer(size: thumbnailSize).image { context in
             let cgContext = context.cgContext
             cgContext.setFillColor(UIColor.systemGray2.cgColor)
@@ -91,7 +91,7 @@ final class ThumbnailGenerationService {
             cgContext.closePath()
             cgContext.fillPath()
 
-            let fileExtension = (originalFileName as NSString).pathExtension.uppercased()
+            let fileExtension = (displayFileName as NSString).pathExtension.uppercased()
             if !fileExtension.isEmpty {
                 let attributes: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 14, weight: .medium),
@@ -111,11 +111,11 @@ final class ThumbnailGenerationService {
         }
 
         guard let data = thumbnail.jpegData(compressionQuality: 0.7) else { return nil }
-        return try? write(data, originalFileName: originalFileName)
+        return try? write(data, storageKey: storageKey)
     }
 
-    private func write(_ data: Data, originalFileName: String) throws -> String {
-        let fileName = "thumb_\(originalFileName).jpg"
+    private func write(_ data: Data, storageKey: String) throws -> String {
+        let fileName = "\(storageKey).thumb"
         try data.write(to: thumbnailsDirectory.appendingPathComponent(fileName))
         return fileName
     }

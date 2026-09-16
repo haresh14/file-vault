@@ -73,6 +73,27 @@ struct FileStorageManagerTests {
         // Cleanup
         try manager.deleteFile(vaultItem: vaultItem)
     }
+
+    @Test func testOnDiskBlobUsesItemUUIDNotDisplayName() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "uuid-key")
+        let item = try manager.saveFile(
+            data: Data("named".utf8),
+            fileName: "vacation.jpg",
+            fileType: "image/jpeg"
+        )
+
+        #expect(item.fileName == "vacation.jpg")
+        #expect(item.storedBlobName == item.id?.uuidString)
+        #expect(FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault").appendingPathComponent(item.storedBlobName ?? "").path
+        ))
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault/vacation.jpg").path
+        ))
+        #expect(try manager.loadFile(vaultItem: item) == Data("named".utf8))
+    }
     
     @Test func testFileEncryption() async throws {
         let storage = try makeStorage()
@@ -96,7 +117,7 @@ struct FileStorageManagerTests {
         let encryptedFilesPath = storage.rootURL.appendingPathComponent("Vault")
         
         // Check that encrypted file exists but is not readable as plain text
-        let encryptedFileURL = encryptedFilesPath.appendingPathComponent(vaultItem.fileName ?? "")
+        let encryptedFileURL = encryptedFilesPath.appendingPathComponent(vaultItem.storedBlobName ?? "")
         
         if FileManager.default.fileExists(atPath: encryptedFileURL.path) {
             let encryptedData = try Data(contentsOf: encryptedFileURL)
@@ -121,10 +142,13 @@ struct FileStorageManagerTests {
 
         let encryptedURL = storage.rootURL
             .appendingPathComponent("Vault")
-            .appendingPathComponent("format.bin")
+            .appendingPathComponent(item.storedBlobName ?? "")
         let encryptedData = try Data(contentsOf: encryptedURL)
         #expect(encryptedData.count == data.count + 28, "Combined AES-GCM stores nonce and tag")
         #expect(try manager.loadFile(vaultItem: item) == data)
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault/format.bin").path
+        ))
 
         manager.setupEncryptionKey(from: "wrong-key")
         #expect(throws: Error.self) {
@@ -186,13 +210,12 @@ struct FileStorageManagerTests {
         manager.setupEncryptionKey(from: password)
 
         #expect(storage.keychainManager.loadKeyDerivationRecord() != nil)
+        #expect(item.fileName == "legacy.txt")
         #expect(try manager.loadFile(vaultItem: item) == payload)
-        #expect(throws: Error.self) {
-            try crypto.decrypt(
-                Data(contentsOf: vaultURL.appendingPathComponent("legacy.txt")),
-                using: crypto.legacySHA256Key(from: password)
-            )
-        }
+        #expect(!FileManager.default.fileExists(atPath: vaultURL.appendingPathComponent("legacy.txt").path))
+        #expect(FileManager.default.fileExists(
+            atPath: vaultURL.appendingPathComponent(item.storedBlobName ?? "").path
+        ))
 
         manager.setupEncryptionKey(from: password)
         #expect(try manager.loadFile(vaultItem: item) == payload)
@@ -357,12 +380,64 @@ struct FileStorageManagerTests {
         try manager.renameFile(vaultItem: item, newFileName: "after.png")
 
         #expect(item.fileName == "after.png")
-        #expect(item.thumbnailFileName == "thumb_after.png.jpg")
+        #expect(item.thumbnailFileName == item.storedThumbnailName)
         #expect(try manager.loadFile(vaultItem: item) == data)
         #expect(manager.loadThumbnail(for: item) != nil)
+        #expect(FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault").appendingPathComponent(item.storedBlobName ?? "").path
+        ))
         #expect(!FileManager.default.fileExists(
             atPath: storage.rootURL.appendingPathComponent("Vault/before.png").path
         ))
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault/after.png").path
+        ))
+    }
+
+    @Test func testDeleteWithTrashDisabledRemovesBlobAndThumbnail() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "delete-key")
+        UserDefaults.standard.set(false, forKey: "trashEnabled")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "delete-me.png",
+            fileType: "image/png"
+        )
+        let blobName = item.storedBlobName ?? ""
+        let thumbName = item.storedThumbnailName ?? ""
+
+        try manager.deleteFile(vaultItem: item)
+
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault").appendingPathComponent(blobName).path
+        ))
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Thumbnails").appendingPathComponent(thumbName).path
+        ))
+        #expect(storage.coreDataManager.fetchAllVaultItems().isEmpty)
+    }
+
+    @Test func testUnlockRemovesOrphanedCiphertextAndKeepsClaimedFiles() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "orphan-key")
+        let item = try manager.saveFile(
+            data: Data("keep me".utf8),
+            fileName: "keep.txt",
+            fileType: "text/plain"
+        )
+        let vaultURL = storage.rootURL.appendingPathComponent("Vault")
+        let orphanURL = vaultURL.appendingPathComponent(UUID().uuidString)
+        try Data("stranded".utf8).write(to: orphanURL)
+
+        manager.setupEncryptionKey(from: "orphan-key")
+
+        #expect(!FileManager.default.fileExists(atPath: orphanURL.path))
+        #expect(FileManager.default.fileExists(
+            atPath: vaultURL.appendingPathComponent(item.storedBlobName ?? "").path
+        ))
+        #expect(try manager.loadFile(vaultItem: item) == Data("keep me".utf8))
     }
 
     @Test func testTrashRestoreAndPermanentDeleteLifecycle() async throws {
@@ -388,6 +463,9 @@ struct FileStorageManagerTests {
 
         manager.moveToTrash(vaultItem: item)
         try manager.permanentlyDeleteFile(vaultItem: item)
+        #expect(!FileManager.default.fileExists(
+            atPath: storage.rootURL.appendingPathComponent("Vault").appendingPathComponent(item.storedBlobName ?? "missing").path
+        ))
         #expect(!FileManager.default.fileExists(
             atPath: storage.rootURL.appendingPathComponent("Vault/trash.txt").path
         ))

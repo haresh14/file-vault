@@ -25,37 +25,16 @@ final class TrashOperationsService {
     }
 
     func permanentlyDelete(_ item: VaultItem) {
-        let fileName = item.fileName
-        let thumbnailFileName = item.thumbnailFileName
-        let shouldDeleteFile = fileName.map { !hasOtherReference(to: $0, excluding: item) } ?? false
-        let shouldDeleteThumbnail = thumbnailFileName.map {
-            !hasOtherThumbnailReference(to: $0, excluding: item)
-        } ?? false
+        let blobNames = item.storedBlobCandidates
+        let thumbNames = item.storedThumbnailCandidates
 
         coreDataManager.deleteVaultItem(item)
 
-        if shouldDeleteFile, let fileName {
-            try? fileManager.removeItem(at: vaultDirectory.appendingPathComponent(fileName))
+        for name in blobNames {
+            try? fileManager.removeItem(at: vaultDirectory.appendingPathComponent(name))
         }
-        if shouldDeleteThumbnail, let thumbnailFileName {
-            try? fileManager.removeItem(
-                at: thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
-            )
-        }
-    }
-
-    private func hasOtherReference(to fileName: String, excluding item: VaultItem) -> Bool {
-        coreDataManager.fetchAllVaultItems().contains {
-            $0.objectID != item.objectID && $0.fileName == fileName
-        }
-    }
-
-    private func hasOtherThumbnailReference(
-        to thumbnailFileName: String,
-        excluding item: VaultItem
-    ) -> Bool {
-        coreDataManager.fetchAllVaultItems().contains {
-            $0.objectID != item.objectID && $0.thumbnailFileName == thumbnailFileName
+        for name in thumbNames {
+            try? fileManager.removeItem(at: thumbnailsDirectory.appendingPathComponent(name))
         }
     }
 }

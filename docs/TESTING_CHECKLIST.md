@@ -66,6 +66,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] New install: import a photo, lock, unlock — file still opens
 - [ ] Settings → Change Authentication: files still open with the new credential; the old one does not
 - [ ] Vault that existed before PBKDF2: first unlock after this build still shows files (may pause briefly while files are rewritten)
+- [ ] Imported file keeps its name in Gallery; the file in `Documents/Vault/` is a UUID, not `vacation.jpg`
+- [ ] Rename in the app changes the Gallery name; the UUID blob on disk stays the same
+- [ ] Older vault files named after the display name still open after first unlock (they are moved to UUID)
 
 ## Files and folders
 
@@ -74,6 +77,8 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Gallery and category search; folder tab has no search
 - [ ] Sort, multi-select, favorite, share, rename, move
 - [ ] Trash restore / empty / disable with contents
+- [ ] Trash off: delete a file and confirm its `Documents/Vault/` blob and `Documents/Thumbnails/` thumb are gone
+- [ ] Unlock clears vault files and thumbnails that belong to no item
 
 ## Preview
 

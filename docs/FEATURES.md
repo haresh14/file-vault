@@ -85,8 +85,8 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 
 | Path / store | Protection | Encrypted by app? |
 |--------------|------------|-------------------|
-| `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes |
-| `Documents/Thumbnails/` | `FileProtectionType.complete` | **No** — JPEG thumbnails, quality 0.7, 200×200 |
+| `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
+| `Documents/Thumbnails/` | `FileProtectionType.complete` | **No** — JPEG-like `.thumb` files named `{uuid}.thumb` (200×200, quality 0.7) |
 | `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | No (metadata in plaintext Core Data) |
 | Keychain items `com.filevault.app` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
 | UserDefaults | Standard suite | Settings, auth type, lock timeout, trash flag, security logs, biometric enabled |
@@ -97,7 +97,8 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 - Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag).
 - Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped.
 - If ciphertext exists but no derivation record is in Keychain, unlock derives a SHA-256 key long enough to open those files, then re-encrypts them with PBKDF2 and stores a salt.
-- Duplicate physical files are reference-counted by `fileName`; a file is not deleted from disk if another `VaultItem` still points at it.
+- Duplicate display names in a folder get a suffix (`name (n).ext`). Each item has its own UUID blob on disk.
+- Permanent delete removes the item's ciphertext and thumbnail from disk. Unlock also deletes vault files and thumbnails that no item claims; the sweep is skipped when the vault has no items.
 
 ---
 
@@ -221,7 +222,7 @@ Changing tabs posts `TabDidChange`, which **clears multi-select** in list/grid s
 | I4 | Duplicate detection | Same `fileSize` + `fileType` in **target folder** → `FileStorageError.duplicateFile` | — |
 | I5 | Name collision | Auto-rename `name (n).ext` | — |
 | I6 | Import progress overlay | Progress UI during gallery/folder imports | `ImportProgressView` |
-| I7 | Thumbnails | Images and videos: 200×200 JPEG @ 0.7; videos get a play overlay | `ThumbnailGenerationService`, `UIGraphicsImageRenderer`, AVFoundation image generator |
+| I7 | Thumbnails | Images and videos: 200×200 JPEG @ 0.7 stored as `{uuid}.thumb`; videos get a play overlay | `ThumbnailGenerationService`, `UIGraphicsImageRenderer`, AVFoundation image generator |
 
 **Not implemented:** in-app camera / microphone capture (`UIImagePickerController` / `AVCaptureSession` are not used). Import is library + Files + web only.
 
@@ -231,11 +232,11 @@ MIME detection: `FileStorageManager.determineFileType(from:)` by extension; UTI 
 
 | ID | Feature | Behavior | APIs |
 |----|---------|----------|------|
-| O1 | Rename file | Alert; renames encrypted file + thumbnail on disk | `FileStorageManager.renameFile` |
+| O1 | Rename file | Alert; updates the display `fileName` in Core Data. The encrypted blob and thumbnail stay `{uuid}` / `{uuid}.thumb` on disk | `FileStorageManager.renameFile` |
 | O2 | Move file | Universal / gallery folder pickers | Core Data relationship |
 | O3 | Favorite | Toggle `isFavorite`; heart in viewer and lists | Core Data |
 | O4 | Share / export | Decrypt to temp file → share sheet | `UIActivityViewController`, `ShareManager`, `prepareForSharing` |
-| O5 | Delete | Trash if enabled; else permanent delete with reference counting | Core Data + FileStorage |
+| O5 | Delete | Trash if enabled; else permanent delete of the Core Data row, the UUID blob, and the thumbnail | Core Data + FileStorage |
 | O6 | Search | **Gallery** and **Category files** use SwiftUI `.searchable` and filter `fileName` immediately (no debounce). Folder browser has **no** search field. | SwiftUI searchable |
 | O7 | Sort files | User Default, Name, Size, Date, Kind, Favorites | `SortOption` / `FolderSortOption` |
 | O8 | Multi-select | Long-press or “Select”; Select All; Favorite, Share, Move, Delete | Selection toolbars / floating bar |
@@ -271,6 +272,7 @@ Category files screens reuse search, sort, selection, context menu, and preview.
 | T5 | Permanent delete | From trash |
 | T6 | Empty trash | Bulk permanent delete |
 | T7 | Disable trash with items | Alert **Empty Trash & Disable**; cannot disable while keeping trash contents |
+| T8 | Delete with trash off | Deletes the item and its on-disk ciphertext and thumbnail immediately |
 
 ### 4.10 Preview and media playback
 
@@ -407,7 +409,7 @@ Password min length:              6
 Passcode length:                  exactly 4 or 6 digits
 Web server port:                  8080
 PHPicker selection limit:         50
-Thumbnail size / JPEG quality:    200×200 / 0.7
+Thumbnail size / JPEG quality:    200×200 / 0.7 as `{uuid}.thumb`
 BG task id:                       com.haresh.FileVault.upload-processing
 Background URLSession id:         com.haresh.FileVault.background-upload
 Streaming upload threshold:       100 MB
@@ -508,7 +510,7 @@ Recorded so upgrades do not “fix” the wrong thing:
 1. Keychain service `com.filevault.app` ≠ bundle id `com.haresh.FileVault`.
 2. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
 3. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
-4. Thumbnails are **not** AES-encrypted (filenames can leak that a file exists).
+4. Thumbnails are **not** AES-encrypted. They are `{uuid}.thumb` JPEGs, so the display name is not in the path.
 5. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
 6. Screenshot/recording Settings toggles are not persisted (see §4.3).
 7. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).

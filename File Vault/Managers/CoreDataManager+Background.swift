@@ -8,6 +8,7 @@ extension CoreDataManager {
         fileSize: Int64,
         thumbnailFileName: String? = nil,
         in folder: Folder? = nil,
+        id: UUID? = nil,
         completion: @escaping (VaultItem?) -> Void
     ) {
         let backgroundContext = persistentContainer.newBackgroundContext()
@@ -16,7 +17,7 @@ extension CoreDataManager {
                 forEntityName: "VaultItem",
                 into: backgroundContext
             ) as! VaultItem
-            item.id = UUID()
+            item.id = id ?? UUID()
             item.fileName = fileName
             item.fileType = fileType
             item.fileSize = fileSize
