@@ -86,7 +86,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | Path / store | Protection | Encrypted by app? |
 |--------------|------------|-------------------|
 | `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
-| `Documents/Thumbnails/` | `FileProtectionType.complete` | **No** — JPEG-like `.thumb` files named `{uuid}.thumb` (200×200, quality 0.7) |
+| `Documents/Thumbnails/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes named `{uuid}.thumb` (200×200 JPEG @ 0.7 before encryption) |
 | `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | No (metadata in plaintext Core Data) |
 | Keychain items `com.filevault.app` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
 | UserDefaults | Standard suite | Settings, auth type, lock timeout, trash flag, security logs, biometric enabled |
@@ -94,11 +94,12 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 **Encryption details**
 
 - Key = PBKDF2-HMAC-SHA256 of the real credential (210,000 iterations, 16-byte random salt, 32-byte key). Salt and parameters live in Keychain account `vaultKeyDerivation` (`WhenUnlockedThisDeviceOnly`).
-- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag).
+- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files and thumbnails.
 - Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped.
 - If ciphertext exists but no derivation record is in Keychain, unlock derives a SHA-256 key long enough to open those files, then re-encrypts them with PBKDF2 and stores a salt.
 - Duplicate display names in a folder get a suffix (`name (n).ext`). Each item has its own UUID blob on disk.
 - Permanent delete removes the item's ciphertext and thumbnail from disk. Unlock also deletes vault files and thumbnails that no item claims; the sweep is skipped when the vault has no items.
+- Unlock encrypts leftover plaintext JPEG thumbnails in place with the vault key.
 
 ---
 
@@ -107,7 +108,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 ### 3.1 First launch
 
 1. `AppDataManager.isFirstLaunch` is true.
-2. `performFirstLaunchCleanup()` wipes Keychain, UserDefaults (except launch flag), Core Data, and vault files.
+2. `performFirstLaunchCleanup()` wipes vault files and thumbnails, Keychain, UserDefaults (except launch flag), and Core Data.
 3. Sets **`trashEnabled = true`**.
 4. User must choose an authentication type, then set the credential.
 
@@ -222,7 +223,7 @@ Changing tabs posts `TabDidChange`, which **clears multi-select** in list/grid s
 | I4 | Duplicate detection | Same `fileSize` + `fileType` in **target folder** → `FileStorageError.duplicateFile` | — |
 | I5 | Name collision | Auto-rename `name (n).ext` | — |
 | I6 | Import progress overlay | Progress UI during gallery/folder imports | `ImportProgressView` |
-| I7 | Thumbnails | Images and videos: 200×200 JPEG @ 0.7 stored as `{uuid}.thumb`; videos get a play overlay | `ThumbnailGenerationService`, `UIGraphicsImageRenderer`, AVFoundation image generator |
+| I7 | Thumbnails | Images and videos: 200×200 JPEG @ 0.7, AES-GCM encrypted as `{uuid}.thumb`; videos get a play overlay | `ThumbnailGenerationService`, `EncryptedFileStore`, `UIGraphicsImageRenderer`, AVFoundation image generator |
 
 **Not implemented:** in-app camera / microphone capture (`UIImagePickerController` / `AVCaptureSession` are not used). Import is library + Files + web only.
 
@@ -232,7 +233,7 @@ MIME detection: `FileStorageManager.determineFileType(from:)` by extension; UTI 
 
 | ID | Feature | Behavior | APIs |
 |----|---------|----------|------|
-| O1 | Rename file | Alert; updates the display `fileName` in Core Data. The encrypted blob and thumbnail stay `{uuid}` / `{uuid}.thumb` on disk | `FileStorageManager.renameFile` |
+| O1 | Rename file | Alert; updates the display `fileName` in Core Data. The encrypted blob and encrypted thumbnail stay `{uuid}` / `{uuid}.thumb` on disk | `FileStorageManager.renameFile` |
 | O2 | Move file | Universal / gallery folder pickers | Core Data relationship |
 | O3 | Favorite | Toggle `isFavorite`; heart in viewer and lists | Core Data |
 | O4 | Share / export | Decrypt to temp file → share sheet | `UIActivityViewController`, `ShareManager`, `prepareForSharing` |
@@ -349,6 +350,8 @@ Security notice in UI: local network only; files encrypted after arrival.
 | About | Version `1.0.0` |
 | Developer (DEBUG only) | Complete App Reset (`exit(0)` after wipe); Simulate First Launch Cleanup; Delete All Files & Folders (keeps passcode/settings) |
 
+All three delete vault files and thumbnails from disk before clearing metadata. Delete All Files & Folders ignores the trash setting and keeps the encryption key loaded, so imports work without unlocking again.
+
 Fake login: **About only**.
 
 ### 4.14 Cross-cutting UX
@@ -409,7 +412,7 @@ Password min length:              6
 Passcode length:                  exactly 4 or 6 digits
 Web server port:                  8080
 PHPicker selection limit:         50
-Thumbnail size / JPEG quality:    200×200 / 0.7 as `{uuid}.thumb`
+Thumbnail size / JPEG quality:    200×200 / 0.7, AES-GCM as `{uuid}.thumb`
 BG task id:                       com.haresh.FileVault.upload-processing
 Background URLSession id:         com.haresh.FileVault.background-upload
 Streaming upload threshold:       100 MB
@@ -510,11 +513,10 @@ Recorded so upgrades do not “fix” the wrong thing:
 1. Keychain service `com.filevault.app` ≠ bundle id `com.haresh.FileVault`.
 2. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
 3. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
-4. Thumbnails are **not** AES-encrypted. They are `{uuid}.thumb` JPEGs, so the display name is not in the path.
-5. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
-6. Screenshot/recording Settings toggles are not persisted (see §4.3).
-7. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
-8. Screenshot detection shows an alert even when screenshot protection is off; only the inactive-state overlay is gated.
+4. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
+5. Screenshot/recording Settings toggles are not persisted (see §4.3).
+6. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
+7. Screenshot detection shows an alert even when screenshot protection is off; only the inactive-state overlay is gated.
 
 ---
 
@@ -523,11 +525,10 @@ Recorded so upgrades do not “fix” the wrong thing:
 If any of these are wrong, say so and this catalog will be corrected:
 
 1. **Fake vault:** Confirm it is intentionally a *UI disguise* (empty lists), not a second encrypted dataset.
-2. **Thumbnails:** Confirm it is acceptable that thumbnails stay unencrypted JPEG in `Documents/Thumbnails`.
-3. **Camera:** Confirm there is no in-app camera and we should not add one during OS upgrades.
-4. **iCloud Backup:** Vault lives in `Documents/`. Do you want vault files excluded from iCloud/computer backup (`isExcludedFromBackup`), or is backup OK?
-5. **Optic ID / visionOS / Mac Catalyst:** In or out of scope for upcoming upgrades?
-6. **Minimum OS after upgrade:** Keep supporting iOS 18.5, or raise the deployment target to the new OS only?
+2. **Camera:** Confirm there is no in-app camera and we should not add one during OS upgrades.
+3. **iCloud Backup:** Vault lives in `Documents/`. Do you want vault files excluded from iCloud/computer backup (`isExcludedFromBackup`), or is backup OK?
+4. **Optic ID / visionOS / Mac Catalyst:** In or out of scope for upcoming upgrades?
+5. **Minimum OS after upgrade:** Keep supporting iOS 18.5, or raise the deployment target to the new OS only?
 
 ---
 

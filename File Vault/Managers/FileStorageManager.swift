@@ -25,6 +25,7 @@ class FileStorageManager: FileStorageManaging {
     private let trashService: TrashOperationsService
     private let temporarySharingService: TemporarySharingService
     private let encryptedFileStore: EncryptedFileStore
+    private let encryptedThumbnailStore: EncryptedFileStore
     private let photoImportService = PhotoImportService()
     
     // Encryption key derived from user's passcode
@@ -64,9 +65,19 @@ class FileStorageManager: FileStorageManaging {
         // Create vault directory
         vaultDirectory = documentsDirectory.appendingPathComponent("Vault", isDirectory: true)
         thumbnailsDirectory = documentsDirectory.appendingPathComponent("Thumbnails", isDirectory: true)
+        encryptedFileStore = EncryptedFileStore(
+            fileManager: fileManager,
+            vaultDirectory: vaultDirectory,
+            cryptoService: cryptoService
+        )
+        encryptedThumbnailStore = EncryptedFileStore(
+            fileManager: fileManager,
+            vaultDirectory: thumbnailsDirectory,
+            cryptoService: cryptoService
+        )
         thumbnailService = ThumbnailGenerationService(
             fileManager: fileManager,
-            thumbnailsDirectory: thumbnailsDirectory
+            thumbnailStore: encryptedThumbnailStore
         )
         trashService = TrashOperationsService(
             fileManager: fileManager,
@@ -75,11 +86,6 @@ class FileStorageManager: FileStorageManaging {
             thumbnailsDirectory: thumbnailsDirectory
         )
         temporarySharingService = TemporarySharingService(fileManager: fileManager)
-        encryptedFileStore = EncryptedFileStore(
-            fileManager: fileManager,
-            vaultDirectory: vaultDirectory,
-            cryptoService: cryptoService
-        )
         
         print("DEBUG: Documents directory: \(documentsDirectory.path)")
         print("DEBUG: Vault directory: \(vaultDirectory.path)")
@@ -139,6 +145,7 @@ class FileStorageManager: FileStorageManaging {
             }
         }
         migrateOnDiskNamesToUUID()
+        encryptPlaintextThumbnails()
         removeOrphanedFiles()
     }
     
@@ -245,6 +252,43 @@ class FileStorageManager: FileStorageManaging {
         } catch {
             print("DEBUG: Failed to migrate file \(sourceName): \(error)")
         }
+
+        reencryptThumbnail(vaultItem, oldKey: oldKey, newKey: newKey)
+    }
+
+    private func reencryptThumbnail(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) {
+        guard let destName = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName else { return }
+        let destURL = thumbnailsDirectory.appendingPathComponent(destName)
+        var sourceURL = destURL
+        if !fileManager.fileExists(atPath: destURL.path) {
+            for name in vaultItem.storedThumbnailCandidates where name != destName {
+                let candidate = thumbnailsDirectory.appendingPathComponent(name)
+                if fileManager.fileExists(atPath: candidate.path) {
+                    sourceURL = candidate
+                    break
+                }
+            }
+        }
+        guard fileManager.fileExists(atPath: sourceURL.path),
+              let data = try? Data(contentsOf: sourceURL) else { return }
+
+        let jpeg: Data
+        if let decrypted = try? cryptoService.decrypt(data, using: oldKey) {
+            jpeg = decrypted
+        } else if isJPEGData(data) {
+            jpeg = data
+        } else {
+            return
+        }
+
+        do {
+            try encryptedThumbnailStore.write(jpeg, fileName: destName, key: newKey)
+            if sourceURL != destURL {
+                try? fileManager.removeItem(at: sourceURL)
+            }
+        } catch {
+            print("DEBUG: Failed to migrate thumbnail \(destName): \(error)")
+        }
     }
 
     private func existingVaultFileName(for item: VaultItem) -> String? {
@@ -308,6 +352,52 @@ class FileStorageManager: FileStorageManaging {
             changed = true
         }
         return changed
+    }
+
+    private func encryptPlaintextThumbnails() {
+        guard encryptionKey != nil else { return }
+        for item in coreDataManager.fetchAllVaultItems() {
+            upgradeThumbnailIfPlaintext(item)
+        }
+    }
+
+    @discardableResult
+    private func upgradeThumbnailIfPlaintext(_ item: VaultItem) -> Bool {
+        guard let key = encryptionKey else { return false }
+        guard let destName = item.storedThumbnailName ?? item.thumbnailFileName else { return false }
+        let destURL = thumbnailsDirectory.appendingPathComponent(destName)
+        var sourceURL = destURL
+        if !fileManager.fileExists(atPath: destURL.path) {
+            for name in item.storedThumbnailCandidates where name != destName {
+                let candidate = thumbnailsDirectory.appendingPathComponent(name)
+                if fileManager.fileExists(atPath: candidate.path) {
+                    sourceURL = candidate
+                    break
+                }
+            }
+        }
+        guard fileManager.fileExists(atPath: sourceURL.path),
+              let data = try? Data(contentsOf: sourceURL),
+              isJPEGData(data) else { return false }
+
+        do {
+            try encryptedThumbnailStore.write(data, fileName: destName, key: key)
+            if sourceURL != destURL {
+                try? fileManager.removeItem(at: sourceURL)
+            }
+            if item.thumbnailFileName != destName {
+                item.thumbnailFileName = destName
+                coreDataManager.save()
+            }
+            return true
+        } catch {
+            print("DEBUG: Failed to encrypt plaintext thumbnail \(destName): \(error)")
+            return false
+        }
+    }
+
+    private func isJPEGData(_ data: Data) -> Bool {
+        data.count >= 2 && data[0] == 0xFF && data[1] == 0xD8
     }
 
     /// Drop ciphertext and thumbnails that no item claims. Skipped while the vault has
@@ -521,12 +611,17 @@ class FileStorageManager: FileStorageManaging {
 
         var thumbnailFileName: String?
         if fileType.hasPrefix("image/") {
-            thumbnailFileName = try? thumbnailService.generateImageThumbnail(from: data, storageKey: blobName)
+            thumbnailFileName = try? thumbnailService.generateImageThumbnail(
+                from: data,
+                storageKey: blobName,
+                key: key
+            )
         } else if fileType.hasPrefix("video/") {
             thumbnailFileName = try? thumbnailService.generateVideoThumbnail(
                 from: data,
                 storageKey: blobName,
-                displayFileName: displayName
+                displayFileName: displayName,
+                key: key
             )
         }
         return (blobID, thumbnailFileName)
@@ -565,6 +660,15 @@ class FileStorageManager: FileStorageManaging {
     /// This is used for items that are already in trash and need to be permanently removed
     func permanentlyDeleteFile(vaultItem: VaultItem) throws {
         trashService.permanentlyDelete(vaultItem)
+    }
+
+    /// Delete every item and its bytes, ignoring the trash setting. The encryption key stays
+    /// loaded so the vault keeps working for new imports.
+    func deleteAllVaultContent() {
+        for item in coreDataManager.fetchAllVaultItems() {
+            trashService.permanentlyDelete(item)
+        }
+        emptyStorageDirectories()
     }
     
     func cleanupFileStorage(vaultItem: VaultItem) {
@@ -618,10 +722,10 @@ class FileStorageManager: FileStorageManaging {
         if migrateItemOnDisk(vaultItem) {
             coreDataManager.save()
         }
-        let name = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName
-        guard let name else { return nil }
-        let thumbnailURL = thumbnailsDirectory.appendingPathComponent(name)
-        return try? Data(contentsOf: thumbnailURL)
+        upgradeThumbnailIfPlaintext(vaultItem)
+        guard let name = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName else { return nil }
+        guard let key = encryptionKey else { return nil }
+        return try? encryptedThumbnailStore.read(fileName: name, key: key)
     }
     
     func loadImage(for vaultItem: VaultItem) async throws -> Data {
@@ -716,72 +820,44 @@ extension FileStorageManager {
     
     func clearAllStoredFiles() {
         print("DEBUG: Clearing all stored files...")
-        
-        let fileManager = FileManager.default
-        
-        // Clear vault directory
-        if fileManager.fileExists(atPath: vaultDirectory.path) {
-            do {
-                // Remove all contents of vault directory
-                let vaultContents = try fileManager.contentsOfDirectory(at: vaultDirectory, includingPropertiesForKeys: nil)
-                for fileURL in vaultContents {
-                    try fileManager.removeItem(at: fileURL)
-                }
-                print("DEBUG: Vault directory contents cleared")
-            } catch {
-                print("ERROR: Failed to clear vault directory: \(error)")
-            }
-        }
-        
-        // Clear thumbnails directory
-        if fileManager.fileExists(atPath: thumbnailsDirectory.path) {
-            do {
-                // Remove all contents of thumbnails directory
-                let thumbnailContents = try fileManager.contentsOfDirectory(at: thumbnailsDirectory, includingPropertiesForKeys: nil)
-                for fileURL in thumbnailContents {
-                    try fileManager.removeItem(at: fileURL)
-                }
-                print("DEBUG: Thumbnails directory contents cleared")
-            } catch {
-                print("ERROR: Failed to clear thumbnails directory: \(error)")
-            }
-        }
-        
-        // Clear encryption key
+        emptyStorageDirectories()
         encryptionKey = nil
-        
         print("DEBUG: All stored files cleared")
     }
     
     func deleteAllStorageDirectories() {
         print("DEBUG: Deleting all storage directories...")
-        
-        let fileManager = FileManager.default
-        
-        // Delete vault directory completely
-        if fileManager.fileExists(atPath: vaultDirectory.path) {
+
+        for directory in [vaultDirectory, thumbnailsDirectory] {
             do {
-                try fileManager.removeItem(at: vaultDirectory)
-                print("DEBUG: Vault directory deleted")
+                if fileManager.fileExists(atPath: directory.path) {
+                    try fileManager.removeItem(at: directory)
+                }
+                // Recreate empty so imports work without relaunching.
+                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {
-                print("ERROR: Failed to delete vault directory: \(error)")
+                print("ERROR: Failed to delete \(directory.lastPathComponent) directory: \(error)")
             }
         }
-        
-        // Delete thumbnails directory completely
-        if fileManager.fileExists(atPath: thumbnailsDirectory.path) {
-            do {
-                try fileManager.removeItem(at: thumbnailsDirectory)
-                print("DEBUG: Thumbnails directory deleted")
-            } catch {
-                print("ERROR: Failed to delete thumbnails directory: \(error)")
-            }
-        }
-        
-        // Clear encryption key
+
+        setFileProtection()
         encryptionKey = nil
-        
+
         print("DEBUG: All storage directories deleted")
+    }
+
+    /// Remove every file in the vault and thumbnail directories, leaving the directories in place.
+    func emptyStorageDirectories() {
+        for directory in [vaultDirectory, thumbnailsDirectory] {
+            guard fileManager.fileExists(atPath: directory.path) else { continue }
+            do {
+                for fileURL in try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
+                    try fileManager.removeItem(at: fileURL)
+                }
+            } catch {
+                print("ERROR: Failed to clear \(directory.lastPathComponent) directory: \(error)")
+            }
+        }
     }
 }
 

@@ -299,11 +299,85 @@ struct FileStorageManagerTests {
                 #expect(image.size.height <= 600, "Thumbnail pixel height should be limited")
             }
         }
-        
-        // Cleanup
+
+        let onDisk = try Data(contentsOf: storage.rootURL
+            .appendingPathComponent("Thumbnails")
+            .appendingPathComponent(vaultItem.storedThumbnailName ?? ""))
+        #expect(UIImage(data: onDisk) == nil, "On-disk thumbnail must not be a plaintext JPEG")
+        #expect(onDisk != thumbnail)
+
         try manager.deleteFile(vaultItem: vaultItem)
     }
-    
+
+    @Test func testLegacyPlaintextThumbnailIsEncryptedOnUnlock() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "thumb-legacy")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "legacy-thumb.png",
+            fileType: "image/png"
+        )
+        let thumbName = item.storedThumbnailName ?? ""
+        let thumbURL = storage.rootURL.appendingPathComponent("Thumbnails").appendingPathComponent(thumbName)
+        let jpeg = createTestImage().jpegData(compressionQuality: 0.7)!
+        try jpeg.write(to: thumbURL)
+        #expect(UIImage(data: try Data(contentsOf: thumbURL)) != nil)
+
+        manager.setupEncryptionKey(from: "thumb-legacy")
+
+        let loaded = manager.loadThumbnail(for: item)
+        #expect(UIImage(data: loaded ?? Data()) != nil)
+        let onDisk = try Data(contentsOf: thumbURL)
+        #expect(UIImage(data: onDisk) == nil)
+        #expect(onDisk != jpeg)
+    }
+
+    @Test func testWrongKeyDoesNotRevealThumbnail() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "thumb-correct")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "secret.png",
+            fileType: "image/png"
+        )
+
+        manager.setupEncryptionKey(from: "thumb-wrong")
+        #expect(manager.loadThumbnail(for: item) == nil)
+
+        manager.setupEncryptionKey(from: "thumb-correct")
+        #expect(UIImage(data: manager.loadThumbnail(for: item) ?? Data()) != nil)
+    }
+
+    @Test func testPasscodeChangeReencryptsThumbnail() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "old-thumb-key")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "migrate-thumb.png",
+            fileType: "image/png"
+        )
+        let before = try Data(contentsOf: storage.rootURL
+            .appendingPathComponent("Thumbnails")
+            .appendingPathComponent(item.storedThumbnailName ?? ""))
+
+        try await manager.migrateFilesToNewEncryptionKey(
+            oldPassword: "old-thumb-key",
+            newPassword: "new-thumb-key"
+        ) { _, _ in }
+
+        let after = try Data(contentsOf: storage.rootURL
+            .appendingPathComponent("Thumbnails")
+            .appendingPathComponent(item.storedThumbnailName ?? ""))
+        #expect(after != before)
+        #expect(UIImage(data: manager.loadThumbnail(for: item) ?? Data()) != nil)
+
+        manager.setupEncryptionKey(from: "old-thumb-key")
+        #expect(manager.loadThumbnail(for: item) == nil)
+    }
+
     @Test func testThumbnailForNonImage() async throws {
         let storage = try makeStorage()
         let manager = storage.fileStorageManager
@@ -438,6 +512,62 @@ struct FileStorageManagerTests {
             atPath: vaultURL.appendingPathComponent(item.storedBlobName ?? "").path
         ))
         #expect(try manager.loadFile(vaultItem: item) == Data("keep me".utf8))
+    }
+
+    @Test func testDeleteAllVaultContentRemovesFilesEvenWithTrashEnabled() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "delete-all-key")
+        UserDefaults.standard.set(true, forKey: "trashEnabled")
+        defer { UserDefaults.standard.set(false, forKey: "trashEnabled") }
+        _ = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "photo.png",
+            fileType: "image/png"
+        )
+        _ = try manager.saveFile(
+            data: Data("doc".utf8),
+            fileName: "doc.txt",
+            fileType: "text/plain"
+        )
+
+        manager.deleteAllVaultContent()
+
+        #expect(storage.coreDataManager.fetchAllVaultItems().isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: storage.rootURL.appendingPathComponent("Vault").path
+        ).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: storage.rootURL.appendingPathComponent("Thumbnails").path
+        ).isEmpty)
+    }
+
+    @Test func testDeleteAllStorageDirectoriesRemovesFilesAndKeepsDirectoriesUsable() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "reset-key")
+        _ = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "reset.png",
+            fileType: "image/png"
+        )
+
+        manager.deleteAllStorageDirectories()
+
+        let vaultPath = storage.rootURL.appendingPathComponent("Vault").path
+        let thumbPath = storage.rootURL.appendingPathComponent("Thumbnails").path
+        #expect(FileManager.default.fileExists(atPath: vaultPath))
+        #expect(FileManager.default.fileExists(atPath: thumbPath))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: vaultPath).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: thumbPath).isEmpty)
+
+        manager.setupEncryptionKey(from: "reset-key")
+        let item = try manager.saveFile(
+            data: Data("after reset".utf8),
+            fileName: "after.txt",
+            fileType: "text/plain"
+        )
+        #expect(try manager.loadFile(vaultItem: item) == Data("after reset".utf8))
     }
 
     @Test func testTrashRestoreAndPermanentDeleteLifecycle() async throws {

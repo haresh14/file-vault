@@ -47,17 +47,17 @@ class AppDataManager: AppDataManaging {
     func clearAllAppData() {
         print("DEBUG: 🧹 Starting complete app data cleanup...")
         
-        // 1. Clear Keychain data
+        // 1. Clear file storage first so vault bytes never outlive the metadata
+        FileStorageManager.shared.clearAllStoredFiles()
+        
+        // 2. Clear Keychain data
         KeychainManager.shared.clearAllKeychainData()
         
-        // 2. Clear UserDefaults data (except the launch flag)
+        // 3. Clear UserDefaults data (except the launch flag)
         clearUserDefaultsExceptLaunchFlag()
         
-        // 3. Clear Core Data
+        // 4. Clear Core Data
         CoreDataManager.shared.clearAllCoreData()
-        
-        // 4. Clear file storage
-        FileStorageManager.shared.clearAllStoredFiles()
         
         // 5. Reset biometric failure state
         BiometricAuthManager.shared.resetFailureCount()
@@ -85,17 +85,18 @@ class AppDataManager: AppDataManaging {
     func performCompleteAppReset() {
         print("DEBUG: 💥 Performing COMPLETE app reset - deleting all files and data...")
         
-        // 1. Clear Keychain data
+        // 1. Delete all storage directories first: removing the Core Data store can tear down
+        // live fetches, and vault bytes must not survive that.
+        FileStorageManager.shared.deleteAllStorageDirectories()
+        
+        // 2. Clear Keychain data
         KeychainManager.shared.clearAllKeychainData()
         
-        // 2. Clear ALL UserDefaults data (including launch flag to trigger fresh setup)
+        // 3. Clear ALL UserDefaults data (including launch flag to trigger fresh setup)
         clearAllUserDefaults()
         
-        // 3. Delete Core Data store files completely
+        // 4. Delete Core Data store files completely
         CoreDataManager.shared.deleteCoreDataStore()
-        
-        // 4. Delete all storage directories
-        FileStorageManager.shared.deleteAllStorageDirectories()
         
         // 5. Reset biometric failure state
         BiometricAuthManager.shared.resetFailureCount()

@@ -218,14 +218,7 @@ struct SettingsView: View {
     }
 
     private func performDeleteAllFiles() {
-        CoreDataManager.shared.fetchAllVaultItems().forEach { item in
-            do {
-                try FileStorageManager.shared.deleteFile(vaultItem: item)
-            } catch {
-                print("Error deleting file: \(error)")
-            }
-            CoreDataManager.shared.deleteVaultItem(item)
-        }
+        FileStorageManager.shared.deleteAllVaultContent()
         CoreDataManager.shared.fetchAllFolders().forEach(CoreDataManager.shared.deleteFolder)
         CoreDataManager.shared.save()
         DispatchQueue.main.async {

@@ -1,27 +1,36 @@
 import Foundation
 import UIKit
 import AVFoundation
+import CryptoKit
 
 final class ThumbnailGenerationService {
     private let fileManager: FileManager
-    private let thumbnailsDirectory: URL
+    private let thumbnailStore: EncryptedFileStore
     private let thumbnailSize = CGSize(width: 200, height: 200)
 
-    init(fileManager: FileManager, thumbnailsDirectory: URL) {
+    init(
+        fileManager: FileManager,
+        thumbnailStore: EncryptedFileStore
+    ) {
         self.fileManager = fileManager
-        self.thumbnailsDirectory = thumbnailsDirectory
+        self.thumbnailStore = thumbnailStore
     }
 
-    func generateImageThumbnail(from data: Data, storageKey: String) throws -> String? {
+    func generateImageThumbnail(from data: Data, storageKey: String, key: SymmetricKey) throws -> String? {
         guard let image = UIImage(data: data) else { return nil }
         let thumbnail = UIGraphicsImageRenderer(size: thumbnailSize).image { _ in
             image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
         }
         guard let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) else { return nil }
-        return try write(thumbnailData, storageKey: storageKey)
+        return try write(thumbnailData, storageKey: storageKey, key: key)
     }
 
-    func generateVideoThumbnail(from data: Data, storageKey: String, displayFileName: String) throws -> String? {
+    func generateVideoThumbnail(
+        from data: Data,
+        storageKey: String,
+        displayFileName: String,
+        key: SymmetricKey
+    ) throws -> String? {
         let originalExtension = (displayFileName as NSString).pathExtension
         let tempFileName = UUID().uuidString
             + (originalExtension.isEmpty ? ".mov" : ".\(originalExtension)")
@@ -32,7 +41,7 @@ final class ThumbnailGenerationService {
         let asset = AVURLAsset(url: tempURL)
         // Intentionally retained for behavior compatibility; modernization is a later wave.
         guard !asset.tracks(withMediaType: .video).isEmpty else {
-            return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName)
+            return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName, key: key)
         }
 
         let generator = AVAssetImageGenerator(asset: asset)
@@ -51,16 +60,20 @@ final class ThumbnailGenerationService {
                 let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
                 let thumbnail = UIImage(cgImage: cgImage)
                 if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) {
-                    return try write(thumbnailData, storageKey: storageKey)
+                    return try write(thumbnailData, storageKey: storageKey, key: key)
                 }
             } catch {
                 print("DEBUG: Error generating video thumbnail at time \(time.seconds): \(error)")
             }
         }
-        return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName)
+        return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName, key: key)
     }
 
-    private func generateGenericVideoThumbnail(storageKey: String, displayFileName: String) -> String? {
+    private func generateGenericVideoThumbnail(
+        storageKey: String,
+        displayFileName: String,
+        key: SymmetricKey
+    ) -> String? {
         let thumbnail = UIGraphicsImageRenderer(size: thumbnailSize).image { context in
             let cgContext = context.cgContext
             cgContext.setFillColor(UIColor.systemGray2.cgColor)
@@ -111,12 +124,12 @@ final class ThumbnailGenerationService {
         }
 
         guard let data = thumbnail.jpegData(compressionQuality: 0.7) else { return nil }
-        return try? write(data, storageKey: storageKey)
+        return try? write(data, storageKey: storageKey, key: key)
     }
 
-    private func write(_ data: Data, storageKey: String) throws -> String {
+    private func write(_ data: Data, storageKey: String, key: SymmetricKey) throws -> String {
         let fileName = "\(storageKey).thumb"
-        try data.write(to: thumbnailsDirectory.appendingPathComponent(fileName))
+        try thumbnailStore.write(data, fileName: fileName, key: key)
         return fileName
     }
 }

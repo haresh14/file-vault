@@ -69,6 +69,8 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Imported file keeps its name in Gallery; the file in `Documents/Vault/` is a UUID, not `vacation.jpg`
 - [ ] Rename in the app changes the Gallery name; the UUID blob on disk stays the same
 - [ ] Older vault files named after the display name still open after first unlock (they are moved to UUID)
+- [ ] Import a photo: Gallery thumbnail shows; `Documents/Thumbnails/{uuid}.thumb` is not a JPEG on disk
+- [ ] Vault that had plaintext thumbs: first unlock still shows thumbnails (files are rewritten under AES-GCM)
 
 ## Files and folders
 
@@ -99,8 +101,8 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Developer (DEBUG)
 
-- [ ] Complete App Reset → Security Setup on relaunch
-- [ ] Delete All Files & Folders keeps the credential
+- [ ] Complete App Reset → Security Setup on relaunch; `Documents/Vault/` and `Documents/Thumbnails/` are empty
+- [ ] Delete All Files & Folders keeps the credential and empties both storage directories, with trash on and off
 
 ## Automated tests
 

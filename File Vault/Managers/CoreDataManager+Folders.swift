@@ -91,7 +91,7 @@ extension CoreDataManager {
 
     private func cleanupFolderFileStorage(_ folder: Folder) {
         for item in folder.itemsArray {
-            try? FileStorageManager.shared.deleteFile(vaultItem: item)
+            try? FileStorageManager.shared.permanentlyDeleteFile(vaultItem: item)
         }
         folder.subfoldersArray.forEach(cleanupFolderFileStorage)
     }
