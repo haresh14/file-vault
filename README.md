@@ -25,7 +25,7 @@ The full technical inventory (for OS upgrades and regressions) is in [docs/FEATU
 
 Face ID usage text is already set on the target (`NSFaceIDUsageDescription`). Photo library access uses `PHPickerViewController` and does not need `NSPhotoLibraryUsageDescription`.
 
-New to Xcode? See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for opening the project, signing, and troubleshooting. Some privacy steps in that guide are historical — the Face ID key is already in the target Info settings.
+New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening the project, signing, and troubleshooting. Some privacy steps in that guide are historical — the Face ID key is already in the target Info settings.
 
 ## Features
 
@@ -106,5 +106,5 @@ These are real implementation issues, not old video-player TODOs:
 ## Need help?
 
 - Feature behavior and OS-upgrade baseline: [docs/FEATURES.md](docs/FEATURES.md)
-- Xcode basics: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
-- Troubleshooting: [DEVELOPER_GUIDE.md#troubleshooting](DEVELOPER_GUIDE.md#troubleshooting)
+- Xcode basics: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
+- Troubleshooting: [docs/DEVELOPER_GUIDE.md#troubleshooting](docs/DEVELOPER_GUIDE.md#troubleshooting)
