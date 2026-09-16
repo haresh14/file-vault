@@ -63,7 +63,8 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | SwiftUI | Entire UI, scene lifecycle (`scenePhase`) |
 | UIKit | Window overlay, alerts, `UIActivityViewController`, `UIDocumentPicker`, `PHPicker`, graphics renderers, screenshot / capture notifications |
 | Core Data | `Folder`, `VaultItem` metadata |
-| CryptoKit | AES-GCM encrypt/decrypt; SHA256 key derivation |
+| CryptoKit | AES-GCM encrypt/decrypt |
+| CommonCrypto | PBKDF2-HMAC-SHA256 key derivation |
 | Security (Keychain) | Real and fake credentials; `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` |
 | LocalAuthentication | Face ID / Touch ID |
 | PhotosUI | `PHPickerViewController` (images + videos, limit 50) |
@@ -87,14 +88,15 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes |
 | `Documents/Thumbnails/` | `FileProtectionType.complete` | **No** — JPEG thumbnails, quality 0.7, 200×200 |
 | `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | No (metadata in plaintext Core Data) |
-| Keychain items `com.filevault.app` | `WhenUnlockedThisDeviceOnly` | System Keychain |
+| Keychain items `com.filevault.app` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
 | UserDefaults | Standard suite | Settings, auth type, lock timeout, trash flag, security logs, biometric enabled |
 
 **Encryption details**
 
-- Key = `SHA256(UTF-8 password/passcode)` → `SymmetricKey`.
+- Key = PBKDF2-HMAC-SHA256 of the real credential (210,000 iterations, 16-byte random salt, 32-byte key). Salt and parameters live in Keychain account `vaultKeyDerivation` (`WhenUnlockedThisDeviceOnly`).
 - Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag).
-- Changing authentication **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped.
+- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped.
+- If ciphertext exists but no derivation record is in Keychain, unlock derives a SHA-256 key long enough to open those files, then re-encrypts them with PBKDF2 and stores a salt.
 - Duplicate physical files are reference-counted by `fileName`; a file is not deleted from disk if another `VaultItem` still points at it.
 
 ---
@@ -395,7 +397,8 @@ Store name: `FileVault`. Class codegen: manual (`Folder+CoreData*`, `VaultItem+C
 ```
 Keychain service:                 com.filevault.app
 Keychain accessibility:           kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-Encryption:                       AES-GCM, key = SHA256(credential UTF-8)
+Encryption:                       AES-GCM; key = PBKDF2-HMAC-SHA256 (210k, 16-byte salt)
+Keychain derivation account:      vaultKeyDerivation
 Auto-lock default:                30 seconds
 Auto-lock options (seconds):      0, 5, 10, 15, 30, 60, 300, -1
 Biometric max failures:           3 (reset after 30s)
@@ -435,7 +438,7 @@ These are confirmed absences. Do not treat them as regressions unless product ad
 
 | Target | Coverage (current files) |
 |--------|---------------------------|
-| File VaultTests | Keychain, Core Data, storage/crypto/thumbnails/trash, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
+| File VaultTests | Keychain (including derivation record), Core Data, storage/crypto/thumbnails/trash, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
 | File VaultUITests | First-launch authentication, tab/navigation, fake-vault restrictions, add controls, and launch smoke tests |
 
 Upgrade work should run unit tests on the new SDK simulator and a smoke pass of UI tests. Tests are not a substitute for the checklist below.
@@ -487,9 +490,9 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 **Data integrity**
 
-- [ ] Existing vault from previous OS still unlocks with same credential
+- [ ] Existing vault from previous OS still unlocks with same credential (PBKDF2 salt in Keychain, or SHA-256 ciphertext rewritten on first unlock)
 - [ ] Thumbnails still load; Core Data store migrates without loss
-- [ ] Keychain items survive the upgrade (same bundle ID)
+- [ ] Keychain items survive the upgrade (same bundle ID), including `vaultKeyDerivation`
 
 **Build**
 

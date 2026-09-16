@@ -61,6 +61,12 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Old credential cannot decrypt
 - [ ] Fake password is cleared
 
+## Vault encryption
+
+- [ ] New install: import a photo, lock, unlock — file still opens
+- [ ] Settings → Change Authentication: files still open with the new credential; the old one does not
+- [ ] Vault that existed before PBKDF2: first unlock after this build still shows files (may pause briefly while files are rewritten)
+
 ## Files and folders
 
 - [ ] Import up to 50 photos/videos; document picker

@@ -24,6 +24,7 @@ struct KeychainManagerTests {
         deinit {
             try? manager.deletePassword()
             try? manager.deleteFakePassword()
+            manager.deleteKeyDerivationRecord()
             defaults.removePersistentDomain(forName: suiteName)
         }
     }
@@ -56,6 +57,18 @@ struct KeychainManagerTests {
         
         // Cleanup
         try manager.deletePassword()
+    }
+
+    @Test func testKeyDerivationRecordStorage() async throws {
+        let testKeychain = TestKeychain()
+        let manager = testKeychain.manager
+        let record = VaultKeyDerivationRecord.makeCurrent(salt: Data(repeating: 9, count: 16))
+
+        try manager.saveKeyDerivationRecord(record)
+        #expect(manager.loadKeyDerivationRecord() == record)
+
+        manager.clearAllKeychainData()
+        #expect(manager.loadKeyDerivationRecord() == nil)
     }
     
     @Test func testPasswordDeletion() async throws {

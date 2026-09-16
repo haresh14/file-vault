@@ -61,7 +61,7 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 - Screen recording overlay
 - Optional shake-to-lock and flip-to-lock
 
-Files in `Documents/Vault/` are encrypted with **AES-GCM** (key = SHA256 of the real credential). Thumbnails are unencrypted JPEGs. Core Data metadata uses Data Protection `completeUntilFirstUserAuthentication`. Credentials use Keychain `WhenUnlockedThisDeviceOnly`.
+Files in `Documents/Vault/` are encrypted with **AES-GCM**. The key is **PBKDF2-HMAC-SHA256** of the real credential (random salt in Keychain). Thumbnails are unencrypted JPEGs. Core Data metadata uses Data Protection `completeUntilFirstUserAuthentication`. Credentials and the derivation salt use Keychain `WhenUnlockedThisDeviceOnly`.
 
 ## App structure
 

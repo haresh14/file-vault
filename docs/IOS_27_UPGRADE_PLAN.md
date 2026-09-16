@@ -52,7 +52,7 @@ AES-GCM, Keychain, Core Data, PHPicker, `NWListener`, AVPlayer, PDFKit, QuickLoo
 | Local HTTP on :8080 | May prompt for local network | `NSLocalNetworkUsageDescription` |
 | `BGTaskScheduler.register` | Supported | Permitted-identifiers plist |
 | `LAContext` Face ID / Touch ID | `biometryType` can be `.opticID` | Map Optic ID as unavailable; Face ID / Touch ID / vault credential |
-| CryptoKit AES-GCM + SHA256 | Supported | Keep |
+| CryptoKit AES-GCM + CommonCrypto PBKDF2 | Supported | Keep |
 | Keychain `WhenUnlockedThisDeviceOnly` | Supported | Keep |
 | `FileProtectionType.complete` | Supported | Keep |
 | `userDidTakeScreenshotNotification` | Supported | Overlay + alert (no API to block screenshots) |

@@ -20,6 +20,7 @@ class FileStorageManager: FileStorageManaging {
     let thumbnailsDirectory: URL
     private let mimeTypeMapper = MIMETypeMapper()
     private let cryptoService = VaultCryptoService()
+    private let keyDerivationStore: VaultKeyDerivationStoring
     private let thumbnailService: ThumbnailGenerationService
     private let trashService: TrashOperationsService
     private let temporarySharingService: TemporarySharingService
@@ -43,15 +44,22 @@ class FileStorageManager: FileStorageManaging {
         self.init(
             fileManager: .default,
             documentsDirectory: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!,
-            coreDataManager: .shared
+            coreDataManager: .shared,
+            keyDerivationStore: KeychainVaultKeyDerivationStore(keychain: .shared)
         )
     }
 
     /// Creates isolated file and metadata storage for tests.
-    init(fileManager: FileManager = .default, documentsDirectory: URL, coreDataManager: CoreDataManager) {
+    init(
+        fileManager: FileManager = .default,
+        documentsDirectory: URL,
+        coreDataManager: CoreDataManager,
+        keyDerivationStore: VaultKeyDerivationStoring = InMemoryVaultKeyDerivationStore()
+    ) {
         self.fileManager = fileManager
         self.documentsDirectory = documentsDirectory
         self.coreDataManager = coreDataManager
+        self.keyDerivationStore = keyDerivationStore
         
         // Create vault directory
         vaultDirectory = documentsDirectory.appendingPathComponent("Vault", isDirectory: true)
@@ -115,8 +123,25 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - Encryption Key Management
     
     func setupEncryptionKey(from password: String) {
-        // Derive encryption key from password using SHA256
-        encryptionKey = cryptoService.key(from: password)
+        if let record = keyDerivationStore.loadRecord() {
+            encryptionKey = try? cryptoService.key(from: password, record: record)
+            return
+        }
+
+        if vaultContainsCiphertext() {
+            encryptionKey = cryptoService.legacySHA256Key(from: password)
+            upgradeLegacySHA256KeyIfNeeded(password: password)
+            return
+        }
+
+        let record = cryptoService.makeRecord()
+        do {
+            try keyDerivationStore.saveRecord(record)
+            encryptionKey = try cryptoService.key(from: password, record: record)
+        } catch {
+            print("DEBUG: Failed to store key derivation record: \(error)")
+            encryptionKey = cryptoService.legacySHA256Key(from: password)
+        }
     }
     
     /// Re-encrypt all vault files with a new encryption key
@@ -124,9 +149,9 @@ class FileStorageManager: FileStorageManaging {
     func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws {
         print("DEBUG: Starting file migration from old key to new key")
         
-        // Create old and new encryption keys
-        let oldKey = cryptoService.key(from: oldPassword)
-        let newKey = cryptoService.key(from: newPassword)
+        let oldKey = deriveKey(for: oldPassword)
+        let newRecord = cryptoService.makeRecord()
+        let newKey = try cryptoService.key(from: newPassword, record: newRecord)
         
         // Get all vault items
         let allItems = coreDataManager.fetchAllVaultItems()
@@ -149,8 +174,8 @@ class FileStorageManager: FileStorageManaging {
         }
         
         print("DEBUG: Migration completed successfully")
-        
-        // Update the current encryption key to the new one
+
+        try keyDerivationStore.saveRecord(newRecord)
         encryptionKey = newKey
         
         print("DEBUG: File migration completed successfully")
@@ -158,48 +183,68 @@ class FileStorageManager: FileStorageManaging {
     
     /// Migrate a single vault item to the new encryption key
     private func migrateVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) async throws {
+        reencryptVaultItem(vaultItem, oldKey: oldKey, newKey: newKey)
+    }
+
+    private func deriveKey(for password: String) -> SymmetricKey {
+        if let record = keyDerivationStore.loadRecord(),
+           let key = try? cryptoService.key(from: password, record: record) {
+            return key
+        }
+        return cryptoService.legacySHA256Key(from: password)
+    }
+
+    private func vaultContainsCiphertext() -> Bool {
+        let urls = (try? fileManager.contentsOfDirectory(
+            at: vaultDirectory,
+            includingPropertiesForKeys: nil
+        )) ?? []
+        return urls.contains { !$0.lastPathComponent.hasPrefix(".") }
+    }
+
+    private func upgradeLegacySHA256KeyIfNeeded(password: String) {
+        let oldKey = cryptoService.legacySHA256Key(from: password)
+        let record = cryptoService.makeRecord()
+        guard let newKey = try? cryptoService.key(from: password, record: record) else { return }
+
+        for item in coreDataManager.fetchAllVaultItems() {
+            reencryptVaultItem(item, oldKey: oldKey, newKey: newKey)
+        }
+
+        do {
+            try keyDerivationStore.saveRecord(record)
+            encryptionKey = newKey
+            print("DEBUG: Upgraded vault key derivation to PBKDF2")
+        } catch {
+            print("DEBUG: Failed to save PBKDF2 derivation record: \(error)")
+        }
+    }
+
+    private func reencryptVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) {
         guard let fileName = vaultItem.fileName else {
             print("DEBUG: Skipping item with no filename")
             return
         }
-        
-        // Skip system files that might not be properly encrypted
+
         if fileName.hasPrefix(".") || fileName == ".DS_Store" {
             print("DEBUG: Skipping system file: \(fileName)")
             return
         }
-        
+
         let fileURL = vaultDirectory.appendingPathComponent(fileName)
-        
-        // Check if file exists
         guard fileManager.fileExists(atPath: fileURL.path) else {
             print("DEBUG: File \(fileName) does not exist, skipping")
             return
         }
-        
+
         do {
-            // Load and decrypt with old key
             let encryptedData = try Data(contentsOf: fileURL)
             let decryptedData = try cryptoService.decrypt(encryptedData, using: oldKey)
-            
-            // Re-encrypt with new key
             let newEncryptedData = try cryptoService.encrypt(decryptedData, using: newKey)
-            
-            // Write back to file
             try newEncryptedData.write(to: fileURL)
-            
             print("DEBUG: Successfully migrated file: \(fileName)")
         } catch {
             print("DEBUG: Failed to migrate file \(fileName): \(error)")
-            // For individual file failures, log the error but don't stop the entire migration
-            // Common reasons: authenticationFailure (system files), corrupted files, etc.
-            if error.localizedDescription.contains("authenticationFailure") {
-                print("DEBUG: Skipping file with authentication failure (likely system file or corrupted): \(fileName)")
-            } else {
-                print("DEBUG: Skipping file due to error: \(fileName) - \(error.localizedDescription)")
-            }
-            // Don't throw - just skip this file and continue with others
-            return
         }
     }
     

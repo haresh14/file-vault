@@ -163,6 +163,45 @@ struct FileStorageManagerTests {
             try manager.loadFile(vaultItem: item)
         }
     }
+
+    @Test func testLegacySHA256VaultUpgradesToPBKDF2() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        let password = "1234"
+        let payload = Data("legacy secret".utf8)
+        let crypto = VaultCryptoService()
+        let vaultURL = storage.rootURL.appendingPathComponent("Vault")
+        let fileStore = EncryptedFileStore(fileManager: .default, vaultDirectory: vaultURL)
+        try fileStore.write(
+            payload,
+            fileName: "legacy.txt",
+            key: crypto.legacySHA256Key(from: password)
+        )
+        let item = storage.coreDataManager.createVaultItem(
+            fileName: "legacy.txt",
+            fileType: "text/plain",
+            fileSize: Int64(payload.count)
+        )
+
+        manager.setupEncryptionKey(from: password)
+
+        #expect(storage.keychainManager.loadKeyDerivationRecord() != nil)
+        #expect(try manager.loadFile(vaultItem: item) == payload)
+        #expect(throws: Error.self) {
+            try crypto.decrypt(
+                Data(contentsOf: vaultURL.appendingPathComponent("legacy.txt")),
+                using: crypto.legacySHA256Key(from: password)
+            )
+        }
+
+        manager.setupEncryptionKey(from: password)
+        #expect(try manager.loadFile(vaultItem: item) == payload)
+
+        manager.setupEncryptionKey(from: "9999")
+        #expect(throws: Error.self) {
+            try manager.loadFile(vaultItem: item)
+        }
+    }
     
     @Test func testMultipleFiles() async throws {
         let storage = try makeStorage()

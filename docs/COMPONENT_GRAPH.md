@@ -52,7 +52,7 @@ flowchart TB
         SQLite["FileVault.sqlite"]
         VaultDir["Documents/Vault (AES-GCM)"]
         Thumbs["Documents/Thumbnails (JPEG)"]
-        Keychain["Keychain"]
+        Keychain["Keychain (credential + PBKDF2 salt)"]
         Defaults["UserDefaults"]
     end
 
@@ -211,12 +211,14 @@ flowchart LR
 flowchart TB
     FSM["FileStorageManager"] --> MIME["MIMETypeMapper"]
     FSM --> Crypto["VaultCryptoService"]
+    FSM --> KDF["VaultKeyDerivationStore"]
     FSM --> Store["EncryptedFileStore"]
     FSM --> Thumbs["ThumbnailGenerationService"]
     FSM --> Photos["PhotoImportService"]
     FSM --> Trash["TrashOperationsService"]
     FSM --> Share["TemporarySharingService"]
     Store --> Crypto
+    KDF --> Keychain["Keychain vaultKeyDerivation"]
     FSM --> CDM["CoreDataManager"]
 
     CDM --> Items["CoreDataManager+VaultItems"]

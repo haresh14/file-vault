@@ -48,6 +48,7 @@ class KeychainManager: KeychainManaging {
     private let defaults: UserDefaults
     private let passwordKey = "userPassword"
     private let fakePasswordKey = "fakePassword"
+    private let keyDerivationAccount = "vaultKeyDerivation"
     private let biometricEnabledKey = "biometricEnabled"
     private let authTypeKey = "authenticationType"
     
@@ -342,6 +343,49 @@ class KeychainManager: KeychainManaging {
     
     // MARK: - Data Cleanup
     
+    // MARK: - Vault key derivation (PBKDF2 salt + parameters)
+
+    func saveKeyDerivationRecord(_ record: VaultKeyDerivationRecord) throws {
+        let data = try JSONEncoder().encode(record)
+        deleteKeyDerivationRecord()
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: keyDerivationAccount,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainError.unknown(status)
+        }
+    }
+
+    func loadKeyDerivationRecord() -> VaultKeyDerivationRecord? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: keyDerivationAccount,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnData as String: true
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            return nil
+        }
+        return try? JSONDecoder().decode(VaultKeyDerivationRecord.self, from: data)
+    }
+
+    func deleteKeyDerivationRecord() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: keyDerivationAccount
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
     func clearAllKeychainData() {
         print("DEBUG: Clearing all keychain data...")
         
@@ -350,6 +394,8 @@ class KeychainManager: KeychainManaging {
         
         // Clear fake password from keychain
         try? deleteFakePassword()
+
+        deleteKeyDerivationRecord()
         
         print("DEBUG: Keychain data cleared")
     }

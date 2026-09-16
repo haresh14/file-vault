@@ -48,7 +48,8 @@ final class IsolatedTestDependencies {
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         fileStorageManager = FileStorageManager(
             documentsDirectory: rootURL,
-            coreDataManager: coreDataManager
+            coreDataManager: coreDataManager,
+            keyDerivationStore: KeychainVaultKeyDerivationStore(keychain: keychainManager)
         )
 
         previousTrashSetting = UserDefaults.standard.object(forKey: "trashEnabled")
@@ -58,6 +59,7 @@ final class IsolatedTestDependencies {
     deinit {
         try? keychainManager.deletePassword()
         try? keychainManager.deleteFakePassword()
+        keychainManager.deleteKeyDerivationRecord()
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         try? FileManager.default.removeItem(at: rootURL)
 
