@@ -166,8 +166,12 @@ struct FileStorageManagerTests {
         #expect(thumbnail != nil, "Thumbnail should be loadable")
         
         if let thumbnail = thumbnail {
-            #expect(thumbnail.size.width <= 200, "Thumbnail width should be limited")
-            #expect(thumbnail.size.height <= 200, "Thumbnail height should be limited")
+            let image = UIImage(data: thumbnail)
+            #expect(image != nil, "Thumbnail data should decode as an image")
+            if let image {
+                #expect(image.size.width <= 200, "Thumbnail width should be limited")
+                #expect(image.size.height <= 200, "Thumbnail height should be limited")
+            }
         }
         
         // Cleanup
