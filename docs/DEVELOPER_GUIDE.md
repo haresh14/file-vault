@@ -123,6 +123,8 @@ File VaultTests/ - Unit tests
 File VaultUITests/ - Launch and navigation smoke tests
 ```
 
+Component relationships (auth, tabs, storage, security, web server) are in [COMPONENT_GRAPH.md](COMPONENT_GRAPH.md).
+
 ### Key Files for Beginners
 
 1. **ContentView.swift**: The main screen of your app

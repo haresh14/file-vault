@@ -4,7 +4,7 @@ A local, encrypted iOS vault for photos, videos, audio, documents, and other fil
 
 There is no cloud sync. The only network feature is an optional LAN web server for uploads from other devices on the same Wi‑Fi.
 
-The full technical inventory (for OS upgrades and regressions) is in [docs/FEATURES.md](docs/FEATURES.md).
+The full technical inventory (for OS upgrades and regressions) is in [docs/FEATURES.md](docs/FEATURES.md). Component relationships are in [docs/COMPONENT_GRAPH.md](docs/COMPONENT_GRAPH.md).
 
 ## Requirements
 
@@ -113,5 +113,6 @@ These are real implementation issues, not old video-player TODOs:
 ## Need help?
 
 - Feature behavior and OS-upgrade baseline: [docs/FEATURES.md](docs/FEATURES.md)
+- Component graph: [docs/COMPONENT_GRAPH.md](docs/COMPONENT_GRAPH.md)
 - Xcode basics: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
 - Troubleshooting: [docs/DEVELOPER_GUIDE.md#troubleshooting](docs/DEVELOPER_GUIDE.md#troubleshooting)
