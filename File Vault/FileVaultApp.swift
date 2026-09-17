@@ -68,6 +68,8 @@ private struct FileVaultRootView: View {
                     VaultLog.debug("DEBUG: ✅ Not first launch - no cleanup needed")
                 }
                 _ = dependencies.webServerManager
+                // Registers the notification delegate. This does not ask for permission.
+                _ = NotificationManager.shared
                 // Blanking attaches to the scene's window, so it also covers sheets and previews.
                 SecurityManager.shared.refreshCaptureBlanking()
             }

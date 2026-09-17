@@ -7,28 +7,46 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 import UserNotifications
 
-class NotificationManager: ObservableObject {
+class NotificationManager: NSObject, ObservableObject {
     static let shared = NotificationManager()
     
     @Published var inAppNotifications: [InAppNotification] = []
     @Published var uploadProgress: [String: UploadNotificationProgress] = [:]
     
-    private init() {}
+    private override init() {
+        super.init()
+        // Without a delegate iOS drops notifications that arrive while the app is on screen.
+        UNUserNotificationCenter.current().delegate = self
+    }
     
     // MARK: - Permission
     
     func requestAuthorizationIfNeeded() {
         let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { settings in
-            guard settings.authorizationStatus == .notDetermined else { return }
-            center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-                if let error {
-                    VaultLog.debug("Notification permission error: \(error)")
-                } else {
-                    VaultLog.debug("Notification permission granted: \(granted)")
+        center.getNotificationSettings { [weak self] settings in
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+                    if let error {
+                        VaultLog.debug("Notification permission error: \(error)")
+                    } else {
+                        VaultLog.debug("Notification permission granted: \(granted)")
+                    }
                 }
+            case .denied:
+                // Silence here would look like a broken feature, so say why nothing arrives.
+                self?.showInAppNotification(
+                    title: "Notifications are off",
+                    message: "Tap to open Settings and turn them on.",
+                    type: .info,
+                    duration: 6.0,
+                    action: .openNotificationSettings
+                )
+            default:
+                break
             }
         }
     }
@@ -123,13 +141,20 @@ class NotificationManager: ObservableObject {
     
     // MARK: - In-App Notifications
     
-    func showInAppNotification(title: String, message: String, type: NotificationType, duration: Double = 2.0) {
+    func showInAppNotification(
+        title: String,
+        message: String,
+        type: NotificationType,
+        duration: Double = 2.0,
+        action: InAppNotificationAction? = nil
+    ) {
         let notification = InAppNotification(
             id: UUID(),
             title: title,
             message: message,
             type: type,
-            timestamp: Date()
+            timestamp: Date(),
+            action: action
         )
         
         DispatchQueue.main.async {
@@ -151,6 +176,9 @@ class NotificationManager: ObservableObject {
     // MARK: - System Notifications
     
     private func showSystemNotification(title: String, message: String) {
+        // On screen, the in-app banner already says this; a second copy would be noise.
+        guard UIApplication.shared.applicationState != .active else { return }
+
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = message
@@ -170,6 +198,16 @@ class NotificationManager: ObservableObject {
     }
 }
 
+extension NotificationManager: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound])
+    }
+}
+
 // MARK: - Data Models
 
 struct InAppNotification: Identifiable, Equatable {
@@ -178,6 +216,21 @@ struct InAppNotification: Identifiable, Equatable {
     let message: String
     let type: NotificationType
     let timestamp: Date
+    var action: InAppNotificationAction?
+}
+
+/// What tapping a banner does. Cases stay comparable so the banner list can diff itself.
+enum InAppNotificationAction: Equatable {
+    case openNotificationSettings
+
+    @MainActor
+    func perform() {
+        switch self {
+        case .openNotificationSettings:
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        }
+    }
 }
 
 struct UploadNotificationProgress {

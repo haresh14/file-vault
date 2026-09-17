@@ -14,6 +14,9 @@ struct NotificationOverlayView: View {
         VStack(spacing: 8) {
             ForEach(notificationManager.inAppNotifications) { notification in
                 NotificationCardView(notification: notification)
+                    // Only a banner that does something takes touches; the rest let the
+                    // vault underneath stay usable.
+                    .allowsHitTesting(notification.action != nil)
                     .transition(.asymmetric(
                         insertion: .move(edge: .top).combined(with: .opacity),
                         removal: .move(edge: .trailing).combined(with: .opacity)
@@ -23,7 +26,6 @@ struct NotificationOverlayView: View {
         .padding(.horizontal, 16)
         .padding(.top, 50) // Account for safe area
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .allowsHitTesting(false) // Allow touches to pass through to content below
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: notificationManager.inAppNotifications)
     }
 }
@@ -33,6 +35,21 @@ struct NotificationCardView: View {
     @StateObject private var notificationManager = NotificationManager.shared
     
     var body: some View {
+        if let action = notification.action {
+            Button {
+                action.perform()
+                notificationManager.removeInAppNotification(id: notification.id)
+            } label: {
+                card(showsDisclosure: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens Settings")
+        } else {
+            card(showsDisclosure: false)
+        }
+    }
+
+    private func card(showsDisclosure: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: notification.type.icon)
                 .foregroundColor(notification.type.color)
@@ -51,14 +68,19 @@ struct NotificationCardView: View {
             
             Spacer()
             
-            Button(action: {
-                notificationManager.removeInAppNotification(id: notification.id)
-            }) {
-                Image(systemName: "xmark")
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
                     .foregroundColor(.secondary)
-                    .font(.caption)
+                    .font(.caption.weight(.semibold))
+            } else {
+                Button(action: {
+                    notificationManager.removeInAppNotification(id: notification.id)
+                }) {
+                    Image(systemName: "xmark")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
             }
-            .allowsHitTesting(true)
         }
         .padding(16)
         .background(
@@ -70,6 +92,7 @@ struct NotificationCardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(notification.type.color.opacity(0.3), lineWidth: 1)
         )
+        .contentShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

@@ -94,6 +94,10 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 ## Web upload
 
 - [ ] Fresh install: launch and unlock do not request notification permission; starting Web Upload requests it once
+- [ ] Upload with the app on screen: in-app completion banner appears, no duplicate system banner
+- [ ] Upload while the app is in the App Switcher or the screen is locked: a system notification arrives, as long as the transfer finishes within the short window iOS allows a backgrounded app
+- [ ] With notifications refused in Settings: starting the server shows a banner that opens this app's Settings page when tapped
+- [ ] Banners without an action still let taps reach the screen underneath
 - [ ] Start server on port 8080; open the **https** URL from another device on the same Wi‑Fi
 - [ ] Browser warns about the certificate; accept it, then enter the 6-digit pairing code; uploads work after pairing
 - [ ] Downloads stay hidden until Allow Downloads is confirmed with Face ID or the vault credential

@@ -308,11 +308,10 @@ Playback decrypts to a temporary file; original vault file stays encrypted.
 | W5b | Export session | Downloads stay off until Face ID / Touch ID or the vault credential unlocks a 10-minute window; ends on background or Stop Downloads | LocalAuthentication, Keychain |
 | W6 | Browser UI | Folder browse, breadcrumbs, upload, manage when not fake login | `WebServerHTMLGenerator`, `WebServerHTMLComponents` |
 | W7 | Block fake login | UI disabled; HTTP 403 | — |
-| W8 | Background keep-alive | `UIBackgroundTask` named `WebServerUpload` while uploads in flight | UIKit background task |
-| W9 | BG processing stub | Registers `com.haresh.FileVault.upload-processing` | BackgroundTasks |
-| W10 | Background URLSession | Session id `com.haresh.FileVault.background-upload`; POST `/upload`; trusts only this session’s TLS certificate | `URLSessionConfiguration.background` |
-| W11 | Large uploads | `POST /upload` with Content-Length **> 100MB** (`100 * 1024 * 1024`) switches to `handleLargeFileUpload`. Browser can also `POST /upload/stream` | custom HTTP |
-| W12 | Gallery web-upload sheet | Same server controls as the tab, presented from Gallery Add Content | `WebUploadView` |
+| W8 | Background keep-alive | `UIBackgroundTask` named `WebServerUpload` while uploads are in flight, so a transfer that is already running survives a short trip away from the app. The server needs the app open; it does not accept new uploads once iOS suspends the app | UIKit background task |
+| W9 | Background URLSession | Session id `com.haresh.FileVault.background-upload`; POST `/upload`; trusts only this session’s TLS certificate | `URLSessionConfiguration.background` |
+| W10 | Large uploads | `POST /upload` with Content-Length **> 100MB** (`100 * 1024 * 1024`) switches to `handleLargeFileUpload`. Browser can also `POST /upload/stream` | custom HTTP |
+| W11 | Gallery web-upload sheet | Same server controls as the tab, presented from Gallery Add Content | `WebUploadView` |
 
 HTTP routes. Transport is TLS. Every route except `POST /pair` requires the session token (header `X-Vault-Token`, session cookie on GET, or `?token=` on GET). The session cookie is `HttpOnly`, `SameSite=Strict`, and `Secure`. Fake login returns 403 on every route.
 
@@ -338,9 +337,9 @@ Security notice in UI: local network only; files encrypted after arrival. The ho
 
 | ID | Feature | Behavior | APIs |
 |----|---------|----------|------|
-| N1 | Notification permission | Requested when the user starts Web Upload for the first time: alert, badge, sound. Launch and unlock do not prompt | UserNotifications |
-| N2 | In-app toasts | Upload start, 25/50/75/100% milestones, completion | `NotificationOverlayView` |
-| N3 | System notification | Fired on **every** upload completion (not only when backgrounded) | `UNUserNotificationCenter` |
+| N1 | Notification permission | Requested when the user starts Web Upload for the first time: alert, badge, sound. Launch and unlock do not prompt. If permission was refused, starting the server shows a banner that opens Settings when tapped | UserNotifications, `UIApplication.openSettingsURLString` |
+| N2 | In-app toasts | Upload start, 25/50/75/100% milestones, completion. A banner with an action is tappable and shows a chevron; the rest carry a close button and let touches reach the vault underneath | `NotificationOverlayView` |
+| N3 | System notification | Posted on upload completion when the app is not on screen, so the in-app banner and a system banner never duplicate each other. A notification that arrives while the app is on screen is still presented as a banner with sound | `UNUserNotificationCenter`, `UNUserNotificationCenterDelegate` |
 | N4 | Upload progress cards | Bottom overlay from `uploadProgress` dictionary | `UploadProgressOverlayView` |
 | N5 | Haptics | First Gallery selection: **medium**; security lock: **heavy**; copy URL: **light** | `UIImpactFeedbackGenerator` |
 
@@ -502,7 +501,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 - [ ] Upload small and >100MB files; folder CRUD from browser
 - [ ] Downloads remain off by default; work when enabled
 - [ ] Fake login cannot start server
-- [ ] Backgrounding during upload: in-app + system notifications
+- [ ] Backgrounding during an in-flight upload: the transfer finishes inside the short window iOS grants, and a system notification arrives
 - [ ] Local network permission prompt (if the new OS requires it) does not break start/stop
 
 **Data integrity**
