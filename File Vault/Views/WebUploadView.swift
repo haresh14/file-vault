@@ -56,7 +56,13 @@ struct WebUploadView: View {
     }
 
     private func toggleServer() {
-        webServer.isRunning ? webServer.stopServer() : webServer.startServer()
+        if webServer.isRunning {
+            webServer.stopServer()
+        } else {
+            // Notifications are useful only when a LAN transfer may finish in the background.
+            NotificationManager.shared.requestAuthorizationIfNeeded()
+            webServer.startServer()
+        }
     }
 
     private func copyURL() {

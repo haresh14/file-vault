@@ -55,16 +55,16 @@ class CoreDataManager: CoreDataManaging {
             storeDescription.url = storeURL
             }
             
-            print("DEBUG: Core Data store URL: \(storeDescription.url?.path ?? "in-memory")")
+            VaultLog.debug("DEBUG: Core Data store URL: \(storeDescription.url?.path ?? "in-memory")")
         }
         
         container.loadPersistentStores { storeDescription, error in
             if let error = error as NSError? {
-                print("DEBUG: Core Data store loading failed: \(error), \(error.userInfo)")
-                print("DEBUG: Store description: \(storeDescription)")
+                VaultLog.debug("DEBUG: Core Data store loading failed: \(error), \(error.userInfo)")
+                VaultLog.debug("DEBUG: Store description: \(storeDescription)")
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             } else {
-                print("DEBUG: Core Data store loaded successfully at: \(storeDescription.url?.path ?? "unknown")")
+                VaultLog.debug("DEBUG: Core Data store loaded successfully at: \(storeDescription.url?.path ?? "unknown")")
                 if !self.inMemory, let url = storeDescription.url {
                     BackupExclusion.excludeFromBackup(url)
                     BackupExclusion.excludeFromBackup(URL(fileURLWithPath: url.path + "-wal"))
@@ -90,7 +90,7 @@ class CoreDataManager: CoreDataManaging {
             try context.save()
         } catch {
             let nsError = error as NSError
-            print("CoreData save error: \(nsError), \(nsError.userInfo)")
+            VaultLog.debug("CoreData save error: \(nsError), \(nsError.userInfo)")
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
         }
     }
@@ -102,7 +102,7 @@ class CoreDataManager: CoreDataManaging {
             try context.save()
         } catch {
             let nsError = error as NSError
-            print("CoreData save error: \(nsError), \(nsError.userInfo)")
+            VaultLog.debug("CoreData save error: \(nsError), \(nsError.userInfo)")
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
         }
     }

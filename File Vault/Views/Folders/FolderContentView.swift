@@ -302,7 +302,7 @@ struct FolderContentView: View {
             try FileStorageManager.shared.renameFile(vaultItem: item, newFileName: newFileName)
             NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
         } catch {
-            print("Error renaming file: \(error)")
+            VaultLog.debug("Error renaming file: \(error)")
         }
         cancelFileRename()
     }

@@ -55,7 +55,7 @@ extension CoreDataManager {
 
     func moveFolder(_ folder: Folder, to parent: Folder?) {
         if let parent, isFolder(folder, ancestorOf: parent) {
-            print("Cannot move folder into itself or its descendants")
+            VaultLog.debug("Cannot move folder into itself or its descendants")
             return
         }
         folder.parent = parent
@@ -76,7 +76,7 @@ extension CoreDataManager {
             // Names are sealed in the store, so sort the decrypted values instead.
             return try context.fetch(request).sorted { $0.displayName.localizedCompare($1.displayName) == .orderedAscending }
         } catch {
-            print("Error fetching folders: \(error)")
+            VaultLog.debug("Error fetching folders: \(error)")
             return []
         }
     }

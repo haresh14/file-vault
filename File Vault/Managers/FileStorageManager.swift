@@ -90,28 +90,28 @@ class FileStorageManager: FileStorageManaging {
         )
         temporarySharingService = TemporarySharingService(fileManager: fileManager)
         
-        print("DEBUG: Documents directory: \(documentsDirectory.path)")
-        print("DEBUG: Vault directory: \(vaultDirectory.path)")
-        print("DEBUG: Thumbnails directory: \(thumbnailsDirectory.path)")
+        VaultLog.debug("DEBUG: Documents directory: \(documentsDirectory.path)")
+        VaultLog.debug("DEBUG: Vault directory: \(vaultDirectory.path)")
+        VaultLog.debug("DEBUG: Thumbnails directory: \(thumbnailsDirectory.path)")
         
         // Create directories if they don't exist
         do {
             try fileManager.createDirectory(at: vaultDirectory, withIntermediateDirectories: true, attributes: nil)
-            print("DEBUG: Vault directory created/verified")
+            VaultLog.debug("DEBUG: Vault directory created/verified")
         } catch {
-            print("DEBUG: Error creating vault directory: \(error)")
+            VaultLog.debug("DEBUG: Error creating vault directory: \(error)")
         }
         
         do {
             try fileManager.createDirectory(at: thumbnailsDirectory, withIntermediateDirectories: true, attributes: nil)
-            print("DEBUG: Thumbnails directory created/verified")
+            VaultLog.debug("DEBUG: Thumbnails directory created/verified")
         } catch {
-            print("DEBUG: Error creating thumbnails directory: \(error)")
+            VaultLog.debug("DEBUG: Error creating thumbnails directory: \(error)")
         }
         
         // Verify directories exist
-        print("DEBUG: Vault directory exists: \(fileManager.fileExists(atPath: vaultDirectory.path))")
-        print("DEBUG: Thumbnails directory exists: \(fileManager.fileExists(atPath: thumbnailsDirectory.path))")
+        VaultLog.debug("DEBUG: Vault directory exists: \(fileManager.fileExists(atPath: vaultDirectory.path))")
+        VaultLog.debug("DEBUG: Thumbnails directory exists: \(fileManager.fileExists(atPath: thumbnailsDirectory.path))")
         
         // Set file protection
         setFileProtection()
@@ -170,7 +170,7 @@ class FileStorageManager: FileStorageManaging {
                 try keyDerivationStore.saveRecord(record)
                 encryptionKey = try cryptoService.key(from: password, record: record)
             } catch {
-                print("DEBUG: Failed to store key derivation record: \(error)")
+                VaultLog.debug("DEBUG: Failed to store key derivation record: \(error)")
                 encryptionKey = cryptoService.legacySHA256Key(from: password)
             }
         }
@@ -188,7 +188,7 @@ class FileStorageManager: FileStorageManaging {
     /// Re-encrypt all vault files with a new encryption key
     /// This is called when the user changes their passcode
     func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws {
-        print("DEBUG: Starting file migration from old key to new key")
+        VaultLog.debug("DEBUG: Starting file migration from old key to new key")
         
         let oldKey = deriveKey(for: oldPassword)
         let newRecord = cryptoService.makeRecord()
@@ -198,7 +198,7 @@ class FileStorageManager: FileStorageManaging {
         let allItems = coreDataManager.fetchAllVaultItems()
         let totalItems = allItems.count
         
-        print("DEBUG: Found \(totalItems) items to migrate")
+        VaultLog.debug("DEBUG: Found \(totalItems) items to migrate")
         
         for (index, item) in allItems.enumerated() {
             // The migrateVaultItem function now handles errors internally and doesn't throw
@@ -214,7 +214,7 @@ class FileStorageManager: FileStorageManaging {
             try await Task.sleep(nanoseconds: 10_000_000) // 10ms
         }
         
-        print("DEBUG: Migration completed successfully")
+        VaultLog.debug("DEBUG: Migration completed successfully")
 
         try keyDerivationStore.saveRecord(newRecord)
         encryptionKey = newKey
@@ -226,7 +226,7 @@ class FileStorageManager: FileStorageManaging {
         )
         coreDataManager.save()
         
-        print("DEBUG: File migration completed successfully")
+        VaultLog.debug("DEBUG: File migration completed successfully")
     }
     
     /// Migrate a single vault item to the new encryption key
@@ -269,20 +269,20 @@ class FileStorageManager: FileStorageManaging {
                 oldKey: oldKey,
                 newKey: newKey
             )
-            print("DEBUG: Upgraded vault key derivation to PBKDF2")
+            VaultLog.debug("DEBUG: Upgraded vault key derivation to PBKDF2")
         } catch {
-            print("DEBUG: Failed to save PBKDF2 derivation record: \(error)")
+            VaultLog.debug("DEBUG: Failed to save PBKDF2 derivation record: \(error)")
         }
     }
 
     private func reencryptVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) {
         guard let sourceName = existingVaultFileName(for: vaultItem) else {
-            print("DEBUG: Skipping item with no on-disk file")
+            VaultLog.debug("DEBUG: Skipping item with no on-disk file")
             return
         }
 
         if sourceName.hasPrefix(".") || sourceName == ".DS_Store" {
-            print("DEBUG: Skipping system file: \(sourceName)")
+            VaultLog.debug("DEBUG: Skipping system file: \(sourceName)")
             return
         }
 
@@ -298,9 +298,9 @@ class FileStorageManager: FileStorageManaging {
             if destinationURL != fileURL {
                 try? fileManager.removeItem(at: fileURL)
             }
-            print("DEBUG: Successfully migrated file: \(sourceName)")
+            VaultLog.debug("DEBUG: Successfully migrated file: \(sourceName)")
         } catch {
-            print("DEBUG: Failed to migrate file \(sourceName): \(error)")
+            VaultLog.debug("DEBUG: Failed to migrate file \(sourceName): \(error)")
         }
 
         reencryptThumbnail(vaultItem, oldKey: oldKey, newKey: newKey)
@@ -337,7 +337,7 @@ class FileStorageManager: FileStorageManaging {
                 try? fileManager.removeItem(at: sourceURL)
             }
         } catch {
-            print("DEBUG: Failed to migrate thumbnail \(destName): \(error)")
+            VaultLog.debug("DEBUG: Failed to migrate thumbnail \(destName): \(error)")
         }
     }
 
@@ -441,7 +441,7 @@ class FileStorageManager: FileStorageManaging {
             }
             return true
         } catch {
-            print("DEBUG: Failed to encrypt plaintext thumbnail \(destName): \(error)")
+            VaultLog.debug("DEBUG: Failed to encrypt plaintext thumbnail \(destName): \(error)")
             return false
         }
     }
@@ -476,7 +476,7 @@ class FileStorageManager: FileStorageManaging {
             let name = url.lastPathComponent
             guard !name.hasPrefix("."), !referenced.contains(name) else { continue }
             try? fileManager.removeItem(at: url)
-            print("DEBUG: Removed orphaned file: \(name)")
+            VaultLog.debug("DEBUG: Removed orphaned file: \(name)")
         }
     }
 
@@ -564,15 +564,15 @@ class FileStorageManager: FileStorageManaging {
     }
     
     func saveFile(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil) throws -> VaultItem {
-        print("DEBUG: saveFile called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
+        VaultLog.debug("DEBUG: saveFile called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
         if let folder = targetFolder {
-            print("DEBUG: ✅ Target folder provided: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+            VaultLog.debug("DEBUG: ✅ Target folder provided: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
         } else {
-            print("DEBUG: ❌ No target folder provided, will save to root level")
+            VaultLog.debug("DEBUG: ❌ No target folder provided, will save to root level")
         }
         
         guard let key = encryptionKey else {
-            print("DEBUG: No encryption key available")
+            VaultLog.debug("DEBUG: No encryption key available")
             throw FileStorageError.noEncryptionKey
         }
         
@@ -580,7 +580,7 @@ class FileStorageManager: FileStorageManaging {
         
         // Check for duplicate content first
         if isDuplicateContent(fileSize: fileSize, fileType: fileType, targetFolder: targetFolder) {
-            print("DEBUG: Duplicate content detected - ignoring: \(fileName)")
+            VaultLog.debug("DEBUG: Duplicate content detected - ignoring: \(fileName)")
             throw FileStorageError.duplicateFile
         }
         
@@ -597,17 +597,17 @@ class FileStorageManager: FileStorageManaging {
             id: persisted.blobID
         )
         
-        print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
+        VaultLog.debug("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
         
         return vaultItem
     }
     
     // New method for background imports
     func saveFileInBackground(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil, completion: @escaping (Result<VaultItem, Error>) -> Void) {
-        print("DEBUG: saveFileInBackground called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
+        VaultLog.debug("DEBUG: saveFileInBackground called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
         
         guard let key = encryptionKey else {
-            print("DEBUG: No encryption key available")
+            VaultLog.debug("DEBUG: No encryption key available")
             completion(.failure(FileStorageError.noEncryptionKey))
             return
         }
@@ -616,7 +616,7 @@ class FileStorageManager: FileStorageManaging {
         
         // Check for duplicate content first
         if isDuplicateContent(fileSize: fileSize, fileType: fileType, targetFolder: targetFolder) {
-            print("DEBUG: Duplicate content detected - ignoring: \(fileName)")
+            VaultLog.debug("DEBUG: Duplicate content detected - ignoring: \(fileName)")
             completion(.failure(FileStorageError.duplicateFile))
             return
         }
@@ -636,15 +636,15 @@ class FileStorageManager: FileStorageManaging {
                 id: persisted.blobID
             ) { vaultItem in
                 if let vaultItem = vaultItem {
-                    print("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
+                    VaultLog.debug("DEBUG: VaultItem created with thumbnailFileName: \(vaultItem.thumbnailFileName ?? "nil")")
                     completion(.success(vaultItem))
                 } else {
-                    print("DEBUG: Failed to create VaultItem")
+                    VaultLog.debug("DEBUG: Failed to create VaultItem")
                     completion(.failure(FileStorageError.importFailed))
                 }
             }
         } catch {
-            print("DEBUG: Error in saveFileInBackground: \(error)")
+            VaultLog.debug("DEBUG: Error in saveFileInBackground: \(error)")
             completion(.failure(error))
         }
     }
@@ -782,10 +782,10 @@ class FileStorageManager: FileStorageManaging {
         return try await withCheckedThrowingContinuation { continuation in
             do {
                 let fileData = try loadFile(vaultItem: vaultItem)
-                print(">>>>>>> DEBUG: File data loaded: \(fileData.count) bytes")
+                VaultLog.debug(">>>>>>> DEBUG: File data loaded: \(fileData.count) bytes")
                 continuation.resume(returning: fileData)
             } catch let error {
-                print(">>>>>>> DEBUG: Error loading image: \(error.localizedDescription)")
+                VaultLog.debug(">>>>>>> DEBUG: Error loading image: \(error.localizedDescription)")
                 continuation.resume(throwing: error)
             }
         }
@@ -826,7 +826,7 @@ class FileStorageManager: FileStorageManaging {
             return (fileCount: fileCount, usedSpace: usedSpace)
             
         } catch {
-            print("DEBUG: Error fetching storage info: \(error)")
+            VaultLog.debug("DEBUG: Error fetching storage info: \(error)")
             return (fileCount: 0, usedSpace: 0)
         }
     }
@@ -834,7 +834,7 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - Import from Photo Library
     
     func importFromPhotoLibrary(asset: PHAsset, targetFolder: Folder? = nil, completion: @escaping (Result<VaultItem, Error>) -> Void) {
-        print("DEBUG: Starting import for asset: \(asset.localIdentifier)")
+        VaultLog.debug("DEBUG: Starting import for asset: \(asset.localIdentifier)")
         photoImportService.importAsset(
             asset,
             imageHandler: { data, fileName, uti in
@@ -869,15 +869,15 @@ class FileStorageManager: FileStorageManaging {
 extension FileStorageManager {
     
     func clearAllStoredFiles() {
-        print("DEBUG: Clearing all stored files...")
+        VaultLog.debug("DEBUG: Clearing all stored files...")
         emptyStorageDirectories()
         encryptionKey = nil
         metadataSealer.key = nil
-        print("DEBUG: All stored files cleared")
+        VaultLog.debug("DEBUG: All stored files cleared")
     }
     
     func deleteAllStorageDirectories() {
-        print("DEBUG: Deleting all storage directories...")
+        VaultLog.debug("DEBUG: Deleting all storage directories...")
 
         for directory in [vaultDirectory, thumbnailsDirectory] {
             do {
@@ -887,7 +887,7 @@ extension FileStorageManager {
                 // Recreate empty so imports work without relaunching.
                 try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {
-                print("ERROR: Failed to delete \(directory.lastPathComponent) directory: \(error)")
+                VaultLog.debug("ERROR: Failed to delete \(directory.lastPathComponent) directory: \(error)")
             }
         }
 
@@ -895,7 +895,7 @@ extension FileStorageManager {
         encryptionKey = nil
         metadataSealer.key = nil
 
-        print("DEBUG: All storage directories deleted")
+        VaultLog.debug("DEBUG: All storage directories deleted")
     }
 
     /// Remove every file in the vault and thumbnail directories, leaving the directories in place.
@@ -907,7 +907,7 @@ extension FileStorageManager {
                     try fileManager.removeItem(at: fileURL)
                 }
             } catch {
-                print("ERROR: Failed to clear \(directory.lastPathComponent) directory: \(error)")
+                VaultLog.debug("ERROR: Failed to clear \(directory.lastPathComponent) directory: \(error)")
             }
         }
     }

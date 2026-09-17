@@ -95,13 +95,13 @@ struct NumberPadButtonStyle: ButtonStyle {
 #Preview {
     CustomNumberPadView(
         onNumberTapped: { number in
-            print("Number tapped: \(number)")
+            VaultLog.debug("Number tapped: \(number)")
         },
         onBackspaceTapped: {
-            print("Backspace tapped")
+            VaultLog.debug("Backspace tapped")
         },
         onHelpTapped: {
-            print("Help tapped")
+            VaultLog.debug("Help tapped")
         }
     )
 } 

@@ -169,7 +169,7 @@ struct AudioPreviewView: View {
                     self.loadingError = error.localizedDescription
                     self.isLoading = false
                 }
-                print("Failed to setup audio player: \(error)")
+                VaultLog.debug("Failed to setup audio player: \(error)")
             }
         }
     }

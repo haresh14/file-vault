@@ -256,7 +256,7 @@ struct VaultItemCell: View {
                     }
                 }
             } catch {
-                print("Error regenerating thumbnail: \(error)")
+                VaultLog.debug("Error regenerating thumbnail: \(error)")
             }
         }
     }

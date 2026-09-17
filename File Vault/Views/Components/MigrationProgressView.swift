@@ -113,7 +113,7 @@ struct MigrationProgressView: View {
         MigrationProgressView(
             currentProgress: 15,
             totalItems: 50,
-            onCancel: { print("Migration cancelled") }
+            onCancel: { VaultLog.debug("Migration cancelled") }
         )
     }
 }

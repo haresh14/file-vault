@@ -1009,20 +1009,10 @@ extension WebServerManager {
                         .catch(() => {});
                 }, 4000);
                 
-                console.log('DEBUG: ====== INITIAL FOLDER ID SETUP ======');
-                console.log('DEBUG: currentFolderId set to:', `"${currentFolderId}"`);
-                console.log('DEBUG: currentFolderId type:', typeof currentFolderId);
-                console.log('DEBUG: currentFolderId length:', currentFolderId.length);
-                console.log('DEBUG: Raw folder ID from server: "\\(currentFolderId ?? "nil")"');
-                console.log('DEBUG: currentFolderId === "":', currentFolderId === '');
-                console.log('DEBUG: currentFolderId truthy check:', !!currentFolderId);
-                console.log('DEBUG: ====== END INITIAL SETUP ======');
                 
                 // Test the folder ID immediately
                 if (currentFolderId) {
-                    console.log('DEBUG: Folder ID is truthy, value:', currentFolderId);
                 } else {
-                    console.log('DEBUG: Folder ID is falsy, value:', currentFolderId);
                 }
                 
                 // Navigation functions
@@ -1446,13 +1436,11 @@ extension WebServerManager {
                     const hasLargeFiles = files.some(file => file.size > streamingFileThreshold);
                     const hasMultipleFiles = files.length > streamingCountThreshold;
                     
-                    console.log(`DEBUG: Upload decision - Files: ${files.length}, Large files: ${hasLargeFiles}, Multiple files: ${hasMultipleFiles}`);
                     return hasLargeFiles || hasMultipleFiles;
                 }
                 
                 // Streaming upload function
                 async function uploadFilesStream() {
-                    console.log('DEBUG: Starting streaming upload for', files.length, 'files');
                     
                     let uploaded = 0;
                     let failed = 0;
@@ -1470,7 +1458,6 @@ extension WebServerManager {
                         const file = filesToUpload[i];
                         const fileId = file._uniqueId;
                         
-                        console.log(`DEBUG: Uploading file ${i + 1}/${originalFileCount}: ${file.name}`);
                         
                         try {
                             // Set file status to uploading
@@ -1501,7 +1488,6 @@ extension WebServerManager {
                             
                             if (result.success) {
                                 uploaded++;
-                                console.log(`DEBUG: Successfully uploaded: ${file.name}`);
                                 
                                 // Mark as completed and remove after a brief delay
                                 setFileStatus(fileId, 'completed');
@@ -1513,7 +1499,6 @@ extension WebServerManager {
                             } else {
                                 failed++;
                                 errors.push(`${file.name}: ${result.message}`);
-                                console.error(`DEBUG: Failed to upload ${file.name}:`, result.message);
                                 
                                 // Mark as failed
                                 hideFileProgress(fileId);
@@ -1523,7 +1508,6 @@ extension WebServerManager {
                         } catch (error) {
                             failed++;
                             errors.push(`${file.name}: ${error.message}`);
-                            console.error(`DEBUG: Error uploading ${file.name}:`, error);
                             
                             // Mark as failed
                             hideFileProgress(fileId);
@@ -1558,29 +1542,15 @@ extension WebServerManager {
                 
                 // Traditional batch upload function (for backward compatibility)
                 async function uploadFilesBatch() {
-                    console.log('DEBUG: Starting batch upload for', files.length, 'files');
                     
                     const formData = new FormData();
                     
                     // Add current folder ID FIRST
-                    console.log('DEBUG: ====== FOLDER ID CHECK ======');
-                    console.log('DEBUG: About to check folder ID for form submission');
-                    console.log('DEBUG: currentFolderId value:', `"${currentFolderId}"`);
-                    console.log('DEBUG: currentFolderId type:', typeof currentFolderId);
-                    console.log('DEBUG: currentFolderId length:', currentFolderId ? currentFolderId.length : 'N/A');
-                    console.log('DEBUG: currentFolderId !== "":', currentFolderId !== '');
-                    console.log('DEBUG: Boolean check result:', currentFolderId && currentFolderId !== '');
-                    console.log('DEBUG: Current URL:', window.location.href);
                     
                     if (currentFolderId && currentFolderId !== '') {
-                        console.log('DEBUG: ✅ Adding folder ID to form data:', currentFolderId);
                         formData.append('folderId', currentFolderId);
-                        console.log('DEBUG: ✅ Folder ID added to form data successfully');
                     } else {
-                        console.log('DEBUG: ❌ No folder ID specified, uploading to root');
-                        console.log('DEBUG: ❌ currentFolderId was empty or falsy:', `"${currentFolderId}"`);
                     }
-                    console.log('DEBUG: ====== END FOLDER ID CHECK ======');
 
                     
                     // Add files AFTER folder ID
@@ -1589,17 +1559,13 @@ extension WebServerManager {
                         // Add folder path if available
                         if (file._folderPath) {
                             formData.append('filePaths', file._folderPath);
-                            console.log('DEBUG: Added file to form data:', file.name, 'with path:', file._folderPath);
                         } else {
                             formData.append('filePaths', '');
-                            console.log('DEBUG: Added file to form data:', file.name);
                         }
                     });
                     
                     // Debug: Show all form data entries
-                    console.log('DEBUG: Final form data contents:');
                     for (let pair of formData.entries()) {
-                        console.log('DEBUG: Form field:', pair[0], '=', typeof pair[1] === 'object' ? pair[1].name : pair[1]);
                     }
                     
                     try {
@@ -1667,7 +1633,6 @@ extension WebServerManager {
                                     showStatus(response.message || 'Upload failed', true);
                                 }
                             } catch (e) {
-                                console.error('Error parsing response:', e);
                                 if (xhr.status === 200) {
                                     showUploadSuccess(files.length);
                                     clearFiles();
@@ -1706,7 +1671,6 @@ extension WebServerManager {
                         // Also send folder ID in header as backup
                         if (currentFolderId && currentFolderId !== '') {
                             xhr.setRequestHeader('X-Folder-ID', currentFolderId);
-                            console.log('DEBUG: Added folder ID to header:', currentFolderId);
                         }
                         
                         xhr.send(formData);
@@ -1730,10 +1694,8 @@ extension WebServerManager {
                     
                     // Choose upload method based on file characteristics
                     if (shouldUseStreamingUpload()) {
-                        console.log('DEBUG: Using streaming upload for better memory efficiency');
                         await uploadFilesStream();
                     } else {
-                        console.log('DEBUG: Using traditional batch upload');
                         await uploadFilesBatch();
                     }
                 });
@@ -1806,7 +1768,6 @@ extension WebServerManager {
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
                         alert('Error creating folder');
                     });
                 }
@@ -1867,7 +1828,6 @@ extension WebServerManager {
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
                         alert('Error renaming folder');
                     });
                 }
@@ -1900,7 +1860,6 @@ extension WebServerManager {
                         selectAllCheckbox.indeterminate = false;
                     }
                     
-                    console.log(`Selection updated: ${selectedCheckboxes.length} items selected`);
                 }
                 
                 function toggleSelectAll() {
@@ -2006,7 +1965,6 @@ extension WebServerManager {
                                 }
                             })
                             .catch(error => {
-                                console.error('Error deleting item:', error);
                                 alert('Error deleting item');
                             });
                     } else {
@@ -2022,7 +1980,6 @@ extension WebServerManager {
                                 }
                             })
                             .catch(error => {
-                                console.error('Error during bulk delete:', error);
                                 alert('Error during bulk delete');
                             });
                     }

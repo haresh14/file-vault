@@ -319,7 +319,7 @@ struct PasscodeView: View {
             // Password/Passcode saved successfully
             onAuthenticated()
         } catch {
-            print("ERROR: Failed to save password/passcode: \(error)")
+            VaultLog.debug("ERROR: Failed to save password/passcode: \(error)")
             let type = isPasswordType ? "password" : "passcode"
             showError(message: "Failed to save \(type)")
         }
@@ -353,7 +353,7 @@ struct PasscodeView: View {
                 onAuthenticated()
             } else if let error = error {
                 // User cancelled or biometric failed, show passcode field
-                print("Biometric authentication failed: \(error.localizedDescription)")
+                VaultLog.debug("Biometric authentication failed: \(error.localizedDescription)")
             }
         }
     }

@@ -50,7 +50,7 @@ struct DocumentPickerView: UIViewControllerRepresentable {
                 for url in urls {
                     // Start accessing security-scoped resource
                     guard url.startAccessingSecurityScopedResource() else {
-                        print("Error: Could not access security-scoped resource for \(url)")
+                        VaultLog.debug("Error: Could not access security-scoped resource for \(url)")
                         continue
                     }
                     
@@ -64,10 +64,10 @@ struct DocumentPickerView: UIViewControllerRepresentable {
                         let fileName = url.lastPathComponent
                         
                         processedData.append((data, fileName))
-                        print("Successfully read file data: \(fileName), size: \(data.count) bytes")
+                        VaultLog.debug("Successfully read file data: \(fileName), size: \(data.count) bytes")
                         
                     } catch {
-                        print("Error reading file \(url.lastPathComponent): \(error)")
+                        VaultLog.debug("Error reading file \(url.lastPathComponent): \(error)")
                     }
                 }
                 

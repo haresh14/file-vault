@@ -85,7 +85,7 @@ final class AuthenticationCoordinator: ObservableObject {
     func handleDidEnterBackground() {
         if isPasswordSet {
             shouldShowPrivacyOverlay = true
-            print("DEBUG: App entered background, showing enhanced privacy overlay")
+            VaultLog.debug("DEBUG: App entered background, showing enhanced privacy overlay")
         }
     }
 
@@ -151,7 +151,7 @@ final class AuthenticationCoordinator: ObservableObject {
                         self.isCheckingBiometric = false
                         self.shouldShowPasscode = true
                         if let error = error {
-                            print("DEBUG: Biometric authentication failed: \(error.localizedDescription)")
+                            VaultLog.debug("DEBUG: Biometric authentication failed: \(error.localizedDescription)")
                         }
                     }
                 }

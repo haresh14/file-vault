@@ -32,7 +32,7 @@ struct MIMETypeMapper {
     }
 
     func mimeType(forUTI uti: String) -> String {
-        print("DEBUG: Converting UTI: \(uti)")
+        VaultLog.debug("DEBUG: Converting UTI: \(uti)")
         switch uti {
         case "public.jpeg", "public.jpg": return "image/jpeg"
         case "public.png": return "image/png"
@@ -43,7 +43,7 @@ struct MIMETypeMapper {
         case "public.quicktime-movie", "public.mov": return "video/quicktime"
         default:
             if let mimeType = UTType(uti)?.preferredMIMEType {
-                print("DEBUG: Converted to MIME type: \(mimeType)")
+                VaultLog.debug("DEBUG: Converted to MIME type: \(mimeType)")
                 return mimeType
             }
             if uti.contains("image") { return "image/jpeg" }

@@ -331,6 +331,6 @@ struct ChangeAuthenticationView: View {
 #Preview {
     ChangeAuthenticationView(
         currentAuthType: .passcode4,
-        onAuthChanged: { print("Auth changed") }
+        onAuthChanged: { VaultLog.debug("Auth changed") }
     )
 } 

@@ -19,7 +19,7 @@ class LoginStateManager: ObservableObject, LoginStateManaging {
     
     func setLoginState(isFakeLogin: Bool) {
         self.isFakeLogin = isFakeLogin
-        print("DEBUG: Login state set to \(isFakeLogin ? "fake" : "real") login")
+        VaultLog.debug("DEBUG: Login state set to \(isFakeLogin ? "fake" : "real") login")
     }
     
     func resetLoginState() {

@@ -11,7 +11,7 @@ final class SecurityEventLogger {
 
     func log(_ event: String) {
         let logEntry = "\(Date()): \(event)"
-        print("SECURITY LOG: \(logEntry)")
+        VaultLog.debug("SECURITY LOG: \(logEntry)")
 
         var logs = defaults.stringArray(forKey: logsKey) ?? []
         logs.append(logEntry)

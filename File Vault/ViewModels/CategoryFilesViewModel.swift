@@ -144,7 +144,7 @@ final class CategoryFilesViewModel: ObservableObject, SearchManageable {
             do {
                 try fileStorageManager.deleteFile(vaultItem: item)
             } catch {
-                print("Error deleting item: \(error)")
+                VaultLog.debug("Error deleting item: \(error)")
             }
         }
         exitSelectionMode()

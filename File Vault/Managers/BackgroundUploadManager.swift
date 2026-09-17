@@ -45,14 +45,14 @@ class BackgroundUploadManager: NSObject {
         do {
             try data.write(to: tempURL)
         } catch {
-            print("Failed to write temporary file for background upload: \(error)")
+            VaultLog.debug("Failed to write temporary file for background upload: \(error)")
             return nil
         }
         
         // Create upload request
         let serverURLString = WebServerManager.shared.serverURL
         guard !serverURLString.isEmpty, let serverURL = URL(string: serverURLString) else {
-            print("Server URL not available or invalid: \(serverURLString)")
+            VaultLog.debug("Server URL not available or invalid: \(serverURLString)")
             try? FileManager.default.removeItem(at: tempURL)
             return nil
         }
@@ -88,7 +88,7 @@ class BackgroundUploadManager: NSObject {
             try body.write(to: multipartTempURL)
             try? FileManager.default.removeItem(at: tempURL) // Remove the original temp file
         } catch {
-            print("Failed to write multipart data to temporary file: \(error)")
+            VaultLog.debug("Failed to write multipart data to temporary file: \(error)")
             try? FileManager.default.removeItem(at: tempURL)
             return nil
         }
@@ -162,14 +162,14 @@ extension BackgroundUploadManager: URLSessionTaskDelegate {
         uploadTasks.removeValue(forKey: task.taskIdentifier)
         
         if let error = error {
-            print("Upload failed for \(taskInfo.fileName): \(error)")
+            VaultLog.debug("Upload failed for \(taskInfo.fileName): \(error)")
             NotificationCenter.default.post(
                 name: .backgroundUploadFailed,
                 object: nil,
                 userInfo: ["uploadId": taskInfo.uploadId, "error": error]
             )
         } else {
-            print("Upload completed for \(taskInfo.fileName)")
+            VaultLog.debug("Upload completed for \(taskInfo.fileName)")
             NotificationCenter.default.post(
                 name: .backgroundUploadCompleted,
                 object: nil,
@@ -200,7 +200,7 @@ extension BackgroundUploadManager: URLSessionDataDelegate {
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         // Handle response data if needed
         if let responseString = String(data: data, encoding: .utf8) {
-            print("Upload response: \(responseString)")
+            VaultLog.debug("Upload response: \(responseString)")
         }
     }
 }

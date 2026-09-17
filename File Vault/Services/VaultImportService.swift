@@ -120,11 +120,11 @@ final class VaultImportService: VaultImportServicing {
                 fileType: fileType,
                 targetFolder: targetFolder
             )
-            print("Successfully imported file: \(fileName)")
+            VaultLog.debug("Successfully imported file: \(fileName)")
         } catch FileStorageError.duplicateFile {
-            print("Skipped duplicate file: \(fileName)")
+            VaultLog.debug("Skipped duplicate file: \(fileName)")
         } catch {
-            print("Error importing file \(fileName): \(error)")
+            VaultLog.debug("Error importing file \(fileName): \(error)")
         }
     }
 }

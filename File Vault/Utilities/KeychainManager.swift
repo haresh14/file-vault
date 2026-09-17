@@ -387,7 +387,7 @@ class KeychainManager: KeychainManaging {
     }
 
     func clearAllKeychainData() {
-        print("DEBUG: Clearing all keychain data...")
+        VaultLog.debug("DEBUG: Clearing all keychain data...")
         
         // Clear password from keychain
         try? deletePassword()
@@ -397,11 +397,11 @@ class KeychainManager: KeychainManaging {
 
         deleteKeyDerivationRecord()
         
-        print("DEBUG: Keychain data cleared")
+        VaultLog.debug("DEBUG: Keychain data cleared")
     }
     
     func clearAllUserDefaultsData() {
-        print("DEBUG: Clearing all UserDefaults data...")
+        VaultLog.debug("DEBUG: Clearing all UserDefaults data...")
         
         // Clear authentication settings
         defaults.removeObject(forKey: authTypeKey)
@@ -418,6 +418,6 @@ class KeychainManager: KeychainManaging {
         // Synchronize to ensure changes are written
         defaults.synchronize()
         
-        print("DEBUG: UserDefaults data cleared")
+        VaultLog.debug("DEBUG: UserDefaults data cleared")
     }
 } 

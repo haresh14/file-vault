@@ -58,7 +58,7 @@ final class VideoPlayerLifecycle: ObservableObject {
                         )
                         await MainActor.run { self.videoSize = corrected }
                     } catch {
-                        print("Error loading track properties: \(error)")
+                        VaultLog.debug("Error loading track properties: \(error)")
                     }
                 }
 
@@ -84,7 +84,7 @@ final class VideoPlayerLifecycle: ObservableObject {
                 await MainActor.run {
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
-                    print("Error loading video: \(error)")
+                    VaultLog.debug("Error loading video: \(error)")
                 }
             }
         }

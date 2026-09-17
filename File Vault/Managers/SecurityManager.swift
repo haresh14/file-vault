@@ -85,7 +85,7 @@ class SecurityManager: ObservableObject, SecurityManaging {
         }
         lastScreenshotNotice = now
 
-        print("DEBUG: Screenshot detected")
+        VaultLog.debug("DEBUG: Screenshot detected")
         eventLogger.log("Screenshot taken")
         guard isScreenshotProtectionEnabled else { return }
         DispatchQueue.main.async { [weak self] in
@@ -195,7 +195,7 @@ class SecurityManager: ObservableObject, SecurityManaging {
     }
 
     private func triggerSecurityLock(reason: String) {
-        print("DEBUG: Security lock triggered - \(reason)")
+        VaultLog.debug("DEBUG: Security lock triggered - \(reason)")
         eventLogger.log(reason)
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .triggerSecurityLock, object: nil)

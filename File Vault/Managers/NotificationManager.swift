@@ -15,18 +15,20 @@ class NotificationManager: ObservableObject {
     @Published var inAppNotifications: [InAppNotification] = []
     @Published var uploadProgress: [String: UploadNotificationProgress] = [:]
     
-    private init() {
-        requestNotificationPermission()
-    }
+    private init() {}
     
     // MARK: - Permission
     
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error)")
-            } else {
-                print("Notification permission granted: \(granted)")
+    func requestAuthorizationIfNeeded() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+                if let error {
+                    VaultLog.debug("Notification permission error: \(error)")
+                } else {
+                    VaultLog.debug("Notification permission granted: \(granted)")
+                }
             }
         }
     }
@@ -162,7 +164,7 @@ class NotificationManager: ObservableObject {
         
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("Error showing system notification: \(error)")
+                VaultLog.debug("Error showing system notification: \(error)")
             }
         }
     }

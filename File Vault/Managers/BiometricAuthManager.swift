@@ -33,7 +33,7 @@ class BiometricAuthManager: BiometricAuthManaging {
         var error: NSError?
         
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            print("DEBUG: Cannot evaluate biometric policy. Error: \(error?.localizedDescription ?? "Unknown")")
+            VaultLog.debug("DEBUG: Cannot evaluate biometric policy. Error: \(error?.localizedDescription ?? "Unknown")")
             return .none
         }
         
@@ -50,14 +50,14 @@ class BiometricAuthManager: BiometricAuthManaging {
             type = .none
         }
         
-        print("DEBUG: Biometric type detected: \(type)")
+        VaultLog.debug("DEBUG: Biometric type detected: \(type)")
         return type
     }
     
     func canUseBiometrics() -> Bool {
         // Check if we've exceeded failure attempts
         if shouldBlockBiometric() {
-            print("DEBUG: Biometric blocked due to too many failures")
+            VaultLog.debug("DEBUG: Biometric blocked due to too many failures")
             return false
         }
         
@@ -66,9 +66,9 @@ class BiometricAuthManager: BiometricAuthManaging {
         let can = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
         
         if !can {
-            print("DEBUG: Biometrics not available. Error: \(error?.localizedDescription ?? "Unknown")")
+            VaultLog.debug("DEBUG: Biometrics not available. Error: \(error?.localizedDescription ?? "Unknown")")
         } else {
-            print("DEBUG: Biometrics available")
+            VaultLog.debug("DEBUG: Biometrics available")
         }
         
         return can
@@ -110,7 +110,7 @@ class BiometricAuthManager: BiometricAuthManaging {
                         self.failureCount += 1
                         self.lastFailureTime = Date()
                         
-                        print("DEBUG: Biometric failure count: \(self.failureCount)")
+                        VaultLog.debug("DEBUG: Biometric failure count: \(self.failureCount)")
                         completion(success, error)
                     }
                 }

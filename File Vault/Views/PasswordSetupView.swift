@@ -245,7 +245,7 @@ struct PasswordSetupView: View {
                 password = ""
                 confirmPassword = ""
             } catch {
-                print("ERROR: Failed to save fake password: \(error)")
+                VaultLog.debug("ERROR: Failed to save fake password: \(error)")
                 showError(message: "Failed to save fake password")
             }
         } else {
@@ -255,7 +255,7 @@ struct PasswordSetupView: View {
                 KeychainManager.shared.setAuthenticationType(.password)
                 onPasswordSet()
             } catch {
-                print("ERROR: Failed to save password: \(error)")
+                VaultLog.debug("ERROR: Failed to save password: \(error)")
                 showError(message: "Failed to save password")
             }
         }
@@ -330,8 +330,8 @@ enum PasswordStrength {
 #Preview {
     NavigationStack {
         PasswordSetupView(
-            onPasswordSet: { print("Password set") },
-            onCancel: { print("Cancelled") }
+            onPasswordSet: { VaultLog.debug("Password set") },
+            onCancel: { VaultLog.debug("Cancelled") }
         )
     }
 } 

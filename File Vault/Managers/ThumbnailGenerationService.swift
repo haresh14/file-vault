@@ -63,7 +63,7 @@ final class ThumbnailGenerationService {
                     return try write(thumbnailData, storageKey: storageKey, key: key)
                 }
             } catch {
-                print("DEBUG: Error generating video thumbnail at time \(time.seconds): \(error)")
+                VaultLog.debug("DEBUG: Error generating video thumbnail at time \(time.seconds): \(error)")
             }
         }
         return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName, key: key)

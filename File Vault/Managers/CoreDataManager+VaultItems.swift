@@ -87,7 +87,7 @@ extension CoreDataManager {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching vault items: \(error)")
+            VaultLog.debug("Error fetching vault items: \(error)")
             return []
         }
     }

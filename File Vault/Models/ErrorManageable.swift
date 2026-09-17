@@ -158,9 +158,9 @@ extension ErrorManageable {
         showErrorAlert = true
         
         // Log error for debugging
-        print("🚨 Error: \(appError.errorDescription ?? "Unknown")")
+        VaultLog.debug("🚨 Error: \(appError.errorDescription ?? "Unknown")")
         if let recovery = appError.recoverySuggestion {
-            print("💡 Suggestion: \(recovery)")
+            VaultLog.debug("💡 Suggestion: \(recovery)")
         }
     }
     

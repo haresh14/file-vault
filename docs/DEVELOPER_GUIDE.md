@@ -5,9 +5,10 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 ## Table of Contents
 1. [Opening the Project](#opening-the-project)
 2. [Adding Privacy Permissions](#adding-privacy-permissions)
-3. [Building and Running the App](#building-and-running-the-app)
-4. [Understanding the Project Structure](#understanding-the-project-structure)
-5. [Common Xcode Tasks](#common-xcode-tasks)
+3. [App Store Compliance](#app-store-compliance)
+4. [Building and Running the App](#building-and-running-the-app)
+5. [Understanding the Project Structure](#understanding-the-project-structure)
+6. [Common Xcode Tasks](#common-xcode-tasks)
 
 ## Opening the Project
 
@@ -27,6 +28,34 @@ Face ID usage is declared in `File Vault/Info.plist` as `NSFaceIDUsageDescriptio
 Photo library access uses `PHPickerViewController`. Do not add `NSPhotoLibraryUsageDescription`.
 
 LAN web upload uses `NSLocalNetworkUsageDescription` in the same Info.plist.
+
+`File Vault/PrivacyInfo.xcprivacy` declares the UserDefaults required-reason API with reason CA92.1. It declares no tracking and no collected data because the app has no account, analytics, or remote service. Re-audit the manifest whenever a dependency or required-reason API is added.
+
+Notification authorization is requested when the user starts Web Upload. Do not move it back to app launch or unlock.
+
+## App Store Compliance
+
+### Export compliance
+
+`ITSAppUsesNonExemptEncryption` is `YES`. App Store Connect answers and legal advice must agree with that declaration. App Review notes:
+
+> The app encrypts user-selected files and metadata on device with AES-GCM. The encryption key is derived from the user's vault credential with PBKDF2-HMAC-SHA256; Keychain material is ThisDeviceOnly. The optional local-network transfer server uses HTTPS with a new self-signed ECDSA certificate per server session. The app has no account or cloud sync, and vault files are excluded from backup.
+
+### Privacy and support URLs
+
+Set `PRIVACY_POLICY_URL` and `SUPPORT_URL` in the app target's build settings to real hosted HTTPS pages. Empty or invalid values hide the corresponding About link. Configure the same URLs in App Store Connect.
+
+The hosted privacy policy must state:
+
+- No account, analytics, advertising, tracking, or sale of data.
+- Vault files, encrypted metadata, credentials, biometric decisions, and security settings remain on the device.
+- Face ID / Touch ID evaluation is performed by iOS; the app does not receive biometric data.
+- Web Upload is optional and limited to the local network. Paired browsers can upload; downloads require an authenticated export session. The browser must verify the displayed self-signed certificate fingerprint to detect interception.
+- Screenshot blanking and the decoy credential are UI protections, not protection against a compromised device or filesystem access.
+- How users request support and how policy changes are published.
+
+Support pages must provide a contact method, supported iOS version, troubleshooting for unlock and LAN certificate warnings, and the warning that forgotten vault credentials cannot be recovered.
+
 ## Building and Running the App
 
 ### On iOS Simulator

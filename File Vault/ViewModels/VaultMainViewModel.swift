@@ -315,7 +315,7 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
             do {
                 try fileStorageManager.deleteFile(vaultItem: item)
             } catch {
-                print("Error deleting item: \(error)")
+                VaultLog.debug("Error deleting item: \(error)")
             }
         }
         

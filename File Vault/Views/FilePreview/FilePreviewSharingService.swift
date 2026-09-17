@@ -65,7 +65,7 @@ struct FilePreviewSharingService {
                 presentingVC.present(activityVC, animated: true)
             }
         } catch {
-            print("Failed to share file: \(error)")
+            VaultLog.debug("Failed to share file: \(error)")
         }
     }
 }

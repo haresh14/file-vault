@@ -50,12 +50,12 @@ class ShareManager {
     ///   - onCompletion: Optional completion handler called after sharing
     func shareVaultItems(_ vaultItems: [VaultItem], from sourceView: UIView? = nil, onCompletion: (() -> Void)? = nil) {
         guard !vaultItems.isEmpty else {
-            print("Error: No items to share")
+            VaultLog.debug("Error: No items to share")
             return
         }
         
         guard let rootViewController = ShareManager.activeKeyWindow()?.rootViewController else {
-            print("Error: Unable to get root view controller for sharing")
+            VaultLog.debug("Error: Unable to get root view controller for sharing")
             return
         }
         
@@ -104,7 +104,7 @@ class ShareManager {
             presentingViewController.present(activityViewController, animated: true)
             
         } catch {
-            print("Error preparing files for sharing: \(error)")
+            VaultLog.debug("Error preparing files for sharing: \(error)")
             
             // Clean up any temporary files that were created
             for url in temporaryURLs {

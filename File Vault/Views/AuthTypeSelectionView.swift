@@ -178,6 +178,6 @@ struct AuthTypeCard: View {
 
 #Preview {
     AuthTypeSelectionView { type in
-        print("Selected: \(type.displayName)")
+        VaultLog.debug("Selected: \(type.displayName)")
     }
 } 

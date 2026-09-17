@@ -34,12 +34,12 @@ extension CoreDataManager {
                     do {
                         completion(try self.context.existingObject(with: item.objectID) as? VaultItem)
                     } catch {
-                        print("Error getting item in main context: \(error)")
+                        VaultLog.debug("Error getting item in main context: \(error)")
                         completion(nil)
                     }
                 }
             } catch {
-                print("Error saving in background context: \(error)")
+                VaultLog.debug("Error saving in background context: \(error)")
                 DispatchQueue.main.async { completion(nil) }
             }
         }

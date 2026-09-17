@@ -31,7 +31,7 @@ final class SecurityMotionDetector: NSObject {
 
     private func startShakeDetection() {
         guard motionManager.isAccelerometerAvailable else {
-            print("DEBUG: Accelerometer not available for shake detection")
+            VaultLog.debug("DEBUG: Accelerometer not available for shake detection")
             return
         }
 
@@ -44,16 +44,16 @@ final class SecurityMotionDetector: NSObject {
                     + acceleration.z * acceleration.z
             )
             if magnitude > self.shakeThreshold {
-                print("DEBUG: Shake detected! Magnitude: \(magnitude)")
+                VaultLog.debug("DEBUG: Shake detected! Magnitude: \(magnitude)")
                 self.onLockRequested?("Shake detected")
             }
         }
-        print("DEBUG: Shake detection started")
+        VaultLog.debug("DEBUG: Shake detection started")
     }
 
     private func stopShakeDetection() {
         motionManager.stopAccelerometerUpdates()
-        print("DEBUG: Shake detection stopped")
+        VaultLog.debug("DEBUG: Shake detection stopped")
     }
 
     private func startFlipDetection() {
@@ -63,7 +63,7 @@ final class SecurityMotionDetector: NSObject {
             name: UIDevice.orientationDidChangeNotification,
             object: nil
         )
-        print("DEBUG: Flip detection started")
+        VaultLog.debug("DEBUG: Flip detection started")
     }
 
     private func stopFlipDetection() {
@@ -72,16 +72,16 @@ final class SecurityMotionDetector: NSObject {
             name: UIDevice.orientationDidChangeNotification,
             object: nil
         )
-        print("DEBUG: Flip detection stopped")
+        VaultLog.debug("DEBUG: Flip detection stopped")
     }
 
     @objc private func deviceOrientationDidChange() {
         let currentOrientation = UIDevice.current.orientation
         if currentOrientation == .faceDown && lastOrientation != .faceDown {
-            print("DEBUG: Face-down flip detected!")
+            VaultLog.debug("DEBUG: Face-down flip detected!")
             onLockRequested?("Device flipped face-down")
         } else if currentOrientation == .faceDown && lastOrientation == .faceUp {
-            print("DEBUG: Face-up to face-down flip detected!")
+            VaultLog.debug("DEBUG: Face-up to face-down flip detected!")
             onLockRequested?("Device flipped")
         }
         lastOrientation = currentOrientation

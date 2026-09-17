@@ -9,7 +9,6 @@ import Foundation
 import Network
 import CoreData
 import SwiftUI
-import BackgroundTasks
 import UIKit
 
 class WebServerManager: ObservableObject, WebServerManaging {
@@ -36,12 +35,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
     private var exportSessionTimer: Timer?
 
     private init() {
-        setupBackgroundTaskSupport()
         setupAppLifecycleObservers()
     }
     
     func startServer() {
-        print("DEBUG: startServer called")
+        VaultLog.debug("DEBUG: startServer called")
 
         accessControl.rotateToken()
         let code = accessControl.pairingCode ?? ""
@@ -53,7 +51,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         do {
             identity = try LANWebTLSIdentity.make(ipAddresses: addresses)
         } catch {
-            print("DEBUG: Failed to create TLS identity: \(error)")
+            VaultLog.debug("DEBUG: Failed to create TLS identity: \(error)")
             accessControl.invalidate()
             return
         }
@@ -66,7 +64,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         }
 
         guard let port = NWEndpoint.Port(rawValue: UInt16(serverPort)) else {
-            print("DEBUG: Invalid port: \(serverPort)")
+            VaultLog.debug("DEBUG: Invalid port: \(serverPort)")
             identity.removeFromKeychain()
             tlsIdentity = nil
             return
@@ -76,24 +74,24 @@ class WebServerManager: ObservableObject, WebServerManaging {
 
         do {
             let listener = try NWListener(using: parameters, on: port)
-            print("DEBUG: Listener created successfully")
+            VaultLog.debug("DEBUG: Listener created successfully")
             
             listener.newConnectionHandler = { [weak self] (connection: NWConnection) in
-                print("DEBUG: newConnectionHandler called")
+                VaultLog.debug("DEBUG: newConnectionHandler called")
                 self?.handleNewConnection(connection)
             }
             
             listener.stateUpdateHandler = { [weak self] (state: NWListener.State) in
-                print("DEBUG: Listener state changed to: \(state)")
+                VaultLog.debug("DEBUG: Listener state changed to: \(state)")
                 switch state {
                 case .ready:
-                    print("DEBUG: Server started successfully on port \(self?.serverPort ?? 0)")
+                    VaultLog.debug("DEBUG: Server started successfully on port \(self?.serverPort ?? 0)")
                     DispatchQueue.main.async {
                         self?.isRunning = true
                         self?.updateServerURL()
                     }
                 case .failed(let error):
-                    print("DEBUG: Server failed to start: \(error)")
+                    VaultLog.debug("DEBUG: Server failed to start: \(error)")
                     self?.tlsIdentity?.removeFromKeychain()
                     self?.tlsIdentity = nil
                     DispatchQueue.main.async {
@@ -101,20 +99,20 @@ class WebServerManager: ObservableObject, WebServerManaging {
                         self?.certificateFingerprint = ""
                     }
                 case .cancelled:
-                    print("DEBUG: Server cancelled")
+                    VaultLog.debug("DEBUG: Server cancelled")
                     DispatchQueue.main.async {
                         self?.isRunning = false
                     }
                 default:
-                    print("DEBUG: Server state: \(state)")
+                    VaultLog.debug("DEBUG: Server state: \(state)")
                 }
             }
             
             self.listener = listener
             listener.start(queue: DispatchQueue.global(qos: .userInitiated))
-            print("DEBUG: Listener started")
+            VaultLog.debug("DEBUG: Listener started")
         } catch {
-            print("DEBUG: Failed to create listener: \(error)")
+            VaultLog.debug("DEBUG: Failed to create listener: \(error)")
             identity.removeFromKeychain()
             tlsIdentity = nil
             DispatchQueue.main.async { self.certificateFingerprint = "" }
@@ -142,7 +140,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             self.connectedDevices.removeAll()
         }
         
-        print("DEBUG: Web server stopped")
+        VaultLog.debug("DEBUG: Web server stopped")
     }
 
     // MARK: - Export Session
@@ -173,14 +171,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     }
     
     // MARK: - Background Task Support
-    
-    private func setupBackgroundTaskSupport() {
-        // Register background task identifier
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.haresh.FileVault.upload-processing", using: nil) { task in
-            self.handleBackgroundUploadTask(task as! BGProcessingTask)
-        }
-    }
-    
+
     private func setupAppLifecycleObservers() {
         NotificationCenter.default.addObserver(
             self,
@@ -215,34 +206,18 @@ class WebServerManager: ObservableObject, WebServerManaging {
         
         backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(withName: "WebServerUpload") {
             // This block is called when the background time is about to expire
-            print("DEBUG: Background task time expiring, ending gracefully")
+            VaultLog.debug("DEBUG: Background task time expiring, ending gracefully")
             self.endBackgroundTask()
         }
         
-        print("DEBUG: Started background task for web server uploads")
+        VaultLog.debug("DEBUG: Started background task for web server uploads")
     }
     
     private func endBackgroundTask() {
         if backgroundTaskIdentifier != .invalid {
             UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
             backgroundTaskIdentifier = .invalid
-            print("DEBUG: Ended background task")
-        }
-    }
-    
-    private func handleBackgroundUploadTask(_ task: BGProcessingTask) {
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
-        
-        // Keep the server running for background uploads
-        if !isRunning {
-            startServer()
-        }
-        
-        // Complete the task when uploads are done
-        DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
-            task.setTaskCompleted(success: true)
+            VaultLog.debug("DEBUG: Ended background task")
         }
     }
     
@@ -250,33 +225,33 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     private func handleNewConnection(_ connection: NWConnection) {
         connections.append(connection)
-        print("DEBUG: New connection added, total connections: \(connections.count)")
+        VaultLog.debug("DEBUG: New connection added, total connections: \(connections.count)")
         
         connection.stateUpdateHandler = { [weak self] (state: NWConnection.State) in
-            print("DEBUG: Connection state changed to: \(state)")
+            VaultLog.debug("DEBUG: Connection state changed to: \(state)")
             switch state {
             case .ready:
-                print("DEBUG: Connection ready - starting to receive HTTP request")
+                VaultLog.debug("DEBUG: Connection ready - starting to receive HTTP request")
                 self?.receiveHTTPRequest(on: connection)
             case .failed(let error):
-                print("DEBUG: Connection failed: \(error)")
+                VaultLog.debug("DEBUG: Connection failed: \(error)")
                 self?.removeConnection(connection)
             case .cancelled:
-                print("DEBUG: Connection cancelled")
+                VaultLog.debug("DEBUG: Connection cancelled")
                 self?.removeConnection(connection)
             case .waiting(let error):
-                print("DEBUG: Connection waiting: \(error)")
+                VaultLog.debug("DEBUG: Connection waiting: \(error)")
             case .preparing:
-                print("DEBUG: Connection preparing")
+                VaultLog.debug("DEBUG: Connection preparing")
             case .setup:
-                print("DEBUG: Connection setup")
+                VaultLog.debug("DEBUG: Connection setup")
             @unknown default:
-                print("DEBUG: Connection unknown state: \(state)")
+                VaultLog.debug("DEBUG: Connection unknown state: \(state)")
             }
         }
         
         connection.start(queue: DispatchQueue.global(qos: .userInitiated))
-        print("DEBUG: Connection started")
+        VaultLog.debug("DEBUG: Connection started")
     }
     
     private func removeConnection(_ connection: NWConnection) {
@@ -297,14 +272,14 @@ class WebServerManager: ObservableObject, WebServerManaging {
             connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
                 
                 if let error = error {
-                    print("DEBUG: Error receiving data: \(error)")
+                    VaultLog.debug("DEBUG: Error receiving data: \(error)")
                     connection.cancel()
                     return
                 }
                 
                 if let data = data, !data.isEmpty {
                     receivedData.append(data)
-                    print("DEBUG: Received \(data.count) bytes, total: \(receivedData.count)")
+                    VaultLog.debug("DEBUG: Received \(data.count) bytes, total: \(receivedData.count)")
                     
                     // No size limit check - we can handle any file size
                     
@@ -313,7 +288,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                         let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
                         if let headerEndRange = receivedData.range(of: headerEndMarker) {
                             headersComplete = true
-                            print("DEBUG: Headers complete, parsing Content-Length")
+                            VaultLog.debug("DEBUG: Headers complete, parsing Content-Length")
                             
                             // Extract headers only (safe to convert to UTF-8)
                             let headerData = receivedData.subdata(in: receivedData.startIndex..<headerEndRange.lowerBound)
@@ -325,7 +300,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                                         let lengthString = line.replacingOccurrences(of: "content-length:", with: "", options: .caseInsensitive)
                                             .trimmingCharacters(in: .whitespaces)
                                         expectedContentLength = Int(lengthString)
-                                        print("DEBUG: Expected Content-Length: \(expectedContentLength ?? 0)")
+                                        VaultLog.debug("DEBUG: Expected Content-Length: \(expectedContentLength ?? 0)")
                                         break
                                     }
                                 }
@@ -333,7 +308,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                                 // Calculate how much data we need
                                 let headerEndIndex = receivedData.startIndex.distance(to: headerEndRange.upperBound)
                                 let totalExpected = headerEndIndex + (expectedContentLength ?? 0)
-                                print("DEBUG: Headers end at \(headerEndIndex), total expected: \(totalExpected)")
+                                VaultLog.debug("DEBUG: Headers end at \(headerEndIndex), total expected: \(totalExpected)")
                             }
                         }
                     }
@@ -348,16 +323,16 @@ class WebServerManager: ObservableObject, WebServerManaging {
                                 let totalExpected = headerEndIndex + contentLength
                                 
                                 if receivedData.count >= totalExpected {
-                                    print("DEBUG: Complete request received (\(receivedData.count)/\(totalExpected) bytes), processing")
+                                    VaultLog.debug("DEBUG: Complete request received (\(receivedData.count)/\(totalExpected) bytes), processing")
                                     self.processHTTPRequest(data: receivedData, connection: connection)
                                     return
                                 } else {
-                                    print("DEBUG: Still receiving data (\(receivedData.count)/\(totalExpected) bytes)")
+                                    VaultLog.debug("DEBUG: Still receiving data (\(receivedData.count)/\(totalExpected) bytes)")
                                 }
                             }
                         } else {
                             // No Content-Length header, process what we have
-                            print("DEBUG: No Content-Length found, processing request with \(receivedData.count) bytes")
+                            VaultLog.debug("DEBUG: No Content-Length found, processing request with \(receivedData.count) bytes")
                             self.processHTTPRequest(data: receivedData, connection: connection)
                             return
                         }
@@ -365,12 +340,12 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 }
                 
                 if isComplete {
-                    print("DEBUG: Connection marked complete")
+                    VaultLog.debug("DEBUG: Connection marked complete")
                     if receivedData.count > 0 {
-                        print("DEBUG: Processing final request with \(receivedData.count) bytes")
+                        VaultLog.debug("DEBUG: Processing final request with \(receivedData.count) bytes")
                         self.processHTTPRequest(data: receivedData, connection: connection)
                     } else {
-                        print("DEBUG: No data received on complete connection")
+                        VaultLog.debug("DEBUG: No data received on complete connection")
                         connection.cancel()
                     }
                 } else {
@@ -380,19 +355,19 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
         }
         
-        print("DEBUG: Starting to receive HTTP request")
+        VaultLog.debug("DEBUG: Starting to receive HTTP request")
         receiveData()
     }
     
     private func processHTTPRequest(data: Data, connection: NWConnection) {
-        print("DEBUG: processHTTPRequest called with \(data.count) bytes")
+        VaultLog.debug("DEBUG: processHTTPRequest called with \(data.count) bytes")
         guard let request = WebHTTPRequest.parse(data) else {
-            print("DEBUG: Invalid HTTP request")
+            VaultLog.debug("DEBUG: Invalid HTTP request")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
 
-        print("DEBUG: Method: \(request.method), Path: \(request.path)")
+        VaultLog.debug("DEBUG: Method: \(request.method), Path: \(request.path)")
         let route = WebRequestRouter.route(request, fakeLoginActive: LoginStateManager.shared.shouldShowEmptyVault)
 
         switch accessControl.authorize(request, route: route) {
@@ -465,7 +440,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     private func sendPreparedResponse(connection: NWConnection, response: WebHTTPResponse) {
         connection.send(content: response.serializedData, completion: .contentProcessed { error in
             if let error = error {
-                print("DEBUG: Error sending response: \(error)")
+                VaultLog.debug("DEBUG: Error sending response: \(error)")
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
                 connection.cancel()
@@ -476,37 +451,37 @@ class WebServerManager: ObservableObject, WebServerManaging {
     // MARK: - Page Serving
     
     private func serveUploadPage(connection: NWConnection, path: String) {
-        print("DEBUG: serveUploadPage called with path: \(path)")
+        VaultLog.debug("DEBUG: serveUploadPage called with path: \(path)")
         
         // Extract folder parameter from URL
         var currentFolderId: String? = nil
         if let url = URL(string: "http://localhost:8080\(path)"),
            let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
            let queryItems = components.queryItems {
-            print("DEBUG: URL components parsed successfully")
-            print("DEBUG: Query items: \(queryItems)")
+            VaultLog.debug("DEBUG: URL components parsed successfully")
+            VaultLog.debug("DEBUG: Query items: \(queryItems)")
             currentFolderId = queryItems.first(where: { $0.name == "folder" })?.value
-            print("DEBUG: Extracted folder ID from URL: '\(currentFolderId ?? "nil")'")
+            VaultLog.debug("DEBUG: Extracted folder ID from URL: '\(currentFolderId ?? "nil")'")
             
             // Validate the folder ID if it exists
             if let folderIdString = currentFolderId, !folderIdString.isEmpty {
                 if let folderId = UUID(uuidString: folderIdString) {
                     if let folder = CoreDataManager.shared.fetchFolder(by: folderId) {
-                        print("DEBUG: Folder validation successful: \(folder.displayName)")
+                        VaultLog.debug("DEBUG: Folder validation successful: \(folder.displayName)")
                     } else {
-                        print("DEBUG: WARNING: Folder ID exists but folder not found in database")
+                        VaultLog.debug("DEBUG: WARNING: Folder ID exists but folder not found in database")
                         currentFolderId = nil
                     }
                 } else {
-                    print("DEBUG: WARNING: Invalid folder ID format, resetting to nil")
+                    VaultLog.debug("DEBUG: WARNING: Invalid folder ID format, resetting to nil")
                     currentFolderId = nil
                 }
             }
         } else {
-            print("DEBUG: Failed to parse URL or no query items found")
+            VaultLog.debug("DEBUG: Failed to parse URL or no query items found")
         }
         
-        print("DEBUG: Final currentFolderId being passed to HTML: '\(currentFolderId ?? "nil")'")
+        VaultLog.debug("DEBUG: Final currentFolderId being passed to HTML: '\(currentFolderId ?? "nil")'")
         let token = accessControl.currentToken ?? ""
         let html = generateUploadHTML(
             currentFolderId: currentFolderId,
@@ -545,8 +520,8 @@ class WebServerManager: ObservableObject, WebServerManaging {
         }
         
         // Continue with regular upload for smaller files
-        print("DEBUG: 🔄 handleFileUpload called with data size: \(requestData.count)")
-        print("DEBUG: 🔄 Starting file upload processing...")
+        VaultLog.debug("DEBUG: 🔄 handleFileUpload called with data size: \(requestData.count)")
+        VaultLog.debug("DEBUG: 🔄 Starting file upload processing...")
         
         // Generate unique upload ID for tracking
         let uploadId = UUID().uuidString
@@ -560,7 +535,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         // Find the end of HTTP headers (double CRLF)
         let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
         guard let headerEndRange = requestData.range(of: headerEndMarker) else {
-            print("DEBUG: No HTTP header end marker found in upload request")
+            VaultLog.debug("DEBUG: No HTTP header end marker found in upload request")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
@@ -568,28 +543,28 @@ class WebServerManager: ObservableObject, WebServerManaging {
         // Extract headers (safe to convert to UTF-8)
         let headerData = requestData.subdata(in: requestData.startIndex..<headerEndRange.lowerBound)
         guard let headerString = String(data: headerData, encoding: .utf8) else {
-            print("DEBUG: Failed to convert header data to UTF-8 string")
+            VaultLog.debug("DEBUG: Failed to convert header data to UTF-8 string")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "Bad Request")
             return
         }
         
-        print("DEBUG: Upload request header string preview (first 1000 chars): \(headerString.prefix(1000))")
+        VaultLog.debug("DEBUG: Upload request header string preview (first 1000 chars): \(headerString.prefix(1000))")
         
         // Parse multipart form data
         let boundary = extractBoundary(from: headerString)
-        print("DEBUG: Extracted boundary: '\(boundary)'")
+        VaultLog.debug("DEBUG: Extracted boundary: '\(boundary)'")
         guard !boundary.isEmpty else {
-            print("DEBUG: No boundary found in request")
+            VaultLog.debug("DEBUG: No boundary found in request")
             sendHTTPResponse(connection: connection, statusCode: 400, body: "No boundary found")
             return
         }
         
         let parts = parseMultipartData(data: requestData, boundary: boundary)
-        print("DEBUG: Parsed \(parts.count) multipart parts")
+        VaultLog.debug("DEBUG: Parsed \(parts.count) multipart parts")
         
         // Extract folder ID from form data OR headers
         var targetFolder: Folder? = nil
-        print("DEBUG: Starting folder ID extraction from \(parts.count) parts")
+        VaultLog.debug("DEBUG: Starting folder ID extraction from \(parts.count) parts")
         
         // First, try to get folder ID from headers
         let headerLines = headerString.components(separatedBy: "\r\n")
@@ -597,11 +572,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
             if line.lowercased().hasPrefix("x-folder-id:") {
                 let folderIdFromHeader = line.replacingOccurrences(of: "x-folder-id:", with: "", options: .caseInsensitive)
                     .trimmingCharacters(in: .whitespaces)
-                print("DEBUG: 🎯 Found folder ID in header: '\(folderIdFromHeader)'")
+                VaultLog.debug("DEBUG: 🎯 Found folder ID in header: '\(folderIdFromHeader)'")
                 if let folderId = UUID(uuidString: folderIdFromHeader) {
                     targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
                     if let folder = targetFolder {
-                        print("DEBUG: ✅ Target folder found from header: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+                        VaultLog.debug("DEBUG: ✅ Target folder found from header: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
                         break
                     }
                 }
@@ -610,44 +585,44 @@ class WebServerManager: ObservableObject, WebServerManaging {
         
         // If not found in headers, try form data
         if targetFolder == nil {
-            print("DEBUG: No folder ID in headers, checking form data...")
+            VaultLog.debug("DEBUG: No folder ID in headers, checking form data...")
         
         for part in parts {
-            print("DEBUG: Examining part - fieldName: '\(part.fieldName ?? "nil")', hasData: \(part.data != nil), dataSize: \(part.data?.count ?? 0)")
+            VaultLog.debug("DEBUG: Examining part - fieldName: '\(part.fieldName ?? "nil")', hasData: \(part.data != nil), dataSize: \(part.data?.count ?? 0)")
             if let data = part.data, let stringValue = String(data: data, encoding: .utf8) {
-                print("DEBUG: Part data as string: '\(stringValue)'")
+                VaultLog.debug("DEBUG: Part data as string: '\(stringValue)'")
             }
             
             if let fieldName = part.fieldName, fieldName == "folderId",
                let data = part.data, let folderIdString = String(data: data, encoding: .utf8),
                !folderIdString.isEmpty {
                 let trimmedFolderId = folderIdString.trimmingCharacters(in: .whitespacesAndNewlines)
-                print("DEBUG: ✅ Found folder ID in form data: '\(trimmedFolderId)'")
+                VaultLog.debug("DEBUG: ✅ Found folder ID in form data: '\(trimmedFolderId)'")
                 if let folderId = UUID(uuidString: trimmedFolderId) {
                     targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
                     if let folder = targetFolder {
-                        print("DEBUG: ✅ Target folder found: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+                        VaultLog.debug("DEBUG: ✅ Target folder found: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
                     } else {
-                        print("DEBUG: ❌ Folder ID is valid UUID but folder not found in database")
+                        VaultLog.debug("DEBUG: ❌ Folder ID is valid UUID but folder not found in database")
                     }
                 } else {
-                    print("DEBUG: ❌ Invalid folder ID format: \(trimmedFolderId)")
+                    VaultLog.debug("DEBUG: ❌ Invalid folder ID format: \(trimmedFolderId)")
                 }
                 break
             } else if let fieldName = part.fieldName, fieldName == "folderId" {
-                print("DEBUG: ❌ Found folderId field but data is empty or invalid")
+                VaultLog.debug("DEBUG: ❌ Found folderId field but data is empty or invalid")
                 if let data = part.data {
-                    print("DEBUG: Raw folderId data: \(data)")
+                    VaultLog.debug("DEBUG: Raw folderId data: \(data)")
                 }
             }
         }
         } // End of form data checking
         
         if targetFolder == nil {
-            print("DEBUG: ❌ No target folder specified, uploading to root level")
-            print("DEBUG: Headers checked, Form data checked - no folderId found anywhere")
+            VaultLog.debug("DEBUG: ❌ No target folder specified, uploading to root level")
+            VaultLog.debug("DEBUG: Headers checked, Form data checked - no folderId found anywhere")
         } else {
-            print("DEBUG: ✅ Will upload to folder: \(targetFolder!.displayName) (ID: \(targetFolder!.id?.uuidString ?? "nil"))")
+            VaultLog.debug("DEBUG: ✅ Will upload to folder: \(targetFolder!.displayName) (ID: \(targetFolder!.id?.uuidString ?? "nil"))")
         }
         
         // Always use "whole" folder upload mode (folders preserve their structure)
@@ -662,14 +637,14 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
         }
         
-        print("DEBUG: Extracted \(filePaths.count) file paths")
+        VaultLog.debug("DEBUG: Extracted \(filePaths.count) file paths")
         
         // Count actual file parts for notification
         let fileParts = parts.filter { $0.fileName != nil && $0.data != nil && !$0.data!.isEmpty }
         let totalFiles = fileParts.count
         let isLargeUpload = totalFiles > 50
         
-        print("DEBUG: Starting regular file upload with \(totalFiles) files (large upload: \(isLargeUpload))")
+        VaultLog.debug("DEBUG: Starting regular file upload with \(totalFiles) files (large upload: \(isLargeUpload))")
         
         // Start upload progress tracking
         NotificationManager.shared.startUploadProgress(uploadId: uploadId, totalFiles: totalFiles)
@@ -692,7 +667,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                             folderUploadMode: folderUploadMode
                         )
             } catch {
-                print("DEBUG: Error in batch upload processing: \(error)")
+                VaultLog.debug("DEBUG: Error in batch upload processing: \(error)")
                 // Fall back to sequential processing for this upload
                 for (_, part) in parts.enumerated() {
                     if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
@@ -705,8 +680,8 @@ class WebServerManager: ObservableObject, WebServerManaging {
             // Use original processing for small uploads
             for (index, part) in parts.enumerated() {
                 if !isLargeUpload {
-                    print("DEBUG: Processing part \(index)")
-                    print("DEBUG: Part filename: \(part.fileName ?? "none")")
+                    VaultLog.debug("DEBUG: Processing part \(index)")
+                    VaultLog.debug("DEBUG: Part filename: \(part.fileName ?? "none")")
                 }
                 
                 if let fileName = part.fileName, let fileData = part.data, !fileData.isEmpty {
@@ -737,7 +712,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                         
                         uploadedFiles.append(fileName)
                         if !isLargeUpload {
-                            print("DEBUG: Successfully uploaded file: \(fileName)")
+                            VaultLog.debug("DEBUG: Successfully uploaded file: \(fileName)")
                         }
                         
                         filePartIndex += 1
@@ -754,7 +729,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                         
                     } catch FileStorageError.duplicateFile {
                         if !isLargeUpload {
-                            print("DEBUG: Skipped duplicate file: \(fileName)")
+                            VaultLog.debug("DEBUG: Skipped duplicate file: \(fileName)")
                         }
                         filePartIndex += 1
                         
@@ -767,7 +742,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                             )
                         }
                     } catch {
-                        print("DEBUG: Error saving uploaded file \(fileName): \(error)")
+                        VaultLog.debug("DEBUG: Error saving uploaded file \(fileName): \(error)")
                         failedFiles.append(fileName)
                         filePartIndex += 1
                         
@@ -794,8 +769,8 @@ class WebServerManager: ObservableObject, WebServerManaging {
             )
         }
         
-        print("DEBUG: Total uploaded files: \(uploadedFiles.count)")
-        print("DEBUG: Total failed files: \(failedFiles.count)")
+        VaultLog.debug("DEBUG: Total uploaded files: \(uploadedFiles.count)")
+        VaultLog.debug("DEBUG: Total failed files: \(failedFiles.count)")
         
         // Complete upload progress tracking
         NotificationManager.shared.completeUpload(
@@ -848,7 +823,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     // MARK: - Streaming Upload Handler
     
     private func handleStreamingFileUpload(requestData: Data, connection: NWConnection) {
-        print("DEBUG: 🌊 Starting streaming file upload processing...")
+        VaultLog.debug("DEBUG: 🌊 Starting streaming file upload processing...")
         
         // Generate unique upload ID for tracking
         let uploadId = UUID().uuidString
@@ -857,7 +832,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         // Find the end of HTTP headers (double CRLF)
         let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
         guard let headerEndRange = requestData.range(of: headerEndMarker) else {
-            print("DEBUG: No HTTP header end marker found in streaming upload request")
+            VaultLog.debug("DEBUG: No HTTP header end marker found in streaming upload request")
             sendStreamingResponse(connection: connection, success: false, message: "Bad Request")
             return
         }
@@ -865,7 +840,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         // Extract headers (safe to convert to UTF-8)
         let headerData = requestData.subdata(in: requestData.startIndex..<headerEndRange.lowerBound)
         guard let headerString = String(data: headerData, encoding: .utf8) else {
-            print("DEBUG: Failed to convert header data to UTF-8 string")
+            VaultLog.debug("DEBUG: Failed to convert header data to UTF-8 string")
             sendStreamingResponse(connection: connection, success: false, message: "Bad Request")
             return
         }
@@ -878,11 +853,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
             if line.lowercased().hasPrefix("x-folder-id:") {
                 let folderIdFromHeader = line.replacingOccurrences(of: "x-folder-id:", with: "", options: .caseInsensitive)
                     .trimmingCharacters(in: .whitespaces)
-                print("DEBUG: 🌊 Found folder ID in header: '\(folderIdFromHeader)'")
+                VaultLog.debug("DEBUG: 🌊 Found folder ID in header: '\(folderIdFromHeader)'")
                 if let folderId = UUID(uuidString: folderIdFromHeader) {
                     targetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
                     if let folder = targetFolder {
-                        print("DEBUG: ✅ Target folder found: \(folder.displayName)")
+                        VaultLog.debug("DEBUG: ✅ Target folder found: \(folder.displayName)")
                         break
                     }
                 }
@@ -908,7 +883,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         }
         
         guard let fileName = fileName, !fileName.isEmpty else {
-            print("DEBUG: 🌊 No filename found in streaming upload")
+            VaultLog.debug("DEBUG: 🌊 No filename found in streaming upload")
             sendStreamingResponse(connection: connection, success: false, message: "Filename required")
             activeUploads.remove(uploadId)
             return
@@ -916,7 +891,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         
         // Extract file data (everything after headers)
         let fileData = requestData.subdata(in: headerEndRange.upperBound..<requestData.endIndex)
-        print("DEBUG: 🌊 Processing single file: \(fileName), size: \(fileData.count) bytes")
+        VaultLog.debug("DEBUG: 🌊 Processing single file: \(fileName), size: \(fileData.count) bytes")
         
         // Process the file immediately in an autoreleasepool
         autoreleasepool {
@@ -947,7 +922,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     targetFolder: actualTargetFolder
                 )
                 
-                print("DEBUG: 🌊 ✅ Successfully processed streaming file: \(fileName)")
+                VaultLog.debug("DEBUG: 🌊 ✅ Successfully processed streaming file: \(fileName)")
                 
                 // Send success response
                 sendStreamingResponse(connection: connection, success: true, message: "File uploaded successfully", fileName: fileName)
@@ -961,10 +936,10 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 }
                 
             } catch FileStorageError.duplicateFile {
-                print("DEBUG: 🌊 Skipped duplicate file: \(fileName)")
+                VaultLog.debug("DEBUG: 🌊 Skipped duplicate file: \(fileName)")
                 sendStreamingResponse(connection: connection, success: true, message: "File already exists (skipped)", fileName: fileName)
             } catch {
-                print("DEBUG: 🌊 ❌ Error processing streaming file \(fileName): \(error)")
+                VaultLog.debug("DEBUG: 🌊 ❌ Error processing streaming file \(fileName): \(error)")
                 sendStreamingResponse(connection: connection, success: false, message: "Failed to save file: \(error.localizedDescription)")
             }
         }
@@ -993,7 +968,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 body: jsonString
             )
         } catch {
-            print("DEBUG: Error creating streaming response: \(error)")
+            VaultLog.debug("DEBUG: Error creating streaming response: \(error)")
             sendHTTPResponse(
                 connection: connection,
                 statusCode: 500,
@@ -1006,7 +981,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     // MARK: - Folder Management Handlers
     
     private func handleCreateFolder(requestData: Data, connection: NWConnection) {
-        print("DEBUG: 📁 handleCreateFolder called")
+        VaultLog.debug("DEBUG: 📁 handleCreateFolder called")
         
         guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
             sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
@@ -1034,9 +1009,9 @@ class WebServerManager: ObservableObject, WebServerManaging {
             let newFolder = CoreDataManager.shared.createFolder(name: folderName.trimmingCharacters(in: .whitespacesAndNewlines), parent: parentFolder)
             
             if let folder = newFolder {
-                print("DEBUG: ✅ Created folder: \(folder.displayName)")
+                VaultLog.debug("DEBUG: ✅ Created folder: \(folder.displayName)")
             } else {
-                print("DEBUG: ❌ Failed to create folder")
+                VaultLog.debug("DEBUG: ❌ Failed to create folder")
             }
             sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder created successfully")
             
@@ -1046,13 +1021,13 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
             
         } catch {
-            print("DEBUG: ❌ Error creating folder: \(error)")
+            VaultLog.debug("DEBUG: ❌ Error creating folder: \(error)")
             sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to create folder")
         }
     }
     
     private func handleRenameFolder(requestData: Data, connection: NWConnection) {
-        print("DEBUG: ✏️ handleRenameFolder called")
+        VaultLog.debug("DEBUG: ✏️ handleRenameFolder called")
         
         guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
             sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
@@ -1077,7 +1052,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
             CoreDataManager.shared.updateFolder(folder, name: trimmedName)
             
-            print("DEBUG: ✅ Renamed folder to: \(trimmedName)")
+            VaultLog.debug("DEBUG: ✅ Renamed folder to: \(trimmedName)")
             sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder renamed successfully")
             
             // Notify UI to refresh
@@ -1086,13 +1061,13 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
             
         } catch {
-            print("DEBUG: ❌ Error renaming folder: \(error)")
+            VaultLog.debug("DEBUG: ❌ Error renaming folder: \(error)")
             sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to rename folder")
         }
     }
     
     private func handleDeleteFolder(requestData: Data, connection: NWConnection) {
-        print("DEBUG: 🗑️ handleDeleteFolder called")
+        VaultLog.debug("DEBUG: 🗑️ handleDeleteFolder called")
         
         guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
             sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
@@ -1115,7 +1090,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             // Delete the folder completely (includes file storage cleanup and Core Data cascade deletion)
             CoreDataManager.shared.deleteFolderCompletely(folder)
             
-            print("DEBUG: ✅ Deleted folder and all its contents completely")
+            VaultLog.debug("DEBUG: ✅ Deleted folder and all its contents completely")
             sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "Folder deleted successfully")
             
             // Notify UI to refresh
@@ -1124,13 +1099,13 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
             
         } catch {
-            print("DEBUG: ❌ Error deleting folder: \(error)")
+            VaultLog.debug("DEBUG: ❌ Error deleting folder: \(error)")
             sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to delete folder")
         }
     }
     
     private func handleDeleteFile(requestData: Data, connection: NWConnection) {
-        print("DEBUG: 🗑️ handleDeleteFile called")
+        VaultLog.debug("DEBUG: 🗑️ handleDeleteFile called")
         
         guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
             sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
@@ -1153,7 +1128,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             
             try FileStorageManager.shared.deleteFile(vaultItem: vaultItem)
             
-            print("DEBUG: ✅ Deleted file: \(vaultItem.fileName ?? "Unknown")")
+            VaultLog.debug("DEBUG: ✅ Deleted file: \(vaultItem.fileName ?? "Unknown")")
             sendJSONResponse(connection: connection, statusCode: 200, success: true, message: "File deleted successfully")
             
             // Notify UI to refresh
@@ -1162,13 +1137,13 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
             
         } catch {
-            print("DEBUG: ❌ Error deleting file: \(error)")
+            VaultLog.debug("DEBUG: ❌ Error deleting file: \(error)")
             sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to delete file")
         }
     }
     
     private func handleBulkDelete(requestData: Data, connection: NWConnection) {
-        print("DEBUG: 🗑️ handleBulkDelete called")
+        VaultLog.debug("DEBUG: 🗑️ handleBulkDelete called")
         
         guard let jsonData = extractJSONFromRequest(requestData: requestData) else {
             sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Invalid JSON data")
@@ -1253,7 +1228,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             }
             
         } catch {
-            print("DEBUG: ❌ Error in bulk delete: \(error)")
+            VaultLog.debug("DEBUG: ❌ Error in bulk delete: \(error)")
             sendJSONResponse(connection: connection, statusCode: 500, success: false, message: "Failed to process bulk delete")
         }
     }
@@ -1336,7 +1311,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     contentType: vaultItem.fileType ?? "application/octet-stream"
                 )
             } catch {
-                print("DEBUG: ❌ Error reading file data: \(error)")
+                VaultLog.debug("DEBUG: ❌ Error reading file data: \(error)")
                 sendHTTPResponse(connection: connection, statusCode: 500, body: "Error reading file")
             }
         case .folder(let id):
@@ -1353,7 +1328,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     contentType: "application/zip"
                 )
             } catch {
-                print("DEBUG: ❌ Error creating ZIP: \(error)")
+                VaultLog.debug("DEBUG: ❌ Error creating ZIP: \(error)")
                 sendHTTPResponse(connection: connection, statusCode: 500, body: "Error creating ZIP file")
             }
         case .selection(let fileIDs, let folderIDs):
@@ -1374,7 +1349,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     contentType: "application/zip"
                 )
             } catch {
-                print("DEBUG: ❌ Error creating selection ZIP: \(error)")
+                VaultLog.debug("DEBUG: ❌ Error creating selection ZIP: \(error)")
                 sendHTTPResponse(connection: connection, statusCode: 500, body: "Error creating ZIP file")
             }
         }
@@ -1447,12 +1422,12 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     private func sendFileResponse(connection: NWConnection, data: Data, fileName: String, contentType: String) {
         let response = WebHTTPResponse.download(data: data, fileName: fileName, contentType: contentType)
-        print("DEBUG: Sending file response: \(fileName), size: \(data.count) bytes")
+        VaultLog.debug("DEBUG: Sending file response: \(fileName), size: \(data.count) bytes")
         
         // Send headers first
         connection.send(content: response.headerData, completion: .contentProcessed { error in
             if let error = error {
-                print("DEBUG: Error sending file headers: \(error)")
+                VaultLog.debug("DEBUG: Error sending file headers: \(error)")
                 connection.cancel()
                 return
             }
@@ -1460,9 +1435,9 @@ class WebServerManager: ObservableObject, WebServerManaging {
             // Then send file data
             connection.send(content: response.bodyData, completion: .contentProcessed { error in
                 if let error = error {
-                    print("DEBUG: Error sending file data: \(error)")
+                    VaultLog.debug("DEBUG: Error sending file data: \(error)")
                 } else {
-                    print("DEBUG: File sent successfully: \(fileName)")
+                    VaultLog.debug("DEBUG: File sent successfully: \(fileName)")
                 }
                 
                 // Close connection after sending
@@ -1579,7 +1554,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     throw FileStorageError.importFailed
                 }
             } catch {
-                print("DEBUG: Error in ZIP creation: \(error)")
+                VaultLog.debug("DEBUG: Error in ZIP creation: \(error)")
             }
         }
         
@@ -1594,7 +1569,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         // Find the end of HTTP headers (double CRLF)
         let headerEndMarker = "\r\n\r\n".data(using: .utf8)!
         guard let headerEndRange = requestData.range(of: headerEndMarker) else {
-            print("DEBUG: No HTTP header end marker found")
+            VaultLog.debug("DEBUG: No HTTP header end marker found")
             return nil
         }
         
@@ -1618,7 +1593,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
             sendHTTPResponse(connection: connection, statusCode: statusCode, contentType: "application/json", body: jsonString)
         } catch {
-            print("DEBUG: Error creating JSON response: \(error)")
+            VaultLog.debug("DEBUG: Error creating JSON response: \(error)")
             sendHTTPResponse(connection: connection, statusCode: 500, contentType: "application/json", body: "{\"success\": false, \"message\": \"Internal server error\"}")
         }
     }
@@ -1693,7 +1668,7 @@ extension WebServerManager {
         }
         guard !folderComponents.isEmpty else { return baseFolder }
         
-        print("DEBUG: Creating folder structure for path: \(folderComponents.joined(separator: "/"))")
+        VaultLog.debug("DEBUG: Creating folder structure for path: \(folderComponents.joined(separator: "/"))")
         
         var currentParent = baseFolder
         
@@ -1704,11 +1679,11 @@ extension WebServerManager {
             // Check if folder already exists
             let existingFolders = CoreDataManager.shared.fetchFolders(in: currentParent)
             if let existingFolder = existingFolders.first(where: { $0.name == folderName }) {
-                print("DEBUG: Folder '\(folderName)' already exists")
+                VaultLog.debug("DEBUG: Folder '\(folderName)' already exists")
                 currentParent = existingFolder
             } else {
                 // Create new folder
-                print("DEBUG: Creating folder '\(folderName)'")
+                VaultLog.debug("DEBUG: Creating folder '\(folderName)'")
                 guard let newFolder = CoreDataManager.shared.createFolder(name: folderName, parent: currentParent) else {
                     throw NSError(domain: "FolderCreationError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create folder: \(folderName)"])
                 }
@@ -1720,7 +1695,7 @@ extension WebServerManager {
     }
     
     private func handleLargeFileUpload(requestData: Data, connection: NWConnection) {
-        print("DEBUG: 📦 Handling large file upload with background support")
+        VaultLog.debug("DEBUG: 📦 Handling large file upload with background support")
         
         // Generate unique upload ID for tracking
         let uploadId = UUID().uuidString
@@ -1750,7 +1725,7 @@ extension WebServerManager {
         // Count actual file parts for notification
         let fileParts = parts.filter { $0.fileName != nil && $0.data != nil && !$0.data!.isEmpty }
         let totalFiles = fileParts.count
-        print("DEBUG: Starting large file upload with \(totalFiles) files")
+        VaultLog.debug("DEBUG: Starting large file upload with \(totalFiles) files")
         
         // Extract folder information and file paths  
         var targetFolderId: String? = nil
@@ -1764,7 +1739,7 @@ extension WebServerManager {
                let data = part.data, let folderIdString = String(data: data, encoding: .utf8),
                !folderIdString.isEmpty {
                 targetFolderId = folderIdString.trimmingCharacters(in: .whitespacesAndNewlines)
-                print("DEBUG: Large upload - found folder ID: '\(targetFolderId!)'")
+                VaultLog.debug("DEBUG: Large upload - found folder ID: '\(targetFolderId!)'")
             } else if let fieldName = part.fieldName, fieldName == "filePaths",
                       let data = part.data, let filePath = String(data: data, encoding: .utf8) {
                 filePaths.append(filePath.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -1777,13 +1752,13 @@ extension WebServerManager {
            let folderId = UUID(uuidString: targetFolderId) {
             baseTargetFolder = CoreDataManager.shared.fetchFolder(by: folderId)
             if let folder = baseTargetFolder {
-                print("DEBUG: Large upload - target folder: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
+                VaultLog.debug("DEBUG: Large upload - target folder: \(folder.displayName) (ID: \(folder.id?.uuidString ?? "nil"))")
             } else {
-                print("DEBUG: Large upload - target folder ID \(targetFolderId) not found in database")
+                VaultLog.debug("DEBUG: Large upload - target folder ID \(targetFolderId) not found in database")
             }
         } else {
-            print("DEBUG: Large upload - no target folder specified, uploading to root level")
-            print("DEBUG: Large upload - targetFolderId was: '\(targetFolderId ?? "nil")'")
+            VaultLog.debug("DEBUG: Large upload - no target folder specified, uploading to root level")
+            VaultLog.debug("DEBUG: Large upload - targetFolderId was: '\(targetFolderId ?? "nil")'")
         }
         
         // Start upload progress tracking
@@ -1805,7 +1780,7 @@ extension WebServerManager {
                             folderUploadMode: folderUploadMode
                         )
                     } catch {
-                        print("DEBUG: Error pre-creating folder structure for \(filePath): \(error)")
+                        VaultLog.debug("DEBUG: Error pre-creating folder structure for \(filePath): \(error)")
                         folderStructureMap[filePath] = baseTargetFolder
                     }
                 }
@@ -1828,14 +1803,14 @@ extension WebServerManager {
                     do {
                         // Get the corresponding file path
                         let filePath = filePartIndex < filePaths.count ? filePaths[filePartIndex] : ""
-                        print("DEBUG: Large file - processing \(fileName) with path: '\(filePath)'")
+                        VaultLog.debug("DEBUG: Large file - processing \(fileName) with path: '\(filePath)'")
                         
                         // Use pre-created folder structure to avoid Core Data conflicts
                         let actualTargetFolder = folderStructureMap[filePath] ?? baseTargetFolder
                         
                         // Extract just the filename (without path) for FileStorageManager
                         let actualFileName = URL(fileURLWithPath: fileName).lastPathComponent
-                        print("DEBUG: Large file - extracted filename: \(actualFileName) from full path: \(fileName)")
+                        VaultLog.debug("DEBUG: Large file - extracted filename: \(actualFileName) from full path: \(fileName)")
                         
                         // Determine file type based on extension
                         let fileType = FileStorageManager.shared.determineFileType(from: actualFileName)
@@ -1850,7 +1825,7 @@ extension WebServerManager {
                         
                         uploadedFiles.append(fileName)
                         processedFiles += 1
-                        print("DEBUG: Large file upload success: \(fileName)")
+                        VaultLog.debug("DEBUG: Large file upload success: \(fileName)")
                         
                         filePartIndex += 1
                         
@@ -1865,13 +1840,13 @@ extension WebServerManager {
                         }
                         
                     } catch FileStorageError.duplicateFile {
-                        print("DEBUG: Large file upload - skipped duplicate: \(fileName)")
+                        VaultLog.debug("DEBUG: Large file upload - skipped duplicate: \(fileName)")
                         // Count duplicates as successful uploads
                         uploadedFiles.append(fileName)
                         processedFiles += 1
                         filePartIndex += 1
                     } catch {
-                        print("DEBUG: Error processing large file \(fileName): \(error)")
+                        VaultLog.debug("DEBUG: Error processing large file \(fileName): \(error)")
                         failedFiles.append(fileName)
                         processedFiles += 1
                         filePartIndex += 1
@@ -1887,7 +1862,7 @@ extension WebServerManager {
             uploadedFiles: uploadedFiles.count, 
             failedFiles: failedFiles.count
         )
-        print("DEBUG: Large file upload completed: \(uploadedFiles.count) uploaded, \(failedFiles.count) failed")
+        VaultLog.debug("DEBUG: Large file upload completed: \(uploadedFiles.count) uploaded, \(failedFiles.count) failed")
         
         // End background task when processing is complete
         endBackgroundTask()
@@ -1921,7 +1896,7 @@ extension WebServerManager {
         folderUploadMode: String
     ) throws {
         
-        print("DEBUG: Starting batch upload processing for \(parts.count) parts")
+        VaultLog.debug("DEBUG: Starting batch upload processing for \(parts.count) parts")
         
         // Batch size for Core Data operations - reduced for memory safety
         let batchSize = 10
@@ -1980,21 +1955,21 @@ extension WebServerManager {
                             )
                         }
                         
-                        print("DEBUG: Processed batch of \(batchItems.count) files. Total processed: \(filePartIndex)")
+                        VaultLog.debug("DEBUG: Processed batch of \(batchItems.count) files. Total processed: \(filePartIndex)")
                         
                         // Clear batch for next iteration
                         batchItems.removeAll()
                     }
                     
                 } catch {
-                    print("DEBUG: Error preparing file \(fileName) for batch: \(error)")
+                    VaultLog.debug("DEBUG: Error preparing file \(fileName) for batch: \(error)")
                     failedFiles.append(fileName)
                     filePartIndex += 1
                 }
             }
         }
         
-        print("DEBUG: Batch upload processing completed. Total processed: \(filePartIndex)")
+        VaultLog.debug("DEBUG: Batch upload processing completed. Total processed: \(filePartIndex)")
     }
     
     private func processBatch(
@@ -2031,7 +2006,7 @@ extension WebServerManager {
                     return
                 } catch {
                     failedFiles.append(item.fileName)
-                    print("DEBUG: Error in batch processing file \(item.fileName): \(error)")
+                    VaultLog.debug("DEBUG: Error in batch processing file \(item.fileName): \(error)")
                 }
             }
         }

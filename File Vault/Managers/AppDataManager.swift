@@ -24,13 +24,13 @@ class AppDataManager: AppDataManaging {
     func markAppAsLaunched() {
         UserDefaults.standard.set(true, forKey: hasLaunchedBeforeKey)
         UserDefaults.standard.synchronize()
-        print("DEBUG: App marked as launched before")
+        VaultLog.debug("DEBUG: App marked as launched before")
     }
     
     // MARK: - Complete App Reset
     
     func performFirstLaunchCleanup() {
-        print("DEBUG: 🚀 Performing first launch cleanup - clearing all stored data...")
+        VaultLog.debug("DEBUG: 🚀 Performing first launch cleanup - clearing all stored data...")
         
         // Clear all data types
         clearAllAppData()
@@ -41,11 +41,11 @@ class AppDataManager: AppDataManaging {
         // Mark that we've done the cleanup
         markAppAsLaunched()
         
-        print("DEBUG: ✅ First launch cleanup completed")
+        VaultLog.debug("DEBUG: ✅ First launch cleanup completed")
     }
     
     func clearAllAppData() {
-        print("DEBUG: 🧹 Starting complete app data cleanup...")
+        VaultLog.debug("DEBUG: 🧹 Starting complete app data cleanup...")
         
         // 1. Clear file storage first so vault bytes never outlive the metadata
         FileStorageManager.shared.clearAllStoredFiles()
@@ -65,25 +65,25 @@ class AppDataManager: AppDataManaging {
         // 6. Clear any permission-related cached state (Photos framework doesn't allow programmatic permission reset)
         // The user will be re-prompted for permissions naturally
         
-        print("DEBUG: ✅ Complete app data cleanup finished")
+        VaultLog.debug("DEBUG: ✅ Complete app data cleanup finished")
     }
     
     // MARK: - Default Preferences
     
     private func setDefaultAppPreferences() {
-        print("DEBUG: Setting default app preferences...")
+        VaultLog.debug("DEBUG: Setting default app preferences...")
         
         // Enable trash by default for new installations
         UserDefaults.standard.set(true, forKey: "trashEnabled")
         UserDefaults.standard.synchronize()
         
-        print("DEBUG: ✅ Default preferences set - trash enabled by default")
+        VaultLog.debug("DEBUG: ✅ Default preferences set - trash enabled by default")
     }
     
     // MARK: - Nuclear Option - Complete Reset
     
     func performCompleteAppReset() {
-        print("DEBUG: 💥 Performing COMPLETE app reset - deleting all files and data...")
+        VaultLog.debug("DEBUG: 💥 Performing COMPLETE app reset - deleting all files and data...")
         
         // 1. Delete all storage directories first: removing the Core Data store can tear down
         // live fetches, and vault bytes must not survive that.
@@ -101,13 +101,13 @@ class AppDataManager: AppDataManaging {
         // 5. Reset biometric failure state
         BiometricAuthManager.shared.resetFailureCount()
         
-        print("DEBUG: ✅ Complete app reset finished - app will behave as fresh install")
+        VaultLog.debug("DEBUG: ✅ Complete app reset finished - app will behave as fresh install")
     }
     
     // MARK: - Private Helper Methods
     
     private func clearUserDefaultsExceptLaunchFlag() {
-        print("DEBUG: Clearing UserDefaults data except launch flag...")
+        VaultLog.debug("DEBUG: Clearing UserDefaults data except launch flag...")
         
         // Store the launch flag temporarily
         let hasLaunched = UserDefaults.standard.bool(forKey: hasLaunchedBeforeKey)
@@ -119,11 +119,11 @@ class AppDataManager: AppDataManaging {
         UserDefaults.standard.set(hasLaunched, forKey: hasLaunchedBeforeKey)
         UserDefaults.standard.synchronize()
         
-        print("DEBUG: UserDefaults cleared (launch flag preserved)")
+        VaultLog.debug("DEBUG: UserDefaults cleared (launch flag preserved)")
     }
     
     private func clearAllUserDefaults() {
-        print("DEBUG: Clearing ALL UserDefaults data...")
+        VaultLog.debug("DEBUG: Clearing ALL UserDefaults data...")
         
         // Clear all app-specific UserDefaults
         KeychainManager.shared.clearAllUserDefaultsData()
@@ -132,14 +132,14 @@ class AppDataManager: AppDataManaging {
         UserDefaults.standard.removeObject(forKey: hasLaunchedBeforeKey)
         UserDefaults.standard.synchronize()
         
-        print("DEBUG: All UserDefaults cleared")
+        VaultLog.debug("DEBUG: All UserDefaults cleared")
     }
     
     // MARK: - Development/Testing Helper
     
     #if DEBUG
     func resetAppForTesting() {
-        print("DEBUG: 🧪 Resetting app for testing purposes...")
+        VaultLog.debug("DEBUG: 🧪 Resetting app for testing purposes...")
         performCompleteAppReset()
     }
     #endif

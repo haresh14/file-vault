@@ -15,7 +15,7 @@ The full technical inventory (for OS upgrades and regressions) is in [docs/FEATU
 | Language | Swift 5.0 (Xcode project setting) |
 | Dependencies | None (no SPM / CocoaPods) |
 | Bundle ID | `com.haresh.FileVault` |
-| Version | Marketing **1.0** (About screen shows **1.0.0**) |
+| Version | Marketing **1.0**; About reads the version and build from the bundle |
 
 ## Quick start
 
@@ -24,6 +24,8 @@ The full technical inventory (for OS upgrades and regressions) is in [docs/FEATU
 3. Run (**⌘R**).
 
 Face ID usage text is already set on the target (`NSFaceIDUsageDescription`). Photo library access uses `PHPickerViewController` and does not need `NSPhotoLibraryUsageDescription`.
+
+The app ships a privacy manifest for app-only UserDefaults use, declares non-exempt encryption, disables multi-window and unused background modes, and requests notification permission only when Web Upload starts. Configure `PRIVACY_POLICY_URL` and `SUPPORT_URL` with hosted HTTPS pages before an App Store archive.
 
 New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening the project, signing, and troubleshooting.
 

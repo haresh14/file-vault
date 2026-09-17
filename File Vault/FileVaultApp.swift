@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import BackgroundTasks
 
 @main
 struct FileVaultApp: App {
@@ -63,10 +62,10 @@ private struct FileVaultRootView: View {
             .environment(\.managedObjectContext, dependencies.coreDataManager.context)
             .onAppear {
                 if dependencies.appDataManager.isFirstLaunch {
-                    print("DEBUG: 🚀 First app launch detected - performing cleanup...")
+                    VaultLog.debug("DEBUG: 🚀 First app launch detected - performing cleanup...")
                     dependencies.appDataManager.performFirstLaunchCleanup()
                 } else {
-                    print("DEBUG: ✅ Not first launch - no cleanup needed")
+                    VaultLog.debug("DEBUG: ✅ Not first launch - no cleanup needed")
                 }
                 _ = dependencies.webServerManager
                 // Blanking attaches to the scene's window, so it also covers sheets and previews.

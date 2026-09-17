@@ -20,7 +20,7 @@ Keep File Vault building with the **iOS 27 SDK (Xcode 27)** without changing pro
 | Info.plist | Checked-in `File Vault/Info.plist` |
 | Face ID | `NSFaceIDUsageDescription` = `Use Face ID to unlock your secure vault` |
 | Local network | `NSLocalNetworkUsageDescription` for LAN web upload |
-| Background tasks | `BGTaskSchedulerPermittedIdentifiers` = `com.haresh.FileVault.upload-processing` |
+| Background modes | None declared; LAN uploads use finite foreground-app background time |
 | Launch screen | Explicit `UILaunchScreen` dictionary |
 | Scene manifest | Explicit in Info.plist |
 | Warning dump | [docs/ios27-baseline-warnings.txt](ios27-baseline-warnings.txt) |
@@ -50,7 +50,6 @@ AES-GCM, Keychain, Core Data, PHPicker, `NWListener`, AVPlayer, PDFKit, QuickLoo
 | `PHPickerViewController` | Supported | Keep (no `UIImagePickerController`) |
 | `NWListener` + `includePeerToPeer` | Supported | Keep |
 | Local HTTPS on :8080 | May prompt for local network; browser warns on the self-signed cert | `NSLocalNetworkUsageDescription` |
-| `BGTaskScheduler.register` | Supported | Permitted-identifiers plist |
 | `LAContext` Face ID / Touch ID | `biometryType` can be `.opticID` | Map Optic ID as unavailable; Face ID / Touch ID / vault credential |
 | CryptoKit AES-GCM + CommonCrypto PBKDF2 | Supported | Keep |
 | Keychain `WhenUnlockedThisDeviceOnly` | Supported | Keep |

@@ -58,7 +58,13 @@ struct SettingsView: View {
                     #endif
                 }
                 Section("About") {
-                    LabeledContent("Version", value: "1.0.0")
+                    LabeledContent("Version", value: AppMetadata.versionDisplay)
+                    if let privacyPolicyURL = AppMetadata.privacyPolicyURL {
+                        Link("Privacy Policy", destination: privacyPolicyURL)
+                    }
+                    if let supportURL = AppMetadata.supportURL {
+                        Link("Support", destination: supportURL)
+                    }
                 }
             }
             .navigationTitle("Settings")
@@ -172,7 +178,7 @@ struct SettingsView: View {
             try KeychainManager.shared.deleteFakePassword()
             isFakePasswordSet = false
         } catch {
-            print("Failed to remove fake password after authentication change: \(error)")
+            VaultLog.debug("Failed to remove fake password after authentication change: \(error)")
         }
         showAuthChangeAlert = true
     }
@@ -258,7 +264,7 @@ struct SettingsView: View {
                 do {
                     try FileStorageManager.shared.permanentlyDeleteFile(vaultItem: item)
                 } catch {
-                    print("Error permanently deleting trashed file: \(error)")
+                    VaultLog.debug("Error permanently deleting trashed file: \(error)")
                 }
             }
             CoreDataManager.shared.save()
@@ -267,7 +273,7 @@ struct SettingsView: View {
             loadTrashCount()
             NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
         } catch {
-            print("Error fetching trashed items: \(error)")
+            VaultLog.debug("Error fetching trashed items: \(error)")
         }
     }
 

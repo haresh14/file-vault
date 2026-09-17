@@ -206,7 +206,7 @@ struct ZoomablePhotoView: View {
                 await MainActor.run {
                     self.isLoading = false
                 }
-                print("Error loading image: \(error)")
+                VaultLog.debug("Error loading image: \(error)")
             }
         }
     }

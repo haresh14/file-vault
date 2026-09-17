@@ -183,7 +183,7 @@ struct PasscodeSetupView: View {
                 passcode = ""
                 confirmPasscode = ""
             } catch {
-                print("ERROR: Failed to save fake passcode: \(error)")
+                VaultLog.debug("ERROR: Failed to save fake passcode: \(error)")
                 showError(message: "Failed to save fake passcode")
             }
         } else {
@@ -193,7 +193,7 @@ struct PasscodeSetupView: View {
                 KeychainManager.shared.setAuthenticationType(authType)
                 onPasscodeSet()
             } catch {
-                print("ERROR: Failed to save passcode: \(error)")
+                VaultLog.debug("ERROR: Failed to save passcode: \(error)")
                 showError(message: "Failed to save passcode")
             }
         }
@@ -213,8 +213,8 @@ struct PasscodeSetupView: View {
     NavigationStack {
         PasscodeSetupView(
             authType: .passcode4,
-            onPasscodeSet: { print("Passcode set") },
-            onCancel: { print("Cancelled") }
+            onPasscodeSet: { VaultLog.debug("Passcode set") },
+            onCancel: { VaultLog.debug("Cancelled") }
         )
     }
 } 

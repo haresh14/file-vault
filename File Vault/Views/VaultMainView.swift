@@ -257,7 +257,7 @@ struct VaultMainView: View {
             
             cancelRename()
         } catch {
-            print("Error renaming file: \(error)")
+            VaultLog.debug("Error renaming file: \(error)")
             // Show error to user - for now just cancel
             cancelRename()
         }

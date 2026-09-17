@@ -63,7 +63,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
         do {
             deletedItems = try CoreDataManager.shared.context.fetch(request)
         } catch {
-            print("Error loading deleted items: \(error)")
+            VaultLog.debug("Error loading deleted items: \(error)")
             deletedItems = []
         }
     }
@@ -111,7 +111,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
             do {
                 try FileStorageManager.shared.permanentlyDeleteFile(vaultItem: item)
             } catch {
-                print("Error permanently deleting file: \(error)")
+                VaultLog.debug("Error permanently deleting file: \(error)")
             }
         }
         
@@ -127,7 +127,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
             do {
                 try FileStorageManager.shared.permanentlyDeleteFile(vaultItem: item)
             } catch {
-                print("Error permanently deleting file: \(error)")
+                VaultLog.debug("Error permanently deleting file: \(error)")
             }
         }
         

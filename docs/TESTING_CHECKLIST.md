@@ -26,7 +26,7 @@ Face ID, local network, and launch screen strings are already in `File Vault/Inf
 2. [ ] Category: Favorites, Photos, Videos, Audio, Documents, Other, All Files
 3. [ ] Gallery: grid, search, add content (photos/videos, files, web upload)
 4. [ ] Web Upload: start/stop server, URL, QR; fake login cannot start the server
-5. [ ] Settings: Security, Advanced Security, Trash, disk usage, About `1.0.0`
+5. [ ] Settings: Security, Advanced Security, Trash, disk usage, About version matches the built marketing version and build number
 
 ## Auto-lock
 
@@ -93,6 +93,7 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Web upload
 
+- [ ] Fresh install: launch and unlock do not request notification permission; starting Web Upload requests it once
 - [ ] Start server on port 8080; open the **https** URL from another device on the same Wi‑Fi
 - [ ] Browser warns about the certificate; accept it, then enter the 6-digit pairing code; uploads work after pairing
 - [ ] Downloads stay hidden until Allow Downloads is confirmed with Face ID or the vault credential
@@ -113,6 +114,15 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 - [ ] Complete App Reset → Security Setup on relaunch; `Documents/Vault/` and `Documents/Thumbnails/` are empty
 - [ ] Delete All Files & Folders keeps the credential and empties both storage directories, with trash on and off
+
+## App Store compliance
+
+- [ ] iPad does not offer a second app window
+- [ ] Archive contains `PrivacyInfo.xcprivacy` with UserDefaults reason CA92.1 and no tracking declaration
+- [ ] Archive Info.plist has `ITSAppUsesNonExemptEncryption = YES`
+- [ ] Release run emits no verbose vault request, path, filename, or security-state diagnostics
+- [ ] Set real HTTPS `PRIVACY_POLICY_URL` and `SUPPORT_URL`; both links appear in About and open the hosted pages
+- [ ] App Store Connect export answers, privacy answers, review notes, and URLs match the app and developer guide
 
 ## Automated tests
 

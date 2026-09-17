@@ -188,7 +188,7 @@ struct DocumentQuickLookView: View {
             try fileData.write(to: tempURL)
             temporaryFileURL = tempURL
         } catch {
-            print("Failed to create temporary file: \(error)")
+            VaultLog.debug("Failed to create temporary file: \(error)")
         }
     }
 }
