@@ -5,8 +5,8 @@
   --lime: #8ed14a;
   --mint: #5ee0c0;
   --lock: #3ec4e8;
-  --paper: #f4fbf7;
-  --card: rgba(255, 255, 255, 0.78);
+  --paper: whitesmoke;
+  --card: #fff;
   --line: rgba(10, 61, 77, 0.12);
   --muted: #3d6a78;
   --shadow: 0 24px 60px rgba(10, 111, 140, 0.18);
@@ -29,11 +29,7 @@ body {
   margin: 0;
   font-family: var(--sans);
   color: var(--teal-ink);
-  background:
-    radial-gradient(1200px 600px at 0% 0%, #1aa8c8 0%, transparent 55%),
-    radial-gradient(900px 700px at 100% 10%, #9be15d 0%, transparent 50%),
-    linear-gradient(160deg, #0f8fb0 0%, #4ec9b0 42%, #8fd24e 100%);
-  background-attachment: fixed;
+  background: whitesmoke;
   min-height: 100vh;
   line-height: 1.55;
 }
@@ -97,7 +93,8 @@ nav a {
   font-size: 0.95rem;
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
+  background: #fff;
+  border: 1px solid var(--line);
 }
 
 nav a:hover,
@@ -150,8 +147,9 @@ nav a[aria-current="page"] {
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.55);
+  background: #fff;
   color: var(--teal-ink);
+  border: 1px solid var(--line);
 }
 
 .icon-stage {
@@ -172,7 +170,6 @@ nav a[aria-current="page"] {
 
 .panel {
   background: var(--card);
-  backdrop-filter: blur(16px);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 28px;
