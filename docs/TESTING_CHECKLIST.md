@@ -1,6 +1,6 @@
 # Testing Checklist - Core Features
 
-Use this checklist against a simulator or device. Automated coverage lives in `File VaultTests` (run serially) and `File VaultUITests`.
+Use this checklist against a simulator or device. Automated coverage lives in `KeepshireTests` (run serially) and `KeepshireUITests`.
 
 Home screen shows **Keepshire**. Face ID and local-network prompts use that name. This bundle ID is a fresh vault.
 
@@ -10,7 +10,7 @@ Home screen shows **Keepshire**. Face ID and local-network prompts use that name
 - [ ] App builds (Cmd+B)
 - [ ] App runs on simulator or device (Cmd+R)
 
-Face ID, local network, and launch screen strings are already in `File Vault/Info.plist`.
+Face ID, local network, and launch screen strings are already in `Keepshire/Info.plist`.
 
 ## First launch
 
@@ -74,8 +74,8 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Import a photo: Gallery thumbnail shows; `Documents/Thumbnails/{uuid}.thumb` is not a JPEG on disk
 - [ ] Vault that had plaintext thumbs: first unlock still shows thumbnails (files are rewritten under AES-GCM)
 - [ ] After unlock, Gallery search still matches the original filename
-- [ ] Lock the device, inspect `FileVault.sqlite` (or a Core Data dump): `fileName` / folder `name` are empty; `sealedMetadata` is present
-- [ ] `Documents/Vault`, `Documents/Thumbnails`, and `FileVault.sqlite` have “Do not back up” set
+- [ ] Lock the device, inspect `Keepshire.sqlite` (or a Core Data dump): `fileName` / folder `name` are empty; `sealedMetadata` is present
+- [ ] `Documents/Vault`, `Documents/Thumbnails`, and `Keepshire.sqlite` have “Do not back up” set
 
 ## Files and folders
 
@@ -138,9 +138,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 ## Automated tests
 
 ```sh
-xcodebuild -project "File Vault.xcodeproj" -scheme "File Vault" \
+xcodebuild -project "Keepshire.xcodeproj" -scheme "Keepshire" \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
-  test -only-testing:"File VaultTests" -parallel-testing-enabled NO
+  test -only-testing:"KeepshireTests" -parallel-testing-enabled NO
 ```
 
 - [ ] Unit tests pass serially

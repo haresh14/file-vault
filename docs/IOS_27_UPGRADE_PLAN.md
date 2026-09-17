@@ -17,7 +17,7 @@ Keep Keepshire building with the **iOS 27 SDK (Xcode 27)** without changing prod
 |--------|--------|
 | Deployment target | **iOS 18.5** |
 | Swift language mode | **5.0** |
-| Info.plist | Checked-in `File Vault/Info.plist` |
+| Info.plist | Checked-in `Keepshire/Info.plist` |
 | Face ID | `NSFaceIDUsageDescription` = `Use Face ID to unlock Keepshire` |
 | Local network | `NSLocalNetworkUsageDescription` for LAN web upload |
 | Background modes | None declared; LAN uploads use finite foreground-app background time |

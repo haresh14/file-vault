@@ -10,28 +10,28 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 5. [Understanding the Project Structure](#understanding-the-project-structure)
 6. [Common Xcode Tasks](#common-xcode-tasks)
 
-The home-screen name is Keepshire (`CFBundleDisplayName`). The Xcode project, scheme, and source folder remain `File Vault`. Bundle ID is `com.haresh.keepshire`. That identifier is a new app: vault files and Keychain items from `com.haresh.FileVault` do not migrate.
+The home-screen name is Keepshire (`CFBundleDisplayName`). The Xcode project is `Keepshire.xcodeproj` and the app source folder is `Keepshire`. Bundle ID is `com.haresh.keepshire`. That identifier is a new app: vault files and Keychain items from `com.haresh.FileVault` do not migrate.
 
 ## Opening the Project
 
 1. **Locate the project file**:
    - Open the repository folder
-   - Find `File Vault.xcodeproj`
+   - Find `Keepshire.xcodeproj`
 
 2. **Open in Xcode**:
-   - Double-click on `File Vault.xcodeproj`
+   - Double-click on `Keepshire.xcodeproj`
    - OR right-click and select "Open With" → "Xcode"
    - OR open Xcode first, then File → Open → navigate to the project file
 
 ## Adding Privacy Permissions
 
-Face ID usage is declared in `File Vault/Info.plist` as `NSFaceIDUsageDescription`: `Use Face ID to unlock Keepshire`.
+Face ID usage is declared in `Keepshire/Info.plist` as `NSFaceIDUsageDescription`: `Use Face ID to unlock Keepshire`.
 
 Photo library access uses `PHPickerViewController`. Do not add `NSPhotoLibraryUsageDescription`.
 
 LAN web upload uses `NSLocalNetworkUsageDescription` in the same Info.plist.
 
-`File Vault/PrivacyInfo.xcprivacy` declares the UserDefaults required-reason API with reason CA92.1. It declares no tracking and no collected data because the app has no account, analytics, or remote service. Re-audit the manifest whenever a dependency or required-reason API is added.
+`Keepshire/PrivacyInfo.xcprivacy` declares the UserDefaults required-reason API with reason CA92.1. It declares no tracking and no collected data because the app has no account, analytics, or remote service. Re-audit the manifest whenever a dependency or required-reason API is added.
 
 Notification authorization is requested when the user starts Web Upload. Do not move it back to app launch or unlock.
 
@@ -100,7 +100,7 @@ Support pages must provide a contact method, supported iOS version, troubleshoot
 ### In Xcode Navigator (Left Sidebar)
 
 ```
-File Vault (Blue folder icon) - Main app folder
+Keepshire (Blue folder icon) - Main app folder
 ├── Coordinators/ - Authentication and lock orchestration
 ├── Dependencies/ - Dependency container
 ├── Models/ - Data structures and protocols
@@ -110,11 +110,11 @@ File Vault (Blue folder icon) - Main app folder
 ├── Views/ - UI components
 ├── Assets.xcassets - Images and colors
 ├── ContentView.swift - Main view
-└── FileVaultApp.swift - App entry point
+└── KeepshireApp.swift - App entry point
 
-File Vault.xcodeproj - Project configuration
-File VaultTests/ - Unit tests
-File VaultUITests/ - Launch and navigation smoke tests
+Keepshire.xcodeproj - Project configuration
+KeepshireTests/ - Unit tests
+KeepshireUITests/ - Launch and navigation smoke tests
 ```
 
 Component relationships (auth, tabs, storage, security, web server) are in [COMPONENT_GRAPH.md](COMPONENT_GRAPH.md).
@@ -122,7 +122,7 @@ Component relationships (auth, tabs, storage, security, web server) are in [COMP
 ### Key Files for Beginners
 
 1. **ContentView.swift**: Auth gates and the unlocked tab root
-2. **FileVaultApp.swift**: App entry
+2. **KeepshireApp.swift**: App entry
 3. **Assets.xcassets**: App icons and images
 
 ## Common Xcode Tasks
@@ -133,7 +133,7 @@ Component relationships (auth, tabs, storage, security, web server) are in [COMP
 2. Select "New File..."
 3. Choose "Swift File"
 4. Name your file (e.g., "FileStorageManager")
-5. Make sure "File Vault" target is checked
+5. Make sure "Keepshire" target is checked
 6. Click "Create"
 
 ### Adding Images/Icons
@@ -161,11 +161,11 @@ Component relationships (auth, tabs, storage, security, web server) are in [COMP
 - Keep unit tests serial when diagnosing shared-state failures:
 
   ```sh
-  xcodebuild -project "File Vault.xcodeproj" -scheme "File Vault" \
+  xcodebuild -project "Keepshire.xcodeproj" -scheme "Keepshire" \
     -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
-    test -only-testing:"File VaultTests" -parallel-testing-enabled NO
+    test -only-testing:"KeepshireTests" -parallel-testing-enabled NO
   ```
-- Run `File VaultUITests` on both an iPhone and iPad simulator for authentication, tab, fake-vault, and add-control smoke coverage.
+- Run `KeepshireUITests` on both an iPhone and iPad simulator for authentication, tab, fake-vault, and add-control smoke coverage.
 
 ### Keyboard Shortcuts
 

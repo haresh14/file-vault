@@ -20,11 +20,11 @@ The full technical inventory (for OS upgrades and regressions) is in [docs/FEATU
 | Test bundle IDs | `com.haresh.keepshire.tests`, `com.haresh.keepshire.uitests` |
 | Version | Marketing **1.0**; About reads the version and build from the bundle |
 
-The Xcode project file is still `File Vault.xcodeproj`. This bundle ID is a new app: existing `com.haresh.FileVault` installs do not migrate Keychain or vault files. TestFlight is a fresh vault.
+The Xcode project is `Keepshire.xcodeproj`. This bundle ID is a new app: existing `com.haresh.FileVault` installs do not migrate Keychain or vault files. TestFlight is a fresh vault.
 
 ## Quick start
 
-1. Open `File Vault.xcodeproj` in Xcode.
+1. Open `Keepshire.xcodeproj` in Xcode.
 2. Select a simulator or a signed device.
 3. Run (**⌘R**).
 
@@ -71,13 +71,13 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 - Screen recording overlay
 - Optional shake-to-lock and flip-to-lock
 
-Files in `Documents/Vault/` and `Documents/Thumbnails/` are encrypted with **AES-GCM** and stored as UUID filenames (the gallery still shows the original name). Display names, MIME types, and sizes are sealed JSON in Core Data, decrypted into memory after unlock. The key is **PBKDF2-HMAC-SHA256** of the real credential (random salt in Keychain). Vault directories and `FileVault.sqlite` are excluded from iCloud/computer backup. Credentials and the derivation salt use Keychain `WhenUnlockedThisDeviceOnly`.
+Files in `Documents/Vault/` and `Documents/Thumbnails/` are encrypted with **AES-GCM** and stored as UUID filenames (the gallery still shows the original name). Display names, MIME types, and sizes are sealed JSON in Core Data, decrypted into memory after unlock. The key is **PBKDF2-HMAC-SHA256** of the real credential (random salt in Keychain). Vault directories and `Keepshire.sqlite` are excluded from iCloud/computer backup. Credentials and the derivation salt use Keychain `WhenUnlockedThisDeviceOnly`.
 
 ## App structure
 
 ```
-File Vault/
-├── FileVaultApp.swift          # App entry, first-launch cleanup, background session init
+Keepshire/
+├── KeepshireApp.swift          # App entry, first-launch cleanup, background session init
 ├── ContentView.swift           # Auth gates → MainTabView
 ├── Coordinators/               # Authentication and lock orchestration
 ├── Dependencies/               # DependencyContainer
@@ -88,20 +88,20 @@ File Vault/
 ├── Views/                      # Tabs: Folders, Category, Gallery, Web Upload, Settings
 ├── Utilities/                  # Keychain, sharing, notification names
 docs/FEATURES.md                # Canonical feature catalog
-File VaultTests/                # Unit tests
-File VaultUITests/              # Launch and navigation smoke tests
+KeepshireTests/                # Unit tests
+KeepshireUITests/              # Launch and navigation smoke tests
 ```
 
 Five tabs after unlock: **Folder**, **Category**, **Gallery**, **Web Upload**, **Settings**.
 
 ## Testing
 
-Unit tests: **⌘U** in Xcode (`File VaultTests`). For deterministic command-line runs, disable parallel testing:
+Unit tests: **⌘U** in Xcode (`KeepshireTests`). For deterministic command-line runs, disable parallel testing:
 
 ```sh
-xcodebuild -project "File Vault.xcodeproj" -scheme "File Vault" \
+xcodebuild -project "Keepshire.xcodeproj" -scheme "Keepshire" \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
-  test -only-testing:"File VaultTests" -parallel-testing-enabled NO
+  test -only-testing:"KeepshireTests" -parallel-testing-enabled NO
 ```
 
 Auth smoke test:

@@ -7,7 +7,7 @@ How Keepshire is composed. `FileStorageManager`, `CoreDataManager`, `SecurityMan
 ```mermaid
 flowchart TB
     subgraph App["App"]
-        FileVaultApp
+        KeepshireApp
         ContentView
         AuthCoordinator["AuthenticationCoordinator"]
     end
@@ -49,15 +49,15 @@ flowchart TB
     end
 
     subgraph Persist["Persistence"]
-        SQLite["FileVault.sqlite (sealed metadata JSON)"]
+        SQLite["Keepshire.sqlite (sealed metadata JSON)"]
         VaultDir["Documents/Vault (AES-GCM, UUID names)"]
         Thumbs["Documents/Thumbnails (AES-GCM, {uuid}.thumb)"]
         Keychain["Keychain (credential + PBKDF2 salt)"]
         Defaults["UserDefaults"]
     end
 
-    FileVaultApp --> ContentView
-    FileVaultApp --> DI["DependencyContainer"]
+    KeepshireApp --> ContentView
+    KeepshireApp --> DI["DependencyContainer"]
     ContentView --> AuthCoordinator
     ContentView --> SecurityManager
     ContentView --> MainTabView
@@ -105,7 +105,7 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-    Launch["FileVaultApp"] --> CV["ContentView"]
+    Launch["KeepshireApp"] --> CV["ContentView"]
     CV --> AC["AuthenticationCoordinator"]
 
     AC -->|"auth type not set"| ATS["AuthTypeSelectionView"]
@@ -227,7 +227,7 @@ flowchart TB
     CDM --> Folders["CoreDataManager+Folders"]
     CDM --> BG["CoreDataManager+Background"]
     CDM --> Batch["CoreDataManager+BatchOperations"]
-    CDM --> Model["FileVault.xcdatamodeld"]
+    CDM --> Model["Keepshire.xcdatamodeld"]
 ```
 
 ```mermaid

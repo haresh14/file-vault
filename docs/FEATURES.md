@@ -37,9 +37,9 @@ Keepshire is a **local, encrypted file vault** for iOS. Users store photos, vide
 
 There is **no cloud sync, no App Groups, no widgets, no Share Extension, and no App Intents**. The only network feature is an optional **LAN HTTPS server** for browser upload/download on the same Wi‑Fi.
 
-Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `AuthenticationCoordinator` → `MainTabView`), MVVM view models, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
+Architecture: SwiftUI app (`KeepshireApp` → `ContentView` → `AuthenticationCoordinator` → `MainTabView`), MVVM view models, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
 
-The Xcode project, scheme, and source folder remain `File Vault`; the Core Data model remains `FileVault`. Those are repository names, not the product name. `com.haresh.keepshire` is a different app from any previous `com.haresh.FileVault` install: Keychain and vault files do not migrate.
+The Xcode project is `Keepshire.xcodeproj`, the app source folder is `Keepshire`, and the Core Data model is `Keepshire`. `com.haresh.keepshire` is a different app from any previous `com.haresh.FileVault` install: Keychain and vault files do not migrate.
 
 ### 1.1 App Store Connect listing
 
@@ -62,7 +62,7 @@ These values live in App Store Connect, not in the binary (except the home-scree
 |---------|---------------|--------|
 | `IPHONEOS_DEPLOYMENT_TARGET` | 18.5 | Set on the project, app target, and unit-test target. The UI-test target does not set its own value (inherits the project 18.5). |
 | `SWIFT_VERSION` | 5.0 | Project setting (not “Swift 5.9+”) |
-| `GENERATE_INFOPLIST_FILE` | NO | Checked-in `File Vault/Info.plist` |
+| `GENERATE_INFOPLIST_FILE` | NO | Checked-in `Keepshire/Info.plist` |
 | `CFBundleDisplayName` | Keepshire | Home-screen and SpringBoard name |
 | `NSFaceIDUsageDescription` | `Use Face ID to unlock Keepshire` | Face ID unlock |
 | `NSLocalNetworkUsageDescription` | `Keepshire uses the local network so you can upload files from a browser on the same Wi-Fi.` | LAN web upload |
@@ -107,7 +107,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 |--------------|------------|-------------------|
 | `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
 | `Documents/Thumbnails/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes named `{uuid}.thumb` (200×200 JPEG @ 0.7 before encryption) |
-| `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | Display names, MIME types, and sizes are AES-GCM sealed JSON on each row (`sealedMetadata`). Search uses the decrypted copies in RAM after unlock. The store, `Documents/Vault/`, and `Documents/Thumbnails/` are excluded from iCloud/computer backup. |
+| `Documents/Keepshire.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | Display names, MIME types, and sizes are AES-GCM sealed JSON on each row (`sealedMetadata`). Search uses the decrypted copies in RAM after unlock. The store, `Documents/Vault/`, and `Documents/Thumbnails/` are excluded from iCloud/computer backup. |
 | Keychain items `com.haresh.keepshire` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
 | UserDefaults | Standard suite | Settings, auth type, lock timeout, trash flag, security logs, biometric enabled |
 
@@ -419,7 +419,7 @@ Fake login: **About only**.
 | createdAt, updatedAt, trashedAt | Date |
 | folder | to-one Folder, **nullify** |
 
-Store name: `FileVault`. Class codegen: manual (`Folder+CoreData*`, `VaultItem+CoreData*`).
+Store name: `Keepshire`. Class codegen: manual (`Folder+CoreData*`, `VaultItem+CoreData*`).
 
 ---
 
@@ -468,8 +468,8 @@ These are confirmed absences. Do not treat them as regressions unless product ad
 
 | Target | Coverage (current files) |
 |--------|---------------------------|
-| File VaultTests | Keychain (including derivation record), Core Data, storage/crypto/thumbnails/trash, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
-| File VaultUITests | First-launch authentication, tab/navigation, fake-vault restrictions, add controls, and launch smoke tests |
+| KeepshireTests | Keychain (including derivation record), Core Data, storage/crypto/thumbnails/trash, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
+| KeepshireUITests | First-launch authentication, tab/navigation, fake-vault restrictions, add controls, and launch smoke tests |
 
 Upgrade work should run unit tests on the new SDK simulator and a smoke pass of UI tests. Tests are not a substitute for the checklist below.
 
@@ -540,7 +540,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 Recorded so upgrades do not “fix” the wrong thing:
 
-1. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
+1. `KeepshireApp` notes that background URLSession events are not handled via `AppDelegate`.
 2. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
 3. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
 
