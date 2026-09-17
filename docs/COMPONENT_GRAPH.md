@@ -271,6 +271,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     UI["WebUploadTabView / WebUploadView"] --> WSM["WebServerManager"]
+    WSM --> Access["WebAccessControl"]
     WSM --> Infra["WebServerInfrastructure"]
     WSM --> HTML["WebServerHTMLGenerator"]
     HTML --> Chunks["WebServerHTMLComponents"]

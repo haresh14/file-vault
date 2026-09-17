@@ -112,11 +112,13 @@ protocol WebServerManaging: ObservableObject {
     var isRunning: Bool { get }
     var serverURL: String { get }
     var connectedDevices: [String] { get }
-    var isDownloadEnabled: Bool { get set }
-    
+    var pairingCode: String { get }
+    var exportSessionExpiresAt: Date? { get }
+
     func startServer()
     func stopServer()
-    func setDownloadEnabled(_ enabled: Bool)
+    func beginExportSession(duration: TimeInterval)
+    func endExportSession()
 }
 
 protocol AppDataManaging {

@@ -7,6 +7,7 @@ struct WebUploadTabView: View {
     @StateObject private var loginStateManager = LoginStateManager.shared
     @State private var showQRCode = false
     @State private var showInstructions = false
+    @State private var showExportUnlock = false
 
     var body: some View {
         NavigationStack {
@@ -26,7 +27,12 @@ struct WebUploadTabView: View {
                         showInstructions: { showInstructions = true }
                     )
                     if webServer.isRunning {
-                        WebUploadDownloadSettings(isEnabled: downloadEnabledBinding)
+                        WebUploadPairingCard(code: webServer.pairingCode)
+                        WebUploadExportSessionCard(
+                            expiresAt: webServer.exportSessionExpiresAt,
+                            startSession: { showExportUnlock = true },
+                            endSession: webServer.endExportSession
+                        )
                         WebUploadInstructionsCard()
                     }
                     WebUploadSecurityNotice()
@@ -43,13 +49,9 @@ struct WebUploadTabView: View {
         .sheet(isPresented: $showInstructions) {
             InstructionsView()
         }
-    }
-
-    private var downloadEnabledBinding: Binding<Bool> {
-        Binding(
-            get: { webServer.isDownloadEnabled },
-            set: { webServer.setDownloadEnabled($0) }
-        )
+        .sheet(isPresented: $showExportUnlock) {
+            WebExportUnlockSheet { webServer.beginExportSession() }
+        }
     }
 
     private func toggleServer() {

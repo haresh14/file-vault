@@ -58,7 +58,11 @@ extension WebServerManager {
         WebHTMLRowBuilder.formattedFileSize(size)
     }
     
-    func generateUploadHTML(currentFolderId: String? = nil, downloadEnabled: Bool = false) -> String {
+    func generateUploadHTML(
+        currentFolderId: String? = nil,
+        downloadEnabled: Bool = false,
+        sessionToken: String = ""
+    ) -> String {
         let (folders, files) = getFolderContents(folderId: currentFolderId)
         let breadcrumbs = generateBreadcrumbs(folderId: currentFolderId)
         
@@ -827,6 +831,7 @@ extension WebServerManager {
                                     <span>Select All</span>
                                 </label>
                                 <button class="action-button delete-selected-btn" onclick="deleteSelectedItems()" id="deleteSelectedBtn" style="display: none;">🗑️ Delete Selected</button>
+                                <button class="action-button" onclick="downloadSelectedItems()" id="downloadSelectedBtn" style="display: none;">📥 Download Selected</button>
                             </div>
                             <div class="action-buttons">
                                 <button class="action-button new-folder-btn" onclick="showNewFolderDialog()">📁 New Folder</button>
@@ -983,6 +988,26 @@ extension WebServerManager {
                 
                 let files = [];
                 let currentFolderId = '\(currentFolderId?.replacingOccurrences(of: "'", with: "\\'") ?? "")';
+                const VAULT_TOKEN = '\(WebHTMLEscaping.javaScriptSingleQuotedAttribute(sessionToken))';
+                const DOWNLOADS_ON = \(downloadEnabled);
+
+                function authHeaders(extra) {
+                    return Object.assign({ 'X-Vault-Token': VAULT_TOKEN }, extra || {});
+                }
+
+                // The phone can open or close the export window at any time; pick it up
+                // without making the user reload by hand.
+                setInterval(function() {
+                    fetch('/api/session', { headers: authHeaders() })
+                        .then(response => response.json())
+                        .then(state => {
+                            const busy = uploadDialog && uploadDialog.style.display === 'flex';
+                            if (!busy && state.exportActive !== DOWNLOADS_ON) {
+                                window.location.reload();
+                            }
+                        })
+                        .catch(() => {});
+                }, 4000);
                 
                 console.log('DEBUG: ====== INITIAL FOLDER ID SETUP ======');
                 console.log('DEBUG: currentFolderId set to:', `"${currentFolderId}"`);
@@ -1400,7 +1425,8 @@ extension WebServerManager {
                         
                         // Set up request
                         xhr.open('POST', '/upload/stream', true);
-                        
+                        xhr.setRequestHeader('X-Vault-Token', VAULT_TOKEN);
+
                         // Add headers
                         Object.keys(headers).forEach(key => {
                             xhr.setRequestHeader(key, headers[key]);
@@ -1672,7 +1698,8 @@ extension WebServerManager {
                         });
                         
                         xhr.open('POST', '/upload', true);
-                        
+                        xhr.setRequestHeader('X-Vault-Token', VAULT_TOKEN);
+
                         // No timeout for large file uploads
                         // xhr.timeout = 0; // No timeout
                         
@@ -1766,9 +1793,7 @@ extension WebServerManager {
                     
                     fetch('/api/folder/create', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify(data)
                     })
                     .then(response => response.json())
@@ -1820,9 +1845,7 @@ extension WebServerManager {
                     
                     fetch('/api/folder/rename', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify(data)
                     })
                     .then(response => response.json())
@@ -1856,11 +1879,14 @@ extension WebServerManager {
                     const checkboxes = document.querySelectorAll('.item-select');
                     const selectedCheckboxes = document.querySelectorAll('.item-select:checked');
                     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+                    const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
                     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
                     
-                    // Update delete button visibility
                     const hasSelections = selectedCheckboxes.length > 0;
                     deleteSelectedBtn.style.display = hasSelections ? 'inline-block' : 'none';
+                    if (downloadSelectedBtn) {
+                        downloadSelectedBtn.style.display = (DOWNLOADS_ON && hasSelections) ? 'inline-block' : 'none';
+                    }
                     
                     // Update select all checkbox
                     if (selectedCheckboxes.length === checkboxes.length && checkboxes.length > 0) {
@@ -2009,9 +2035,7 @@ extension WebServerManager {
                     
                     return fetch('/api/folder/delete', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify(data)
                     })
                     .then(response => response.json());
@@ -2024,9 +2048,7 @@ extension WebServerManager {
                     
                     return fetch('/api/file/delete', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify(data)
                     })
                     .then(response => response.json());
@@ -2039,23 +2061,66 @@ extension WebServerManager {
                     
                     return fetch('/api/bulk/delete', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify(data)
                     })
                     .then(response => response.json());
                 }
                 
-                // Download Functions
-                function downloadFile(fileId) {
-                    const downloadUrl = `/download/file/${fileId}`;
-                    window.open(downloadUrl, '_blank');
+                // Download Functions: ask for a single-use link, then follow it once.
+                function followDownload(url) {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.rel = 'noopener';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
                 }
-                
+
+                function requestDownload(payload) {
+                    return fetch('/api/download/ticket', {
+                        method: 'POST',
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
+                        body: JSON.stringify(payload)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success && result.url) {
+                            followDownload(result.url);
+                            return;
+                        }
+                        throw new Error(result.message || 'Download unavailable');
+                    });
+                }
+
+                function downloadFile(fileId) {
+                    requestDownload({ type: 'file', id: fileId }).catch(error => alert('Download failed: ' + error.message));
+                }
+
                 function downloadFolder(folderId) {
-                    const downloadUrl = `/download/folder/${folderId}`;
-                    window.open(downloadUrl, '_blank');
+                    requestDownload({ type: 'folder', id: folderId }).catch(error => alert('Download failed: ' + error.message));
+                }
+
+                // One archive for the whole selection: browsers block a burst of separate downloads.
+                function downloadSelectedItems() {
+                    const items = getSelectedItems();
+                    if (!items.length) { return; }
+
+                    const button = document.getElementById('downloadSelectedBtn');
+                    const label = button ? button.textContent : null;
+                    if (button) {
+                        button.disabled = true;
+                        button.textContent = '📦 Preparing ZIP...';
+                    }
+
+                    requestDownload({ items: items.map(item => ({ type: item.type, id: item.id })) })
+                        .catch(error => alert('Download failed: ' + error.message))
+                        .then(() => {
+                            if (button) {
+                                button.disabled = false;
+                                button.textContent = label;
+                            }
+                        });
                 }
                 
                 // Handle Enter key for dialogs

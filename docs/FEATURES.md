@@ -301,7 +301,8 @@ Playback decrypts to a temporary file; original vault file stays encrypted.
 | W2 | Copy URL | Clipboard + light haptic | UIPasteboard |
 | W3 | QR code | QR of server URL | Core Image `CIQRCodeGenerator` |
 | W4 | Help / instructions | Same-WiFi upload steps | SwiftUI sheet |
-| W5 | Download toggle | Off by default (`webServerDownloadEnabled`); only while server running | UserDefaults |
+| W5 | Pairing | 6-digit code shown in the app; browser posts it to `/pair` (5 attempts) for a session cookie | `WebAccessControl` |
+| W5b | Export session | Downloads stay off until Face ID / Touch ID or the vault credential unlocks a 10-minute window; ends on background or Stop Downloads | LocalAuthentication, Keychain |
 | W6 | Browser UI | Folder browse, breadcrumbs, upload, manage when not fake login | `WebServerHTMLGenerator`, `WebServerHTMLComponents` |
 | W7 | Block fake login | UI disabled; HTTP 403 | — |
 | W8 | Background keep-alive | `UIBackgroundTask` named `WebServerUpload` while uploads in flight | UIKit background task |
@@ -310,12 +311,14 @@ Playback decrypts to a temporary file; original vault file stays encrypted.
 | W11 | Large uploads | `POST /upload` with Content-Length **> 100MB** (`100 * 1024 * 1024`) switches to `handleLargeFileUpload`. Browser can also `POST /upload/stream` | custom HTTP |
 | W12 | Gallery web-upload sheet | Same server controls as the tab, presented from Gallery Add Content | `WebUploadView` |
 
-HTTP routes:
+HTTP routes. Every route except `POST /pair` requires the session token (header `X-Vault-Token`, session cookie on GET, or `?token=` on GET). Fake login returns 403 on every route.
 
 | Method | Path | Purpose |
 |--------|------|---------|
+| POST | `/pair` | Exchange pairing code for session cookie (public; attempt-capped) |
 | GET | `/`, `/upload` | Upload HTML |
 | GET | `/test`, `/status` | Diagnostics |
+| GET | `/api/session` | Whether an export session is active |
 | POST | `/upload` | Multipart upload |
 | POST | `/upload/stream` | Streaming upload |
 | POST | `/api/folder/create` | Create folder |
@@ -323,10 +326,10 @@ HTTP routes:
 | POST | `/api/folder/delete` | Delete folder |
 | POST | `/api/file/delete` | Delete file |
 | POST | `/api/bulk/delete` | Bulk delete |
-| GET | `/download/file/{id}` | File download (if enabled) |
-| GET | `/download/folder/{id}` | Folder ZIP download (if enabled) |
+| POST | `/api/download/ticket` | Issue a one-shot download ticket for one file, one folder, or a selection (export session required) |
+| GET | `/download/t/{ticket}` | Redeem ticket (single use, client-bound, 60s) |
 
-Security notice in UI: local network only; files encrypted after arrival.
+Security notice in UI: local network only; files encrypted after arrival. Downloads use single-use tickets while an export session is open. Download Selected sends the whole selection on one ticket and returns a single `File Vault Selection.zip`. Folder and selection ZIPs stage files with complete file protection and delete the staging directory afterward.
 
 ### 4.12 Notifications and haptics
 
@@ -504,7 +507,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 **Build**
 
 - [ ] Warn-as-known: deprecations listed in [IOS_27_UPGRADE_PLAN.md](IOS_27_UPGRADE_PLAN.md) only
-- [ ] No new unprotected network endpoints (LAN server remains opt-in and local)
+- [ ] No new unprotected network endpoints (LAN server is opt-in; `POST /pair` is the only public route and is attempt-capped)
 
 ---
 

@@ -9,23 +9,31 @@ struct WebServerManagerTests {
         @Published var isRunning = false
         @Published var serverURL = ""
         @Published var connectedDevices: [String] = []
-        @Published var isDownloadEnabled = false
+        @Published var pairingCode = ""
+        @Published var exportSessionExpiresAt: Date?
 
         func startServer() {
             guard !isRunning else { return }
             isRunning = true
             serverURL = "http://127.0.0.1:8080"
+            pairingCode = "123456"
         }
 
         func stopServer() {
             isRunning = false
             serverURL = ""
+            pairingCode = ""
+            exportSessionExpiresAt = nil
             connectedDevices = []
         }
 
-        func setDownloadEnabled(_ enabled: Bool) {
-            isDownloadEnabled = enabled
-    }
+        func beginExportSession(duration: TimeInterval) {
+            exportSessionExpiresAt = Date().addingTimeInterval(duration)
+        }
+
+        func endExportSession() {
+            exportSessionExpiresAt = nil
+        }
     }
 
     @Test func testWebServerManagerSingleton() {
@@ -59,14 +67,14 @@ struct WebServerManagerTests {
         #expect(!manager.isRunning)
         }
 
-    @Test func testInjectedDownloadSetting() {
+    @Test func testInjectedExportSession() {
         let manager = FakeWebServerManager()
 
-        manager.setDownloadEnabled(true)
-        #expect(manager.isDownloadEnabled)
-        manager.setDownloadEnabled(false)
-        #expect(!manager.isDownloadEnabled)
-        }
+        manager.beginExportSession(duration: 600)
+        #expect(manager.exportSessionExpiresAt != nil)
+        manager.endExportSession()
+        #expect(manager.exportSessionExpiresAt == nil)
+    }
 
     @Test func testTestingContainerUsesInjectedWebServer() {
         let manager = FakeWebServerManager()
@@ -78,7 +86,8 @@ struct WebServerManagerTests {
     @Test func testHTTPStatusText() {
         #expect(HTTPStatusText.text(for: 200) == "OK")
         #expect(HTTPStatusText.text(for: 400) == "Bad Request")
-        #expect(HTTPStatusText.text(for: 403) == "Unknown")
+        #expect(HTTPStatusText.text(for: 401) == "Unauthorized")
+        #expect(HTTPStatusText.text(for: 403) == "Forbidden")
         #expect(HTTPStatusText.text(for: 404) == "Not Found")
         #expect(HTTPStatusText.text(for: 500) == "Internal Server Error")
     }
@@ -141,8 +150,10 @@ struct WebServerManagerTests {
             ("POST /api/folder/delete HTTP/1.1\r\n\r\n", .deleteFolder),
             ("POST /api/file/delete HTTP/1.1\r\n\r\n", .deleteFile),
             ("POST /api/bulk/delete HTTP/1.1\r\n\r\n", .bulkDelete),
-            ("GET /download/file/123 HTTP/1.1\r\n\r\n", .fileDownload),
-            ("GET /download/folder/123 HTTP/1.1\r\n\r\n", .folderDownload),
+            ("POST /api/download/ticket HTTP/1.1\r\n\r\n", .issueDownloadTicket),
+            ("GET /download/t/abc123 HTTP/1.1\r\n\r\n", .ticketDownload),
+            ("POST /pair HTTP/1.1\r\n\r\n", .pair),
+            ("GET /api/session HTTP/1.1\r\n\r\n", .sessionState),
             ("GET /status HTTP/1.1\r\n\r\n", .status),
             ("GET /missing HTTP/1.1\r\n\r\n", .notFound)
         ]
@@ -224,11 +235,173 @@ struct WebServerManagerTests {
     }
 
     @Test func testDownloadPathResolution() {
-        let id = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
-        #expect(WebDownloadPathResolver.fileID(from: "/download/file/\(id.uuidString)") == id)
-        #expect(WebDownloadPathResolver.folderID(from: "/download/folder/\(id.uuidString)") == id)
-        #expect(WebDownloadPathResolver.fileID(from: "/download/file/../../etc/passwd") == nil)
-        #expect(WebDownloadPathResolver.folderID(from: "/download/folder/not-a-uuid") == nil)
+        #expect(WebDownloadPathResolver.ticket(from: "/download/t/abc123") == "abc123")
+        #expect(WebDownloadPathResolver.ticket(from: "/download/t/abc123?x=1") == "abc123")
+        #expect(WebDownloadPathResolver.ticket(from: "/download/t/") == nil)
+        #expect(WebDownloadPathResolver.ticket(from: "/download/t/a/b") == nil)
+        #expect(WebDownloadPathResolver.ticket(from: "/download/file/123") == nil)
+    }
+
+    // MARK: - Access control
+
+    private func request(_ wire: String) -> WebHTTPRequest {
+        WebHTTPRequest.parse(Data(wire.utf8))!
+    }
+
+    @Test func testEveryRouteRejectsRequestsWithoutTheSessionToken() {
+        let control = WebAccessControl()
+        control.rotateToken()
+
+        let unauthenticated: [(String, WebRequestRoute)] = [
+            ("GET / HTTP/1.1\r\n\r\n", .uploadPage),
+            ("POST /upload HTTP/1.1\r\n\r\n", .upload),
+            ("POST /api/file/delete HTTP/1.1\r\n\r\n", .deleteFile),
+            ("POST /api/bulk/delete HTTP/1.1\r\n\r\n", .bulkDelete),
+            ("POST /api/download/ticket HTTP/1.1\r\n\r\n", .issueDownloadTicket),
+            ("GET /download/t/abc HTTP/1.1\r\n\r\n", .ticketDownload),
+            ("GET /api/session HTTP/1.1\r\n\r\n", .sessionState),
+            ("GET /status HTTP/1.1\r\n\r\n", .status)
+        ]
+
+        for (wire, route) in unauthenticated {
+            #expect(control.authorize(request(wire), route: route) == .unauthorized)
+        }
+        // Pairing is the one public route, so a browser can exchange the code for a session.
+        #expect(control.authorize(request("POST /pair HTTP/1.1\r\n\r\n"), route: .pair) == .allow)
+    }
+
+    @Test func testTokenIsAcceptedFromHeaderCookieAndLink() {
+        let control = WebAccessControl()
+        let token = control.rotateToken()
+
+        #expect(control.authorize(
+            request("POST /upload HTTP/1.1\r\nX-Vault-Token: \(token)\r\n\r\n"),
+            route: .upload
+        ) == .allow)
+        #expect(control.authorize(
+            request("GET / HTTP/1.1\r\nCookie: fv_session=\(token)\r\n\r\n"),
+            route: .uploadPage
+        ) == .allow)
+        #expect(control.authorize(
+            request("GET /?token=\(token) HTTP/1.1\r\n\r\n"),
+            route: .uploadPage
+        ) == .allow)
+
+        // A cookie alone cannot drive a write, which keeps another site from forging one.
+        #expect(control.authorize(
+            request("POST /api/bulk/delete HTTP/1.1\r\nCookie: fv_session=\(token)\r\n\r\n"),
+            route: .bulkDelete
+        ) == .unauthorized)
+    }
+
+    @Test func testRotatingTheTokenInvalidatesOldSessions() {
+        let control = WebAccessControl()
+        let first = control.rotateToken()
+        control.rotateToken()
+
+        #expect(control.authorize(
+            request("POST /upload HTTP/1.1\r\nX-Vault-Token: \(first)\r\n\r\n"),
+            route: .upload
+        ) == .unauthorized)
+    }
+
+    @Test func testPairingCodeIsSingleUseAndLocksAfterFiveWrongGuesses() {
+        let control = WebAccessControl()
+        let token = control.rotateToken()
+        let code = control.pairingCode!
+
+        let wrongGuess = code == "000000" ? "111111" : "000000"
+        for _ in 0..<WebAccessControl.maxPairingAttempts {
+            #expect(control.redeemPairingCode(wrongGuess) == nil)
+        }
+        #expect(control.isPairingLocked)
+        #expect(control.redeemPairingCode(code) == nil)
+
+        control.rotateToken()
+        #expect(!control.isPairingLocked)
+        #expect(control.redeemPairingCode(control.pairingCode!) != nil)
+        #expect(control.redeemPairingCode(control.pairingCode!) != token)
+    }
+
+    @Test func testDownloadsRequireAnActiveExportSession() {
+        let control = WebAccessControl()
+        let token = control.rotateToken()
+        let ticketRequest = request("POST /api/download/ticket HTTP/1.1\r\nX-Vault-Token: \(token)\r\n\r\n")
+
+        #expect(control.authorize(ticketRequest, route: .issueDownloadTicket) == .exportSessionRequired)
+        #expect(control.issueTicket(for: .file(UUID()), client: "192.168.1.5") == nil)
+
+        control.beginExportSession(duration: 600)
+        #expect(control.authorize(ticketRequest, route: .issueDownloadTicket) == .allow)
+
+        control.endExportSession()
+        #expect(control.authorize(ticketRequest, route: .issueDownloadTicket) == .exportSessionRequired)
+    }
+
+    @Test func testExportSessionExpiresOnItsOwn() {
+        let control = WebAccessControl()
+        control.rotateToken()
+        let start = Date()
+        control.beginExportSession(now: start, duration: 600)
+
+        #expect(control.isExportSessionActive(now: start.addingTimeInterval(599)))
+        #expect(!control.isExportSessionActive(now: start.addingTimeInterval(601)))
+        #expect(control.exportSessionExpiry(now: start.addingTimeInterval(601)) == nil)
+    }
+
+    @Test func testDownloadTicketIsSingleUseAndBoundToOneDevice() {
+        let control = WebAccessControl()
+        control.rotateToken()
+        control.beginExportSession(duration: 600)
+        let fileID = UUID()
+
+        let ticket = control.issueTicket(for: .file(fileID), client: "192.168.1.5")!
+        #expect(control.redeemTicket(ticket, client: "192.168.1.9") == nil, "another device must not redeem it")
+        #expect(control.redeemTicket(ticket, client: "192.168.1.5") == .file(fileID))
+        #expect(control.redeemTicket(ticket, client: "192.168.1.5") == nil, "a ticket works only once")
+    }
+
+    @Test func testSelectionTicketCarriesEveryPickedItem() {
+        let control = WebAccessControl()
+        control.rotateToken()
+        control.beginExportSession(duration: 600)
+        let files = [UUID(), UUID(), UUID()]
+        let folders = [UUID()]
+
+        let ticket = control.issueTicket(for: .selection(files: files, folders: folders), client: "client")!
+        #expect(control.redeemTicket(ticket, client: "client") == .selection(files: files, folders: folders))
+    }
+
+    @Test func testDownloadTicketExpiresAndDiesWithTheExportSession() {
+        let control = WebAccessControl()
+        control.rotateToken()
+        let start = Date()
+        control.beginExportSession(now: start, duration: 600)
+
+        let stale = control.issueTicket(for: .folder(UUID()), client: "client", now: start)!
+        #expect(control.redeemTicket(stale, client: "client", now: start.addingTimeInterval(61)) == nil)
+
+        let live = control.issueTicket(for: .folder(UUID()), client: "client", now: start)!
+        control.endExportSession()
+        #expect(control.redeemTicket(live, client: "client", now: start) == nil)
+    }
+
+    @Test func testPairingResponseSetsASessionCookie() {
+        let response = WebHTTPResponse.text(
+            statusCode: 200,
+            body: "ok",
+            extraHeaders: ["Set-Cookie": "fv_session=abc; Path=/; SameSite=Strict; HttpOnly"]
+        )
+        let wire = String(decoding: response.serializedData, as: UTF8.self)
+
+        #expect(wire.contains("Set-Cookie: fv_session=abc; Path=/; SameSite=Strict; HttpOnly\r\n"))
+        #expect(wire.hasSuffix("\r\n\r\nok"))
+    }
+
+    @Test func testFormDecodingReadsThePairingCode() {
+        #expect(WebFormDecoder.value(named: "code", in: Data("code=123456".utf8)) == "123456")
+        #expect(WebFormDecoder.value(named: "code", in: Data("other=1&code=99+88".utf8)) == "99 88")
+        #expect(WebFormDecoder.value(named: "code", in: Data("nothing=1".utf8)) == nil)
     }
 
     @Test func testPureHTMLRowsEscapeUntrustedValuesAndToggleDownloads() {
@@ -253,6 +426,7 @@ struct WebServerManagerTests {
         #expect(enabledFolder.contains("downloadFolder('folder-id')"))
         #expect(!disabledFile.contains("downloadFile("))
         #expect(enabledFile.contains("downloadFile('file-id')"))
+        #expect(!enabledFolder.contains("<script>alert"))
         #expect(!enabledFolder.contains("<script>alert"))
         #expect(enabledFolder.contains("&lt;script&gt;alert"))
         #expect(enabledFile.contains("a\\'b&lt;&amp;&quot;.pdf"))

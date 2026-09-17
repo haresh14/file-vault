@@ -13,18 +13,22 @@ struct WebHTTPResponse: Equatable {
     static func text(
         statusCode: Int,
         contentType: String = "text/html; charset=utf-8",
-        body: String
+        body: String,
+        extraHeaders: [String: String] = [:]
     ) -> WebHTTPResponse {
         let bodyData = Data(body.utf8)
+        let additional = extraHeaders
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key): \($0.value)\r\n" }
+            .joined()
         let header = """
         HTTP/1.1 \(statusCode) \(HTTPStatusText.text(for: statusCode))\r
         Content-Type: \(contentType)\r
         Content-Length: \(bodyData.count)\r
         Connection: close\r
         Cache-Control: no-cache\r
-        \r
 
-        """
+        """ + additional + "\r\n"
         return WebHTTPResponse(headerData: Data(header.utf8), bodyData: bodyData)
     }
 
@@ -49,6 +53,8 @@ struct HTTPStatusText {
         switch code {
         case 200: return "OK"
         case 400: return "Bad Request"
+        case 401: return "Unauthorized"
+        case 403: return "Forbidden"
         case 404: return "Not Found"
         case 500: return "Internal Server Error"
         default: return "Unknown"
@@ -163,20 +169,29 @@ enum WebRequestRoute: Equatable {
     case deleteFolder
     case deleteFile
     case bulkDelete
-    case fileDownload
-    case folderDownload
+    case issueDownloadTicket
+    case ticketDownload
+    case pair
+    case sessionState
     case status
     case fakeLoginForbidden
     case notFound
 }
 
 enum WebRequestRouter {
-    // Intentionally public on the user-started LAN listener: the browser upload UI has no
-    // account/session credential. Fake-login mode blocks every route, and vault downloads
-    // remain separately opt-in through the persisted download toggle.
     static let fakeLoginResponse = WebHTTPResponse.text(
         statusCode: 403,
         body: "<html><body><h2>Access disabled</h2><p>Web access is disabled in fake login mode.</p></body></html>"
+    )
+
+    static let unauthorizedResponse = WebHTTPResponse.text(
+        statusCode: 401,
+        body: "<html><body><h2>Not authorized</h2><p>Open the address shown in File Vault on your iPhone. The link carries a one-time session code that expires when the server stops.</p></body></html>"
+    )
+
+    static let exportSessionResponse = WebHTTPResponse.text(
+        statusCode: 403,
+        body: "<html><body><h2>Downloads are off</h2><p>Start an export session in File Vault on your iPhone to download files.</p></body></html>"
     )
 
     static func route(_ request: WebHTTPRequest, fakeLoginActive: Bool = false) -> WebRequestRoute {
@@ -184,7 +199,8 @@ enum WebRequestRouter {
             return .fakeLoginForbidden
         }
 
-        switch (request.method, request.path) {
+        let path = request.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? request.path
+        switch (request.method, path) {
         case ("GET", "/"): return .uploadPage
         case ("GET", let path) where path.hasPrefix("/upload"): return .uploadPage
         case ("GET", "/test"): return .testPage
@@ -195,8 +211,12 @@ enum WebRequestRouter {
         case ("POST", "/api/folder/delete"): return .deleteFolder
         case ("POST", "/api/file/delete"): return .deleteFile
         case ("POST", "/api/bulk/delete"): return .bulkDelete
-        case ("GET", let path) where path.hasPrefix("/download/file/"): return .fileDownload
-        case ("GET", let path) where path.hasPrefix("/download/folder/"): return .folderDownload
+        case ("POST", "/api/download/ticket"): return .issueDownloadTicket
+        // Public by design: exchanges the short code shown in the app for a session token.
+        // Attempts are capped in WebAccessControl and the code dies with the server.
+        case ("POST", "/pair"): return .pair
+        case ("GET", let path) where path.hasPrefix("/download/t/"): return .ticketDownload
+        case ("GET", "/api/session"): return .sessionState
         case ("GET", "/status"): return .status
         default: return .notFound
         }
@@ -305,23 +325,71 @@ enum WebUploadPathResolver {
     }
 }
 
+enum WebFormDecoder {
+    /// Reads a field out of an `application/x-www-form-urlencoded` body.
+    static func value(named name: String, in body: Data) -> String? {
+        guard let string = String(data: body, encoding: .utf8) else { return nil }
+        for pair in string.split(separator: "&") {
+            let parts = pair.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2, parts[0] == Substring(name) else { continue }
+            let value = parts[1].replacingOccurrences(of: "+", with: " ")
+            return value.removingPercentEncoding ?? value
+        }
+        return nil
+    }
+}
+
+enum WebPairingPage {
+    static func html(message: String?) -> String {
+        let notice = message.map {
+            "<p class=\"notice\">\(WebHTMLEscaping.text($0))</p>"
+        } ?? ""
+        return """
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>File Vault</title>
+        <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #111; color: #f5f5f7; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #1c1c1e; padding: 32px; border-radius: 16px; width: 320px; text-align: center; }
+        h1 { font-size: 20px; margin: 0 0 8px; }
+        p { color: #98989d; font-size: 14px; line-height: 1.4; }
+        .notice { color: #ff453a; }
+        input { width: 100%; box-sizing: border-box; font-size: 28px; letter-spacing: 8px; text-align: center; padding: 12px; margin: 16px 0; border-radius: 10px; border: 1px solid #3a3a3c; background: #2c2c2e; color: #fff; }
+        button { width: 100%; padding: 14px; border: 0; border-radius: 10px; background: #0a84ff; color: #fff; font-size: 16px; }
+        </style></head>
+        <body><div class="card">
+        <h1>Enter pairing code</h1>
+        <p>Open File Vault on your iPhone and type the 6-digit code shown under Web Upload.</p>
+        \(notice)
+        <form method="POST" action="/pair">
+        <input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus>
+        <button type="submit">Connect</button>
+        </form>
+        </div></body></html>
+        """
+    }
+
+    static func successHTML() -> String {
+        """
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=/"></head>
+        <body>Connected. <a href="/">Continue</a></body></html>
+        """
+    }
+}
+
 enum WebDownloadPathResolver {
-    static func fileID(from path: String) -> UUID? {
-        identifier(from: path, expectedKind: "file")
-    }
-
-    static func folderID(from path: String) -> UUID? {
-        identifier(from: path, expectedKind: "folder")
-    }
-
-    private static func identifier(from path: String, expectedKind: String) -> UUID? {
-        let components = path.split(separator: "/", omittingEmptySubsequences: false)
+    /// Reads the one-shot ticket out of `/download/t/<ticket>`.
+    static func ticket(from path: String) -> String? {
+        let withoutQuery = path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
+        let components = withoutQuery.split(separator: "/", omittingEmptySubsequences: false)
         guard components.count == 4,
               components[0].isEmpty,
               components[1] == "download",
-              components[2] == Substring(expectedKind) else {
+              components[2] == "t",
+              !components[3].isEmpty else {
             return nil
         }
-        return UUID(uuidString: String(components[3]))
+        return String(components[3])
     }
 }

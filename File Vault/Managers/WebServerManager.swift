@@ -18,26 +18,32 @@ class WebServerManager: ObservableObject, WebServerManaging {
     @Published var isRunning = false
     @Published var serverURL: String = ""
     @Published var connectedDevices: [String] = []
-    @Published var isDownloadEnabled = false // Default to disabled
-    
+    /// Short code the user types in the browser to pair a device with this session.
+    @Published var pairingCode: String = ""
+    /// Set while downloads are allowed; nil once the export session expires.
+    @Published var exportSessionExpiresAt: Date?
+
+    let accessControl = WebAccessControl()
+
     private var listener: NWListener?
     private var connections: [NWConnection] = []
     private let serverPort = 8080
     private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
     private var activeUploads: Set<String> = []
-    
-    // UserDefaults key for download setting
-    private let downloadEnabledKey = "webServerDownloadEnabled"
-    
+    private var exportSessionTimer: Timer?
+
     private init() {
         setupBackgroundTaskSupport()
         setupAppLifecycleObservers()
-        loadDownloadSetting()
     }
     
     func startServer() {
         print("DEBUG: startServer called")
-        
+
+        accessControl.rotateToken()
+        let code = accessControl.pairingCode ?? ""
+        DispatchQueue.main.async { self.pairingCode = code }
+
         guard let port = NWEndpoint.Port(rawValue: UInt16(serverPort)) else {
             print("DEBUG: Invalid port: \(serverPort)")
             return
@@ -94,14 +100,46 @@ class WebServerManager: ObservableObject, WebServerManaging {
         connections.removeAll()
         
         endBackgroundTask()
-        
+        accessControl.invalidate()
+
         DispatchQueue.main.async {
             self.isRunning = false
             self.serverURL = ""
+            self.pairingCode = ""
+            self.exportSessionExpiresAt = nil
+            self.exportSessionTimer?.invalidate()
+            self.exportSessionTimer = nil
             self.connectedDevices.removeAll()
         }
         
         print("DEBUG: Web server stopped")
+    }
+
+    // MARK: - Export Session
+
+    /// Opens the download window. Callers gate this behind biometric confirmation.
+    func beginExportSession(duration: TimeInterval = WebAccessControl.exportSessionLifetime) {
+        let expiry = accessControl.beginExportSession(duration: duration)
+        DispatchQueue.main.async {
+            self.exportSessionExpiresAt = expiry
+            self.exportSessionTimer?.invalidate()
+            self.exportSessionTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+                self?.endExportSession()
+            }
+        }
+    }
+
+    func endExportSession() {
+        accessControl.endExportSession()
+        DispatchQueue.main.async {
+            self.exportSessionExpiresAt = nil
+            self.exportSessionTimer?.invalidate()
+            self.exportSessionTimer = nil
+        }
+    }
+
+    var isExportSessionActive: Bool {
+        accessControl.isExportSessionActive()
     }
     
     // MARK: - Background Task Support
@@ -130,6 +168,8 @@ class WebServerManager: ObservableObject, WebServerManaging {
     }
     
     @objc private func appWillEnterBackground() {
+        // Downloads stay tied to a user who is looking at the app.
+        endExportSession()
         if isRunning && !activeUploads.isEmpty {
             startBackgroundTask()
         }
@@ -323,9 +363,41 @@ class WebServerManager: ObservableObject, WebServerManaging {
         }
 
         print("DEBUG: Method: \(request.method), Path: \(request.path)")
-        switch WebRequestRouter.route(request, fakeLoginActive: LoginStateManager.shared.shouldShowEmptyVault) {
+        let route = WebRequestRouter.route(request, fakeLoginActive: LoginStateManager.shared.shouldShowEmptyVault)
+
+        switch accessControl.authorize(request, route: route) {
+        case .allow:
+            break
+        case .unauthorized:
+            // A browser that typed the address by hand gets the pairing form instead of a bare 401.
+            if route == .uploadPage {
+                servePairingPage(connection: connection, message: nil)
+            } else {
+                sendPreparedResponse(connection: connection, response: WebRequestRouter.unauthorizedResponse)
+            }
+            return
+        case .exportSessionRequired:
+            sendPreparedResponse(connection: connection, response: WebRequestRouter.exportSessionResponse)
+            return
+        }
+
+        switch route {
         case .fakeLoginForbidden:
             sendPreparedResponse(connection: connection, response: WebRequestRouter.fakeLoginResponse)
+        case .pair:
+            handlePairing(request: request, connection: connection)
+        case .issueDownloadTicket:
+            handleDownloadTicket(request: request, connection: connection)
+        case .ticketDownload:
+            handleTicketDownload(request: request, connection: connection)
+        case .sessionState:
+            sendJSONResponse(
+                connection: connection,
+                statusCode: 200,
+                success: true,
+                message: "ok",
+                data: ["exportActive": accessControl.isExportSessionActive()]
+            )
         case .uploadPage:
             serveUploadPage(connection: connection, path: request.path)
         case .testPage:
@@ -344,10 +416,6 @@ class WebServerManager: ObservableObject, WebServerManaging {
             handleDeleteFile(requestData: data, connection: connection)
         case .bulkDelete:
             handleBulkDelete(requestData: data, connection: connection)
-        case .fileDownload:
-            handleFileDownload(path: request.path, connection: connection)
-        case .folderDownload:
-            handleFolderDownload(path: request.path, connection: connection)
         case .status:
             serveStatusPage(connection: connection)
         case .notFound:
@@ -409,8 +477,23 @@ class WebServerManager: ObservableObject, WebServerManaging {
         }
         
         print("DEBUG: Final currentFolderId being passed to HTML: '\(currentFolderId ?? "nil")'")
-        let html = generateUploadHTML(currentFolderId: currentFolderId, downloadEnabled: isDownloadEnabled)
-        sendHTTPResponse(connection: connection, statusCode: 200, body: html)
+        let token = accessControl.currentToken ?? ""
+        let html = generateUploadHTML(
+            currentFolderId: currentFolderId,
+            downloadEnabled: accessControl.isExportSessionActive(),
+            sessionToken: token
+        )
+        // Refresh the cookie so links opened from the app keep working as the user navigates.
+        sendPreparedResponse(
+            connection: connection,
+            response: WebHTTPResponse.text(
+                statusCode: 200,
+                body: html,
+                extraHeaders: [
+                    "Set-Cookie": "\(WebAccessControl.sessionCookieName)=\(token); Path=/; SameSite=Strict; HttpOnly"
+                ]
+            )
+        )
     }
     
     private func serveStatusPage(connection: NWConnection) {
@@ -1147,94 +1230,189 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     // MARK: - Download Handlers
     
-    private func handleFileDownload(path: String, connection: NWConnection) {
-        print("DEBUG: 📥 handleFileDownload called with path: \(path)")
-        
-        // Check if downloads are enabled
-        guard isDownloadEnabled else {
-            print("DEBUG: ❌ Downloads are disabled")
-            sendHTTPResponse(connection: connection, statusCode: 403, body: "Downloads are currently disabled")
+    /// Hands the browser a one-shot link for a single file or folder. The link dies on first
+    /// use, after a minute, when the export session ends, or if another device tries it.
+    private func handleDownloadTicket(request: WebHTTPRequest, connection: NWConnection) {
+        guard let json = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any] else {
+            sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "File or folder id is required")
             return
         }
-        
-        guard let fileId = WebDownloadPathResolver.fileID(from: path) else {
-            print("DEBUG: ❌ Invalid file download path: \(path)")
-            sendHTTPResponse(connection: connection, statusCode: 400, body: "Invalid file ID")
+
+        let target: WebDownloadTarget
+        if let items = json["items"] as? [[String: Any]] {
+            guard let selection = selectionTarget(from: items) else {
+                sendJSONResponse(connection: connection, statusCode: 404, success: false, message: "Nothing in the selection could be found")
+                return
+            }
+            target = selection
+        } else {
+            guard let type = json["type"] as? String,
+                  let idString = json["id"] as? String,
+                  let id = UUID(uuidString: idString) else {
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "File or folder id is required")
+                return
+            }
+            switch type {
+            case "file":
+                guard CoreDataManager.shared.fetchAllVaultItems().contains(where: { $0.id == id }) else {
+                    sendJSONResponse(connection: connection, statusCode: 404, success: false, message: "File not found")
+                    return
+                }
+                target = .file(id)
+            case "folder":
+                guard CoreDataManager.shared.fetchFolder(by: id) != nil else {
+                    sendJSONResponse(connection: connection, statusCode: 404, success: false, message: "Folder not found")
+                    return
+                }
+                target = .folder(id)
+            default:
+                sendJSONResponse(connection: connection, statusCode: 400, success: false, message: "Unknown download type")
+                return
+            }
+        }
+
+        guard let ticket = accessControl.issueTicket(for: target, client: clientIdentity(for: connection)) else {
+            sendJSONResponse(connection: connection, statusCode: 403, success: false, message: "Start an export session in File Vault to download files")
             return
         }
-        
-        // Find the file
-        let vaultItems = CoreDataManager.shared.fetchAllVaultItems()
-        guard let vaultItem = vaultItems.first(where: { $0.id == fileId }) else {
-            print("DEBUG: ❌ File not found: \(fileId)")
-            sendHTTPResponse(connection: connection, statusCode: 404, body: "File not found")
+        sendJSONResponse(
+            connection: connection,
+            statusCode: 200,
+            success: true,
+            message: "Download ready",
+            data: ["url": "/download/t/\(ticket)"]
+        )
+    }
+
+    private func handleTicketDownload(request: WebHTTPRequest, connection: NWConnection) {
+        guard let ticket = WebDownloadPathResolver.ticket(from: request.path),
+              let target = accessControl.redeemTicket(ticket, client: clientIdentity(for: connection)) else {
+            sendHTTPResponse(connection: connection, statusCode: 403, body: "This download link has expired. Request the file again.")
             return
         }
-        
-        // Get file data
-        do {
-            let fileData = try FileStorageManager.shared.loadFile(vaultItem: vaultItem)
-            let fileName = vaultItem.fileName ?? "download"
-            let fileType = vaultItem.fileType ?? "application/octet-stream"
-            
-            print("DEBUG: ✅ Serving file: \(fileName), size: \(fileData.count) bytes, type: \(fileType)")
-            
-            // Send file with proper headers
-            sendFileResponse(
-                connection: connection,
-                data: fileData,
-                fileName: fileName,
-                contentType: fileType
-            )
-            
-        } catch {
-            print("DEBUG: ❌ Error reading file data: \(error)")
-            sendHTTPResponse(connection: connection, statusCode: 500, body: "Error reading file")
+
+        switch target {
+        case .file(let id):
+            guard let vaultItem = CoreDataManager.shared.fetchAllVaultItems().first(where: { $0.id == id }) else {
+                sendHTTPResponse(connection: connection, statusCode: 404, body: "File not found")
+                return
+            }
+            do {
+                let fileData = try FileStorageManager.shared.loadFile(vaultItem: vaultItem)
+                sendFileResponse(
+                    connection: connection,
+                    data: fileData,
+                    fileName: vaultItem.fileName ?? "download",
+                    contentType: vaultItem.fileType ?? "application/octet-stream"
+                )
+            } catch {
+                print("DEBUG: ❌ Error reading file data: \(error)")
+                sendHTTPResponse(connection: connection, statusCode: 500, body: "Error reading file")
+            }
+        case .folder(let id):
+            guard let folder = CoreDataManager.shared.fetchFolder(by: id) else {
+                sendHTTPResponse(connection: connection, statusCode: 404, body: "Folder not found")
+                return
+            }
+            do {
+                let zipData = try createZipFromFolder(folder)
+                sendFileResponse(
+                    connection: connection,
+                    data: zipData,
+                    fileName: "\(folder.displayName).zip",
+                    contentType: "application/zip"
+                )
+            } catch {
+                print("DEBUG: ❌ Error creating ZIP: \(error)")
+                sendHTTPResponse(connection: connection, statusCode: 500, body: "Error creating ZIP file")
+            }
+        case .selection(let fileIDs, let folderIDs):
+            let items = CoreDataManager.shared.fetchAllVaultItems().filter { item in
+                item.id.map(fileIDs.contains) ?? false
+            }
+            let folders = folderIDs.compactMap { CoreDataManager.shared.fetchFolder(by: $0) }
+            guard !items.isEmpty || !folders.isEmpty else {
+                sendHTTPResponse(connection: connection, statusCode: 404, body: "Nothing in the selection could be found")
+                return
+            }
+            do {
+                let zipData = try createZipFromSelection(items: items, folders: folders)
+                sendFileResponse(
+                    connection: connection,
+                    data: zipData,
+                    fileName: "File Vault Selection.zip",
+                    contentType: "application/zip"
+                )
+            } catch {
+                print("DEBUG: ❌ Error creating selection ZIP: \(error)")
+                sendHTTPResponse(connection: connection, statusCode: 500, body: "Error creating ZIP file")
+            }
         }
     }
-    
-    private func handleFolderDownload(path: String, connection: NWConnection) {
-        print("DEBUG: 📥 handleFolderDownload called with path: \(path)")
-        
-        // Check if downloads are enabled
-        guard isDownloadEnabled else {
-            print("DEBUG: ❌ Downloads are disabled")
-            sendHTTPResponse(connection: connection, statusCode: 403, body: "Downloads are currently disabled")
+
+    /// Keeps only ids that still exist, so a stale page cannot ask for deleted content.
+    private func selectionTarget(from items: [[String: Any]]) -> WebDownloadTarget? {
+        let knownFileIDs = Set(CoreDataManager.shared.fetchAllVaultItems().compactMap(\.id))
+        var files: [UUID] = []
+        var folders: [UUID] = []
+
+        for item in items {
+            guard let type = item["type"] as? String,
+                  let idString = item["id"] as? String,
+                  let id = UUID(uuidString: idString) else { continue }
+            switch type {
+            case "file" where knownFileIDs.contains(id):
+                files.append(id)
+            case "folder" where CoreDataManager.shared.fetchFolder(by: id) != nil:
+                folders.append(id)
+            default:
+                continue
+            }
+        }
+
+        guard !files.isEmpty || !folders.isEmpty else { return nil }
+        return .selection(files: files, folders: folders)
+    }
+
+    // MARK: - Pairing
+
+    private func handlePairing(request: WebHTTPRequest, connection: NWConnection) {
+        let submitted = WebFormDecoder.value(named: "code", in: request.body) ?? ""
+        guard let token = accessControl.redeemPairingCode(submitted) else {
+            let message = accessControl.isPairingLocked
+                ? "Too many attempts. Restart the server in File Vault to get a new code."
+                : "That code is not right. Check File Vault on your iPhone."
+            servePairingPage(connection: connection, message: message, statusCode: 401)
             return
         }
-        
-        guard let folderId = WebDownloadPathResolver.folderID(from: path) else {
-            print("DEBUG: ❌ Invalid folder download path: \(path)")
-            sendHTTPResponse(connection: connection, statusCode: 400, body: "Invalid folder ID")
-            return
-        }
-        
-        // Find the folder
-        guard let folder = CoreDataManager.shared.fetchFolder(by: folderId) else {
-            print("DEBUG: ❌ Folder not found: \(folderId)")
-            sendHTTPResponse(connection: connection, statusCode: 404, body: "Folder not found")
-            return
-        }
-        
-        // Create ZIP file
-        do {
-            let zipData = try createZipFromFolder(folder)
-            let zipFileName = "\(folder.displayName).zip"
-            
-            print("DEBUG: ✅ Created ZIP for folder: \(folder.displayName), size: \(zipData.count) bytes")
-            
-            // Send ZIP file
-            sendFileResponse(
-                connection: connection,
-                data: zipData,
-                fileName: zipFileName,
-                contentType: "application/zip"
+
+        sendPreparedResponse(
+            connection: connection,
+            response: WebHTTPResponse.text(
+                statusCode: 200,
+                body: WebPairingPage.successHTML(),
+                extraHeaders: [
+                    "Set-Cookie": "\(WebAccessControl.sessionCookieName)=\(token); Path=/; SameSite=Strict; HttpOnly"
+                ]
             )
-            
-        } catch {
-            print("DEBUG: ❌ Error creating ZIP: \(error)")
-            sendHTTPResponse(connection: connection, statusCode: 500, body: "Error creating ZIP file")
+        )
+    }
+
+    private func servePairingPage(connection: NWConnection, message: String?, statusCode: Int = 401) {
+        sendPreparedResponse(
+            connection: connection,
+            response: WebHTTPResponse.text(
+                statusCode: statusCode,
+                body: WebPairingPage.html(message: message)
+            )
+        )
+    }
+
+    private func clientIdentity(for connection: NWConnection) -> String {
+        if case let .hostPort(host, _) = connection.endpoint {
+            return "\(host)"
         }
+        return "\(connection.endpoint)"
     }
     
     private func sendFileResponse(connection: NWConnection, data: Data, fileName: String, contentType: String) {
@@ -1266,9 +1444,14 @@ class WebServerManager: ObservableObject, WebServerManaging {
     }
     
     private func createZipFromFolder(_ folder: Folder) throws -> Data {
-        // Create a temporary directory for the ZIP operation
+        // Staging holds decrypted bytes, so it gets the same protection class as the vault
+        // and is removed as soon as the archive is built.
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: tempDir,
+            withIntermediateDirectories: true,
+            attributes: [.protectionKey: FileProtectionType.complete]
+        )
         
         defer {
             // Clean up temp directory
@@ -1286,6 +1469,48 @@ class WebServerManager: ObservableObject, WebServerManaging {
         return try Data(contentsOf: zipFileURL)
     }
     
+    /// Zips a mixed selection of loose files and folders into one archive.
+    private func createZipFromSelection(items: [VaultItem], folders: [Folder]) throws -> Data {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let stagingDir = tempDir.appendingPathComponent("File Vault Selection")
+        try FileManager.default.createDirectory(
+            at: stagingDir,
+            withIntermediateDirectories: true,
+            attributes: [.protectionKey: FileProtectionType.complete]
+        )
+
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        for item in items {
+            let fileData = try FileStorageManager.shared.loadFile(vaultItem: item)
+            let fileURL = uniqueURL(for: item.fileName ?? "unknown", in: stagingDir)
+            try fileData.write(to: fileURL, options: .completeFileProtection)
+        }
+        for folder in folders {
+            try createFolderStructure(folder: folder, in: stagingDir, relativePath: "")
+        }
+
+        let zipFileURL = tempDir.appendingPathComponent("File Vault Selection.zip")
+        try createZipFile(from: stagingDir, to: zipFileURL)
+        return try Data(contentsOf: zipFileURL)
+    }
+
+    /// Two vault items can share a display name; the archive cannot.
+    private func uniqueURL(for fileName: String, in directory: URL) -> URL {
+        let candidate = directory.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: candidate.path) else { return candidate }
+
+        let base = candidate.deletingPathExtension().lastPathComponent
+        let ext = candidate.pathExtension
+        var suffix = 2
+        while true {
+            let name = ext.isEmpty ? "\(base) (\(suffix))" : "\(base) (\(suffix)).\(ext)"
+            let next = directory.appendingPathComponent(name)
+            if !FileManager.default.fileExists(atPath: next.path) { return next }
+            suffix += 1
+        }
+    }
+
     private func createFolderStructure(folder: Folder, in baseURL: URL, relativePath: String) throws {
         let folderPath = relativePath.isEmpty ? folder.displayName : "\(relativePath)/\(folder.displayName)"
         let folderURL = baseURL.appendingPathComponent(folderPath)
@@ -1298,7 +1523,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             let fileData = try FileStorageManager.shared.loadFile(vaultItem: item)
             let fileName = item.fileName ?? "unknown"
             let fileURL = folderURL.appendingPathComponent(fileName)
-            try fileData.write(to: fileURL)
+            try fileData.write(to: fileURL, options: .completeFileProtection)
         }
         
         // Recursively handle subfolders
@@ -1408,25 +1633,6 @@ class WebServerManager: ObservableObject, WebServerManaging {
         return address
     }
     
-    // MARK: - Download Setting Management
-    
-    private func loadDownloadSetting() {
-        let defaults = UserDefaults.standard
-        isDownloadEnabled = defaults.bool(forKey: downloadEnabledKey)
-        print("DEBUG: Loaded download setting: \(isDownloadEnabled)")
-    }
-    
-    private func saveDownloadSetting() {
-        let defaults = UserDefaults.standard
-        defaults.set(isDownloadEnabled, forKey: downloadEnabledKey)
-        print("DEBUG: Saved download setting: \(isDownloadEnabled)")
-    }
-    
-    func setDownloadEnabled(_ enabled: Bool) {
-        isDownloadEnabled = enabled
-        saveDownloadSetting()
-    }
-
 }
 
 extension WebServerManager {

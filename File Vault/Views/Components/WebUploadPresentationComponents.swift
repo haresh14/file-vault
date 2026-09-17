@@ -146,17 +146,150 @@ struct WebUploadServerControls: View {
     }
 }
 
-struct WebUploadDownloadSettings: View {
-    @Binding var isEnabled: Bool
+/// Confirms the person holding the phone before downloads are allowed, using Face ID or the
+/// vault's own passcode. The device passcode is never accepted here.
+struct WebExportUnlockSheet: View {
+    let onUnlocked: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var credential = ""
+    @State private var errorMessage: String?
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 48))
+                    .foregroundColor(.blue)
+                Text("Allow downloads for 10 minutes")
+                    .font(.headline)
+                Text("Confirm it's you before the browser can pull files out of the vault.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+
+                if BiometricAuthManager.shared.canUseBiometrics() {
+                    Button(action: authenticateWithBiometrics) {
+                        Label(biometricButtonTitle, systemImage: biometricButtonIcon)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(10)
+                    }
+                    .accessibilityIdentifier("webUpload.exportFaceID")
+                }
+
+                SecureField("Vault passcode or password", text: $credential)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .focused($isFocused)
+                    .submitLabel(.go)
+                    .onSubmit(verifyCredential)
+                    .accessibilityIdentifier("webUpload.exportCredential")
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+
+                Button("Allow Downloads", action: verifyCredential)
+                    .disabled(credential.isEmpty)
+                Spacer()
+            }
+            .padding()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear {
+                if BiometricAuthManager.shared.canUseBiometrics() {
+                    authenticateWithBiometrics()
+                } else {
+                    isFocused = true
+                }
+            }
+        }
+    }
+
+    private var biometricButtonTitle: String {
+        BiometricAuthManager.shared.biometricType() == .touchID ? "Use Touch ID" : "Use Face ID"
+    }
+
+    private var biometricButtonIcon: String {
+        BiometricAuthManager.shared.biometricType() == .touchID ? "touchid" : "faceid"
+    }
+
+    private func authenticateWithBiometrics() {
+        BiometricAuthManager.shared.authenticateWithBiometrics(
+            reason: "Allow downloads from the web browser"
+        ) { success, _ in
+            if success {
+                onUnlocked()
+                dismiss()
+            } else {
+                isFocused = true
+            }
+        }
+    }
+
+    private func verifyCredential() {
+        let result = KeychainManager.shared.validatePassword(credential)
+        // The duress credential must never open a download window.
+        guard result.isValid, !result.isFakeLogin else {
+            credential = ""
+            errorMessage = "That passcode is not right."
+            return
+        }
+        onUnlocked()
+        dismiss()
+    }
+}
+
+struct WebUploadPairingCard: View {
+    let code: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Download Settings:")
+            Text("Pairing Code:")
                 .font(.headline)
-            Toggle("Enable Downloads from Web", isOn: $isEnabled)
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-                .accessibilityIdentifier("webUpload.downloads")
-            Text("When enabled, users can download files from the web interface. Disabled by default for security.")
+            Text(code.isEmpty ? "------" : code)
+                .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                .kerning(6)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("webUpload.pairingCode")
+            Text("The browser asks for this code the first time it connects. It changes every time you start the server.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+struct WebUploadExportSessionCard: View {
+    let expiresAt: Date?
+    let startSession: () -> Void
+    let endSession: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Downloads:")
+                .font(.headline)
+            if let expiresAt {
+                Text("Allowed until \(expiresAt.formatted(date: .omitted, time: .shortened))")
+                    .font(.subheadline)
+                    .foregroundColor(.green)
+                Button("Stop Downloads", action: endSession)
+                    .accessibilityIdentifier("webUpload.endExportSession")
+            } else {
+                Button("Allow Downloads for 10 Minutes", action: startSession)
+                    .accessibilityIdentifier("webUpload.startExportSession")
+            }
+            Text("Downloads stay off until you allow them. Each file gets a single-use link, and the window closes when it expires or you leave the app.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }

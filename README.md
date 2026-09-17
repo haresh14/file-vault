@@ -54,7 +54,9 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 
 ### Web upload
 - Local HTTP server on port **8080**, URL copy, QR code
-- Browser upload, folder management; optional downloads (off by default)
+- Browser must enter the 6-digit pairing code shown in the app
+- Browser upload and folder management; downloads only after Face ID / vault credential opens a 10-minute export session
+- Each download uses a single-use ticket; a multi-item selection comes back as one ZIP
 
 ### Extra security (Settings)
 - Screenshot notice and inactive-state overlay
