@@ -21,25 +21,7 @@ struct FileVaultApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .dependencies(dependencies)
-                .environment(\.managedObjectContext, dependencies.coreDataManager.context)
-                .onAppear {
-                    // Check for first launch and perform cleanup if needed
-                    handleFirstLaunchCleanup()
-                    
-                    // Initialize WebServerManager to register background tasks
-                    _ = dependencies.webServerManager
-                }
-        }
-    }
-    
-    private func handleFirstLaunchCleanup() {
-        if dependencies.appDataManager.isFirstLaunch {
-            print("DEBUG: 🚀 First app launch detected - performing cleanup...")
-            dependencies.appDataManager.performFirstLaunchCleanup()
-        } else {
-            print("DEBUG: ✅ Not first launch - no cleanup needed")
+            FileVaultRootView(dependencies: dependencies)
         }
     }
     
@@ -69,5 +51,26 @@ struct FileVaultApp: App {
             try? KeychainManager.shared.saveFakePassword("9876")
         }
         AppDataManager.shared.markAppAsLaunched()
+    }
+}
+
+private struct FileVaultRootView: View {
+    let dependencies: DependencyContainer
+
+    var body: some View {
+        ContentView()
+            .dependencies(dependencies)
+            .environment(\.managedObjectContext, dependencies.coreDataManager.context)
+            .onAppear {
+                if dependencies.appDataManager.isFirstLaunch {
+                    print("DEBUG: 🚀 First app launch detected - performing cleanup...")
+                    dependencies.appDataManager.performFirstLaunchCleanup()
+                } else {
+                    print("DEBUG: ✅ Not first launch - no cleanup needed")
+                }
+                _ = dependencies.webServerManager
+                // Blanking attaches to the scene's window, so it also covers sheets and previews.
+                SecurityManager.shared.refreshCaptureBlanking()
+            }
     }
 }

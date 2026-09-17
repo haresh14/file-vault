@@ -176,14 +176,14 @@ Fake login does **not** use a second encrypted store. ViewModels return empty li
 
 | ID | Feature | Default | Behavior | Apple APIs |
 |----|---------|---------|----------|------------|
-| S1 | Screenshot detection | On | Alert: “Screenshot detected…”, security log. Detection is **always** registered; the alert is not gated on the Settings toggle | `UIApplication.userDidTakeScreenshotNotification` |
-| S2 | Screenshot / app-switcher cover | On | Extra black overlay window while inactive **if** screenshot protection is enabled | `willResignActive` / `didBecomeActive`, extra `UIWindow` at `alert + 1` |
-| S3 | Screen recording protection | On | When `UIScreen.main.isCaptured` **and** recording protection is enabled, show the same black overlay | `UIScreen.capturedDidChangeNotification` |
+| S1 | Screenshot blanking | On | Vault stays visible and unchanged on the device. The app window's layer renders inside a secure text-entry canvas, so system screenshots of the window — including sheets, pickers, and full-screen previews — come out blank. After a shot, a single alert explains the blank image — repeat notifications for one capture are collapsed into one notice and one log entry. The alert runs only when this toggle is on | `ScreenCaptureBlanker`, `UITextField.isSecureTextEntry`, `UIApplication.userDidTakeScreenshotNotification` |
+| S2 | App Switcher cover | On | Extra black overlay window while inactive **if** screenshot protection is enabled | `willResignActive` / `didBecomeActive`, `SecurityOverlayWindow` at `alert + 1` |
+| S3 | Screen recording protection | On | While the screen is captured **and** recording protection is enabled, a black cover window stays up. The cover is reference-counted by reason, so returning from the App Switcher does not drop it, and capture state is re-checked on activation | `UIScreen.capturedDidChangeNotification`, `UIWindowScene.screen.isCaptured` |
 | S4 | Shake to lock | Off | Accelerometer magnitude > **2.5** → lock | CoreMotion `CMMotionManager`, interval 0.1s |
 | S5 | Flip to lock | Off | Transition into `UIDeviceOrientation.faceDown` → lock | `UIDevice.orientationDidChangeNotification` |
 | S6 | Security logs | — | Last **100** strings in UserDefaults `SecurityLogs` (debug-oriented, not shown in Settings UI) | UserDefaults |
 
-Toggles live in Settings → Advanced Security. Shake and flip write UserDefaults in `enableShakeToLock` / `enableFlipToLock`. Screenshot and recording toggles update in-memory/`@Published` state via `enableScreenshotProtection` / `enableRecordingProtection` and do not write UserDefaults; `saveSettings()` is unused by Settings. After relaunch, screenshot/recording default to **on**.
+Toggles live in Settings → Advanced Security. Screenshot, recording, shake, and flip each write UserDefaults when changed. After relaunch, screenshot and recording default to **on** if no value has been stored.
 
 ### 4.4 Main navigation
 
@@ -470,6 +470,10 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 - [ ] Change auth re-encrypts files; old credential cannot decrypt
 - [ ] Fake password: empty UI, no add, no web server, About-only settings
 - [ ] Shake to lock / flip to lock when enabled
+- [ ] Screenshot protection on: vault stays visible, Photos gets a blank image, alert says the shot is blank
+- [ ] Sheets and full-screen previews are also blank in the screenshot; the lock screen is visually unchanged
+- [ ] Screenshot protection off: screenshot contains the vault; no blanking alert
+- [ ] Screenshot and recording toggles still match after relaunch
 
 **Files**
 
@@ -520,9 +524,7 @@ Recorded so upgrades do not “fix” the wrong thing:
 2. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
 3. About UI version `1.0.0` vs `MARKETING_VERSION` `1.0`.
 4. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
-5. Screenshot/recording Settings toggles are not persisted (see §4.3).
-6. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
-7. Screenshot detection shows an alert even when screenshot protection is off; only the inactive-state overlay is gated.
+5. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
 
 ---
 

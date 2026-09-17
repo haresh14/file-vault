@@ -26,7 +26,7 @@ struct SettingsSecuritySection: View {
                 .onChange(of: flipToLock) { _, value in updateFlipToLock(value) }
             VStack(alignment: .leading, spacing: 5) {
                 Text("Enhanced Protection").font(.caption).foregroundColor(.secondary)
-                Text("• Screenshot/Recording: Protects vault contents from capture attempts\n• Shake to Lock: Locks app when device is shaken vigorously\n• Flip to Lock: Locks app when device is flipped face-down")
+                Text("• Screenshots: the vault stays on screen; Photos gets a blank image\n• Screen recording: a black cover while a recording is in progress\n• Shake to Lock: locks the app when the device is shaken vigorously\n• Flip to Lock: locks the app when the device is flipped face-down")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

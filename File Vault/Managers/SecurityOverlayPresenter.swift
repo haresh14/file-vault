@@ -2,8 +2,18 @@ import SwiftUI
 import UIKit
 
 final class SecurityOverlayPresenter {
+    /// Why the black cover is up. Leaving the app must not tear down a cover that
+    /// screen recording still needs, so each reason is tracked separately.
+    enum ProtectionReason: Hashable {
+        case recording
+        case inactive
+    }
+
     private var overlayWindow: UIWindow?
-    private(set) var isProtectionActive = false
+    private var reasons: Set<ProtectionReason> = []
+    private weak var screenshotAlert: UIAlertController?
+
+    var isProtectionActive: Bool { !reasons.isEmpty }
 
     private var candidateWindowScenes: [UIWindowScene] {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
@@ -27,27 +37,37 @@ final class SecurityOverlayPresenter {
         return nil
     }
 
-    func showProtection() {
-        guard !isProtectionActive else { return }
+    func showProtection(for reason: ProtectionReason) {
+        let wasActive = isProtectionActive
+        reasons.insert(reason)
+        guard !wasActive else { return }
 
         DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.createOverlayWindow()
-            // Preserve the existing state transition even if no scene is available.
-            self.isProtectionActive = true
+            self?.createOverlayWindow()
         }
     }
 
-    func hideProtection() {
-        guard isProtectionActive else { return }
+    func hideProtection(for reason: ProtectionReason) {
+        guard reasons.remove(reason) != nil, reasons.isEmpty else { return }
 
         DispatchQueue.main.async { [weak self] in
             self?.removeOverlayWindow()
-            self?.isProtectionActive = false
+        }
+    }
+
+    func hideAllProtection() {
+        guard isProtectionActive else { return }
+        reasons.removeAll()
+
+        DispatchQueue.main.async { [weak self] in
+            self?.removeOverlayWindow()
         }
     }
 
     func showScreenshotAlert() {
+        // Without this the next notice presents on top of the one already showing,
+        // and the person has to dismiss the same message twice.
+        guard screenshotAlert == nil else { return }
         guard let rootViewController = activeKeyWindow?.rootViewController else { return }
 
         var presentingViewController = rootViewController
@@ -56,18 +76,23 @@ final class SecurityOverlayPresenter {
         }
 
         let alert = UIAlertController(
-            title: "Security Notice",
-            message: "Screenshot detected. Please ensure your vault contents remain secure.",
+            title: SecurityNoticeCopy.screenshotTitle,
+            message: SecurityNoticeCopy.screenshotMessage,
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.screenshotAlert = nil
+        })
+        screenshotAlert = alert
         presentingViewController.present(alert, animated: true)
     }
 
-    private func createOverlayWindow() {
-        guard let windowScene = candidateWindowScenes.first else { return }
+    var isShowingScreenshotAlert: Bool { screenshotAlert != nil }
 
-        overlayWindow = UIWindow(windowScene: windowScene)
+    private func createOverlayWindow() {
+        guard overlayWindow == nil, let windowScene = candidateWindowScenes.first else { return }
+
+        overlayWindow = SecurityOverlayWindow(windowScene: windowScene)
         overlayWindow?.windowLevel = UIWindow.Level.alert + 1
         overlayWindow?.backgroundColor = .black
         overlayWindow?.isOpaque = true
@@ -84,6 +109,9 @@ final class SecurityOverlayPresenter {
         overlayWindow = nil
     }
 }
+
+/// Marks the black cover window so window lookups never mistake it for app content.
+final class SecurityOverlayWindow: UIWindow {}
 
 struct SecurityOverlayView: View {
     var body: some View {

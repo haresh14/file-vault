@@ -7,7 +7,7 @@ Keep File Vault building with the **iOS 27 SDK (Xcode 27)** without changing pro
 - Raising the deployment target above **iOS 18.5**
 - Enabling Swift 6 language mode / complete concurrency checking
 - Redesigning for Liquid Glass
-- Product bug fixes (screenshot toggle persistence, MIME mismatches)
+- Product bug fixes (MIME mismatches)
 
 **Sources:** [docs/FEATURES.md](FEATURES.md), iOS & iPadOS 27 release notes, Xcode 27 release notes.
 
@@ -55,7 +55,7 @@ AES-GCM, Keychain, Core Data, PHPicker, `NWListener`, AVPlayer, PDFKit, QuickLoo
 | CryptoKit AES-GCM + CommonCrypto PBKDF2 | Supported | Keep |
 | Keychain `WhenUnlockedThisDeviceOnly` | Supported | Keep |
 | `FileProtectionType.complete` | Supported | Keep |
-| `userDidTakeScreenshotNotification` | Supported | Overlay + alert (no API to block screenshots) |
+| `userDidTakeScreenshotNotification` | Supported | Alert when screenshot protection is on; blanking uses a secure text-entry layer |
 | Swift 6 language mode | Optional | Keep `SWIFT_VERSION = 5.0` |
 
 Optic ID is not an unlock path on this iPhone/iPad app.

@@ -49,7 +49,7 @@ final class SecurityCaptureMonitor: NSObject {
         onDidBecomeActive?()
     }
 
-    private var isScreenBeingCaptured: Bool {
+    var isScreenBeingCaptured: Bool {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         guard !scenes.isEmpty else { return UIScreen.main.isCaptured }
         return scenes.contains { $0.screen.isCaptured }

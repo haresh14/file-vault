@@ -59,7 +59,7 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 - Each download uses a single-use ticket; a multi-item selection comes back as one ZIP
 
 ### Extra security (Settings)
-- Screenshot notice and inactive-state overlay
+- Screenshot blanking (vault stays on screen; Photos gets a black image) and App Switcher overlay
 - Screen recording overlay
 - Optional shake-to-lock and flip-to-lock
 
@@ -105,8 +105,6 @@ A broader regression list is in [docs/FEATURES.md](docs/FEATURES.md#9-upgrade-ve
 
 ## Current known gaps
 
-- Screenshot and screen-recording Settings toggles are not written to UserDefaults; they default to on after relaunch.
-- Screenshot detection always shows an alert; the Settings toggle only gates the inactive-state overlay.
 - Folder tab has no search field.
 - No in-app camera capture.
 

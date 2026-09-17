@@ -102,8 +102,11 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Device security
 
-- [ ] Screenshot: alert appears even if the Settings toggle is off; overlay follows the toggle
-- [ ] Screen recording overlay when that toggle is on
+- [ ] Screenshot protection on: vault stays visible; the image in Photos is blank; one alert says the shot is blank, and one entry lands in the security log
+- [ ] Lock screen, sheets (Settings, Web Upload, pickers), and full-screen previews look normal on the device and are blank in the screenshot
+- [ ] Screenshot protection off: no blanking alert; screenshot can include the vault
+- [ ] Screenshot and recording toggles still match after relaunch
+- [ ] Screen recording overlay when that toggle is on; it stays up after switching apps and back, and when a recording is already running at launch
 - [ ] Shake to lock / flip to lock when enabled
 
 ## Developer (DEBUG)

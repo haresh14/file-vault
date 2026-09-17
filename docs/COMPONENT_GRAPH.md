@@ -257,6 +257,8 @@ erDiagram
 flowchart TB
     SecurityManager --> Capture["SecurityCaptureMonitor"]
     SecurityManager --> Overlay["SecurityOverlayPresenter"]
+    SecurityManager --> Blanking["ScreenCaptureBlanker"]
+    Blanking -->|"window layer into secure canvas"| Window["App UIWindow (incl. sheets, previews)"]
     SecurityManager --> Motion["SecurityMotionDetector"]
     SecurityManager --> Logger["SecurityEventLogger"]
     Capture -->|"screenshot / recording / resign-active"| Overlay

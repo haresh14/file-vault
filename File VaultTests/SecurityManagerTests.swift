@@ -8,6 +8,7 @@
 import Testing
 import Foundation
 import UIKit
+import SwiftUI
 @testable import File_Vault
 
 @MainActor
@@ -29,6 +30,80 @@ struct SecurityManagerTests {
         #expect(manager1 === manager2, "SecurityManager should be a singleton")
     }
     
+    @Test func testScreenshotAndRecordingTogglesSurviveANewManager() async throws {
+        let suiteName = "SecurityManagerPersist-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let first = SecurityManager(defaults: defaults)
+        first.enableScreenshotProtection(false)
+        first.enableRecordingProtection(false)
+
+        let second = SecurityManager(defaults: defaults)
+        #expect(!second.isScreenshotProtectionEnabled)
+        #expect(!second.isRecordingProtectionEnabled)
+
+        second.enableScreenshotProtection(true)
+        second.enableRecordingProtection(true)
+        let third = SecurityManager(defaults: defaults)
+        #expect(third.isScreenshotProtectionEnabled)
+        #expect(third.isRecordingProtectionEnabled)
+
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    @Test func testScreenshotNoticeCopyDoesNotClaimCaptureIsImpossible() {
+        #expect(SecurityNoticeCopy.screenshotTitle == "Screenshot is blank")
+        #expect(SecurityNoticeCopy.screenshotMessage.contains("black frame"))
+        #expect(!SecurityNoticeCopy.screenshotMessage.lowercased().contains("impossible"))
+        #expect(!SecurityNoticeCopy.screenshotMessage.lowercased().contains("prevent"))
+    }
+
+    @Test func testBlankingMovesTheWholeWindowLayerAndPutsItBack() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        window.rootViewController = UIViewController()
+        let originalSuperlayer = window.layer.superlayer
+        let blanker = ScreenCaptureBlanker()
+
+        #expect(blanker.apply(to: window))
+        #expect(blanker.isActive)
+        #expect(blanker.isBlanking(window))
+        // Everything the window draws, including presented sheets, now renders inside the
+        // secure canvas rather than straight into the scene.
+        #expect(window.layer.superlayer !== originalSuperlayer)
+
+        blanker.remove()
+        #expect(!blanker.isActive)
+        #expect(window.layer.superlayer === originalSuperlayer)
+    }
+
+    @Test func testApplyingTwiceToTheSameWindowIsANoOp() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        let blanker = ScreenCaptureBlanker()
+
+        #expect(blanker.apply(to: window))
+        let canvas = window.layer.superlayer
+        #expect(blanker.apply(to: window))
+        #expect(window.layer.superlayer === canvas)
+
+        blanker.remove()
+    }
+
+    @Test func testRecordingCoverSurvivesLeavingAndReturningToTheApp() {
+        let presenter = SecurityOverlayPresenter()
+
+        presenter.showProtection(for: .recording)
+        presenter.showProtection(for: .inactive)
+        #expect(presenter.isProtectionActive)
+
+        // Coming back from the App Switcher must not drop a cover recording still needs.
+        presenter.hideProtection(for: .inactive)
+        #expect(presenter.isProtectionActive)
+
+        presenter.hideProtection(for: .recording)
+        #expect(!presenter.isProtectionActive)
+    }
+
     @Test func testDefaultSecuritySettings() async throws {
         let manager = makeManager()
         
@@ -52,16 +127,24 @@ struct SecurityManagerTests {
     
     @Test func testScreenshotDetectionLogging() async throws {
         let manager = makeManager()
-        
-        // Clear existing logs
         manager.clearSecurityLogs()
-        
-        // Simulate screenshot detection
-        let initialLogCount = manager.getSecurityLogs().count
-        
-        // Since we can't directly call the private method, we'll test the public interface
-        // The actual screenshot detection would be tested in integration tests
-        #expect(initialLogCount == 0, "Security logs should be empty after clearing")
+        #expect(manager.getSecurityLogs().isEmpty)
+
+        manager.handleScreenshot()
+        #expect(manager.getSecurityLogs().count == 1)
+        #expect(manager.getSecurityLogs().contains { $0.contains("Screenshot taken") })
+    }
+
+    @Test func testRepeatedNotificationsForOneCaptureGiveOneNotice() async throws {
+        let manager = makeManager()
+        manager.clearSecurityLogs()
+
+        // iOS can post the screenshot notification more than once per capture.
+        manager.handleScreenshot()
+        manager.handleScreenshot()
+        manager.handleScreenshot()
+
+        #expect(manager.getSecurityLogs().count == 1)
     }
     
     // MARK: - Screen Recording Protection Tests
