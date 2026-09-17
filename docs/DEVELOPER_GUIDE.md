@@ -45,7 +45,122 @@ Notification authorization is requested when the user starts Web Upload. Do not 
 
 ### Privacy and support URLs
 
-Set `PRIVACY_POLICY_URL` and `SUPPORT_URL` in the app target's build settings. They are `https://keepshire.haresh.dev/privacy` and `https://keepshire.haresh.dev/support`. Empty or invalid values hide the corresponding About link. Configure the same URLs in App Store Connect. The pages live in `web/` (landing, `/privacy/`, `/support/`). On Vercel, the project Root Directory is `web` and the domain is `https://keepshire.haresh.dev`. Listing fields that are not in the binary: name **Keepshire: Private Photo Vault**, subtitle **Hide photos, videos & files**, keywords `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock`.
+`PRIVACY_POLICY_URL` is `https://keepshire.haresh.dev/privacy`. `SUPPORT_URL` is `https://keepshire.haresh.dev/support`. Settings → About opens those pages. Put the same URLs in App Store Connect. Source files live in `web/`. Vercel Root Directory is `web`; the domain is `https://keepshire.haresh.dev`.
+
+Listing fields that are not in the binary:
+
+| Field | Value |
+|--------|--------|
+| Name (30) | Keepshire: Private Photo Vault |
+| Subtitle (30) | Hide photos, videos & files |
+| Keywords | `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock` |
+| Privacy | `https://keepshire.haresh.dev/privacy` |
+| Support | `https://keepshire.haresh.dev/support` |
+| Bundle ID | `com.haresh.keepshire` |
+| SKU (your choice) | `keepshire` |
+| Primary language | English (US) |
+
+### Apple Developer Program and App Store Connect
+
+These steps require your Apple ID and cannot be finished from this repo. They are not legal advice.
+
+**1. Enroll**
+
+1. Open [developer.apple.com/programs](https://developer.apple.com/programs/).
+2. Enroll as an **Individual** (personal project) with the Apple ID you will use for the App Store.
+3. Pay the annual fee and wait until the account shows **Active**.
+4. Sign the contracts in [App Store Connect](https://appstoreconnect.apple.com/) → Agreements, Tax, and Banking. Add a bank account and tax form or you cannot sell (even a free app needs Paid Apps / Free Apps agreements accepted).
+
+**2. Register the bundle ID**
+
+1. Open [developer.apple.com/account/resources/identifiers/list](https://developer.apple.com/account/resources/identifiers/list).
+2. Click **+** → **App IDs** → **App**.
+3. Description: `Keepshire`.
+4. Bundle ID: **Explicit** `com.haresh.keepshire`.
+5. Capabilities: leave the extras off (no Push, no Associated Domains, no App Groups, no iCloud).
+6. Register.
+7. In Xcode: Keepshire target → **Signing & Capabilities** → Team = your personal team → **Automatically manage signing**. The first device build may ask you to allow certificates.
+
+**3. Create the app record (listing)**
+
+1. [App Store Connect](https://appstoreconnect.apple.com/) → **Apps** → **+** → **New App**.
+2. Platforms: iOS.
+3. Name: `Keepshire: Private Photo Vault`.
+4. Primary language: English (U.S.).
+5. Bundle ID: `com.haresh.keepshire` (the ID from step 2).
+6. SKU: `keepshire` (internal; users never see it).
+7. User access: Full Access.
+
+Then open the app → **App Information** / **App Store** tab and paste:
+
+- Subtitle: `Hide photos, videos & files`
+- Privacy Policy URL: `https://keepshire.haresh.dev/privacy`
+- Category: something like **Utilities** (primary) and **Photo & Video** (secondary) if offered.
+- Support URL: `https://keepshire.haresh.dev/support` (on the version page, under General App Information).
+- Marketing URL (optional): `https://keepshire.haresh.dev`
+- Description (draft you can paste):
+
+```
+Keepshire is a private vault for photos, videos, audio, and files on your iPhone and iPad. There is no account and no cloud.
+
+Unlock with a 4-digit passcode, 6-digit passcode, or password. Face ID or Touch ID is optional. Files stay encrypted on the device.
+
+Import from Photos or the Files app, or send from a browser on the same Wi-Fi. Optional screenshot blanking and a decoy credential that opens an empty screen.
+
+If you forget your vault passcode or password, the files cannot be recovered.
+```
+
+- Keywords: `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock`
+- Screenshots: iPhone 6.7" (required) plus iPad 12.9" if you ship iPad. No vault contents that look like someone else’s photos.
+- Review notes (paste):
+
+```
+The app encrypts user-selected files and metadata on device with AES-GCM. The encryption key is derived from the user's vault credential with PBKDF2-HMAC-SHA256; Keychain material is ThisDeviceOnly. The optional local-network transfer server uses HTTPS with a new self-signed ECDSA certificate per server session. The app has no account or cloud sync, and vault files are excluded from backup.
+
+Demo: create a 6-digit passcode, import one photo, optional Face ID. Web Upload: start the server, accept the browser certificate warning, enter the pairing code shown in the app. There is no test account.
+```
+
+**4. App Privacy (nutrition label)**
+
+App Store Connect → App Privacy → **Get Started**.
+
+- Data collected: **No**. Keepshire has no account, analytics, or tracking. Do not declare Name, Email, Photos, or Product Interaction as collected-by-you; imported photos stay on device.
+- Tracking: **No**.
+
+**5. Export compliance (encryption)**
+
+The Info.plist key `ITSAppUsesNonExemptEncryption` is **YES** because Keepshire uses AES-GCM at rest (not “HTTPS only”). Answers in Connect must not contradict that.
+
+Typical path (wording varies; read the screen):
+
+1. First TestFlight / App Store upload, or **App Store Connect** → the app → **Distribution** / compliance questions.
+2. “Does your app use encryption?” → **Yes**.
+3. Questions about exemption (HTTPS only, authentication only, etc.) → **No, not exempt** for this product. Custom file encryption is why the plist is YES.
+4. If Apple then asks for an ERN or annual self-classification, follow the link they show. That paperwork is yours (or a lawyer’s). Do not flip the plist to `NO` to skip it.
+
+A lawyer who does software export can confirm this. This repo does not replace that.
+
+**6. Name / trademark (counsel)**
+
+Nobody in this project can be your lawyer. Practical checks before you spend on ads:
+
+- Search [Apple Trademark List](https://www.apple.com/legal/intellectual-property/trademark/appletmlist.html) — Keepshire is not Apple FileVault; do not use “FileVault” in the listing.
+- Search the App Store for “Keepshire” and similar spellings.
+- Search USPTO TESS / your country’s trademark office.
+
+If you want the name protected, hire a trademark attorney. Shipping as an Individual under Keepshire is a business choice you make; the code already uses that name.
+
+**7. Age rating**
+
+Complete the age-rating questionnaire. Keepshire does not include unrestricted web browsing, gambling, or its own UGC feed. User-imported photos can include anything the user owns — answer the “user-generated content” / “mature themes” questions as Apple phrases them that year; do not claim the app filters photos.
+
+**8. First build (TestFlight)**
+
+1. In Xcode: Product → Archive (Any iOS Device, Release).
+2. Distribute App → App Store Connect → Upload.
+3. Wait for processing, then add the build to a TestFlight internal group and install it on your iPhone.
+4. Confirm Settings → About opens the live privacy and support URLs.
+
 
 The hosted privacy policy must state:
 
