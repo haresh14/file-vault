@@ -45,7 +45,7 @@ Notification authorization is requested when the user starts Web Upload. Do not 
 
 ### Privacy and support URLs
 
-Set `PRIVACY_POLICY_URL` and `SUPPORT_URL` in the app target's build settings to real hosted HTTPS pages. Empty or invalid values hide the corresponding About link. Configure the same URLs in App Store Connect. Listing fields that are not in the binary: name **Keepshire: Private Photo Vault**, subtitle **Hide photos, videos & files**, keywords `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock`.
+Set `PRIVACY_POLICY_URL` and `SUPPORT_URL` in the app target's build settings to the hosted HTTPS pages. Empty or invalid values hide the corresponding About link. Configure the same URLs in App Store Connect. The pages live in `web/` (landing, `/privacy/`, `/support/`). On Vercel, set the project Root Directory to `web` and point the domain (for example `https://keepshire.haresh.dev`) at that deployment. Listing fields that are not in the binary: name **Keepshire: Private Photo Vault**, subtitle **Hide photos, videos & files**, keywords `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock`.
 
 The hosted privacy policy must state:
 

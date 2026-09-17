@@ -30,7 +30,7 @@ The Xcode project is `Keepshire.xcodeproj`. This bundle ID is a new app: existin
 
 Face ID usage text is already set on the target (`NSFaceIDUsageDescription`). Photo library access uses `PHPickerViewController` and does not need `NSPhotoLibraryUsageDescription`.
 
-The app ships a privacy manifest for app-only UserDefaults use, declares non-exempt encryption, disables multi-window and unused background modes, and requests notification permission only when Web Upload starts. Configure `PRIVACY_POLICY_URL` and `SUPPORT_URL` with hosted HTTPS pages before an App Store archive.
+The app ships a privacy manifest for app-only UserDefaults use, declares non-exempt encryption, disables multi-window and unused background modes, and requests notification permission only when Web Upload starts. The marketing site, privacy policy, and support pages live in `web/`. After they are hosted, set `PRIVACY_POLICY_URL` and `SUPPORT_URL` to those HTTPS addresses before an App Store archive.
 
 New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening the project, signing, and troubleshooting.
 

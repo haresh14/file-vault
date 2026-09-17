@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — Keepshire</title>
+  <meta name="description" content="Keepshire support: unlock help, LAN certificate warnings, and how to reach us.">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img src="/assets/icon.png" width="44" height="44" alt="">
+      Keepshire
+    </a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/" aria-current="page">Support</a>
+    </nav>
+  </header>
+
+  <article class="wrap panel legal">
+    <header>
+      <h1>Support</h1>
+      <p class="meta">Keepshire for iPhone and iPad, iOS 18.5 or later. Email <a href="mailto:hello@haresh.dev">hello@haresh.dev</a>.</p>
+    </header>
+
+    <h2>Forgotten passcode or password</h2>
+    <p>There is no reset, iCloud recovery, or back door. If you forget the real vault credential, the files stay unreadable. Reinstalling Keepshire starts a new empty vault; it does not unlock the old one.</p>
+
+    <h2>Unlock and Face ID</h2>
+    <ul>
+      <li>Cancel Face ID / Touch ID to type the vault passcode or password.</li>
+      <li>After three failed biometric attempts, wait 30 seconds, then try again or use the vault credential.</li>
+      <li>Keepshire never asks for the iPhone passcode as the vault password.</li>
+    </ul>
+
+    <h2>Web Upload certificate warning</h2>
+    <p>The browser warning is expected. The phone creates a new certificate each time you start the server. In Safari, use Show Details and visit the site; in Chrome, use Advanced and proceed. In Keepshire, compare the SHA-256 fingerprint if you want to confirm it is this device. You must be on the same Wi‑Fi. Keep the app open while files transfer. If the iPhone is locked, unlock it and retry.</p>
+
+    <h2>Pairing and downloads</h2>
+    <p>Enter the 6-digit code shown in the app. After five wrong guesses the code locks until you restart the server. Downloads stay off until you allow an export session with Face ID / Touch ID or the vault credential.</p>
+
+    <h2>Notifications</h2>
+    <p>Permission is requested when you start Web Upload. If you previously refused, open iOS Settings → Keepshire → Notifications, or tap the in-app banner that links there.</p>
+
+    <h2>Decoy credential</h2>
+    <p>The fake passcode or password opens an empty UI so someone watching the phone can be shown an unused app. It does not create a second encrypted vault and does not hide files from a backup or a filesystem copy.</p>
+
+    <h2>Contact</h2>
+    <p>Email <a href="mailto:hello@haresh.dev?subject=Keepshire%20support">hello@haresh.dev</a> with your iOS version and what you were doing. Do not send vault files, passcodes, pairing codes, or certificate fingerprints in email.</p>
+  </article>
+
+  <footer class="site-footer">
+    <span>Keepshire · @keepshire</span>
+    <span>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/">Support</a>
+    </span>
+  </footer>
+</body>
+</html>
