@@ -132,7 +132,7 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Archive contains `PrivacyInfo.xcprivacy` with UserDefaults reason CA92.1 and no tracking declaration
 - [ ] Archive Info.plist has `ITSAppUsesNonExemptEncryption = YES`
 - [ ] Release run emits no verbose vault request, path, filename, or security-state diagnostics
-- [ ] Set real HTTPS `PRIVACY_POLICY_URL` and `SUPPORT_URL`; both links appear in About and open the hosted pages
+- [ ] Settings → About: Privacy Policy opens https://keepshire.haresh.dev/privacy and Support opens https://keepshire.haresh.dev/support
 - [ ] App Store Connect export answers, privacy answers, review notes, and URLs match the app and developer guide
 
 ## Automated tests

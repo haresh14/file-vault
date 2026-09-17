@@ -70,7 +70,7 @@ These values live in App Store Connect, not in the binary (except the home-scree
 | `PrivacyInfo.xcprivacy` | UserDefaults CA92.1; no tracking or collected data | App-only preferences; no account or analytics |
 | `UIBackgroundModes` | Not declared | In-flight LAN uploads use finite `beginBackgroundTask` time |
 | Scene manifest | Multiple scenes disabled | One SwiftUI `WindowGroup`; no second unlocked vault window |
-| Policy / support URLs | `PRIVACY_POLICY_URL`, `SUPPORT_URL` build settings | About links appear only for configured HTTPS values |
+| Policy / support URLs | `https://keepshire.haresh.dev/privacy`, `https://keepshire.haresh.dev/support` | Settings → About |
 | Launch screen | Explicit empty `UILaunchScreen` dictionary | Required when linking with iOS 27 SDK |
 | Signing | Automatic | Team `AYL8H487NP` |
 | Entitlements file | **None** | No App Groups, iCloud, associated domains, or push entitlement |
@@ -371,7 +371,7 @@ Security notice in UI: local network only; files encrypted after arrival. The ho
 | Trash | Enable; View Trash + count |
 | Lock Behavior | Read-only restatement of current timeout |
 | Disk | Total files; total size (encrypted files + thumbnails) |
-| About | Marketing version + build number from the bundle; Privacy Policy and Support links when their HTTPS build settings are configured |
+| About | Marketing version + build number from the bundle; Privacy Policy and Support open https://keepshire.haresh.dev/privacy and https://keepshire.haresh.dev/support |
 | Developer (DEBUG only) | Complete App Reset (`exit(0)` after wipe); Simulate First Launch Cleanup; Delete All Files & Folders (keeps passcode/settings) |
 
 All three delete vault files and thumbnails from disk before clearing metadata. Delete All Files & Folders ignores the trash setting and keeps the encryption key loaded, so imports work without unlocking again.
