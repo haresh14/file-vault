@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Keepshire</title>
+  <meta name="description" content="Keepshire privacy policy. No account, no analytics, on-device vault.">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img src="/assets/icon.png" width="44" height="44" alt="">
+      Keepshire
+    </a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/privacy/" aria-current="page">Privacy</a>
+      <a href="/support/">Support</a>
+    </nav>
+  </header>
+
+  <article class="wrap panel legal">
+    <header>
+      <h1>Privacy Policy</h1>
+      <p class="meta">Effective 17 September 2026. Keepshire is an iOS app by Haresh. Contact: <a href="mailto:hello@haresh.dev">hello@haresh.dev</a>.</p>
+    </header>
+
+    <h2>What Keepshire is</h2>
+    <p>Keepshire is a local encrypted vault for photos, videos, audio, documents, and other files you import. It has no user account and no cloud sync.</p>
+
+    <h2>Data we do not collect</h2>
+    <p>Keepshire does not create an account, run analytics, show ads, track you across apps or websites, or sell data. There is no remote service for vault contents.</p>
+
+    <h2>What stays on your device</h2>
+    <p>Imported files, encrypted metadata, vault credentials, Face ID / Touch ID decisions, security settings, and optional trash contents remain on the device. Vault directories and the app’s Core Data store are excluded from iCloud and computer backup.</p>
+    <p>The encryption key is derived from your vault passcode or password. Keychain items use This Device Only accessibility and do not sync with iCloud Keychain.</p>
+
+    <h2>Face ID and Touch ID</h2>
+    <p>If you turn biometrics on, iOS evaluates Face ID or Touch ID on the device. Keepshire does not receive biometric templates or images of your face or fingerprint.</p>
+
+    <h2>Notifications</h2>
+    <p>Keepshire asks for notification permission when you start Web Upload, so it can tell you when a transfer finishes while the app is in the background. You can refuse. In-app banners still work.</p>
+
+    <h2>Local network (Web Upload)</h2>
+    <p>Web Upload is optional. When you start it, Keepshire listens on your local Wi‑Fi with HTTPS and a certificate created on the phone. Browsers show a trust warning because there is no public certificate authority. Compare the fingerprint shown in the app if you want to confirm the connection is this phone.</p>
+    <p>A paired browser can upload files. Downloads require an export session you unlock with Face ID / Touch ID or the vault credential. Files are encrypted after they arrive on the device. Anyone on the same network who obtains the pairing code during a session could reach the server; stop the server when you are done.</p>
+
+    <h2>Screenshots, recordings, and the decoy credential</h2>
+    <p>Screenshot blanking and the decoy (fake) credential are interface protections. They can hide the vault from someone looking at the screen. They do not protect against a compromised device, a backup, or someone who can read the filesystem.</p>
+
+    <h2>App Store and this website</h2>
+    <p>This site is static marketing and policy pages. It does not receive vault files. If you email support, that message is handled as ordinary email.</p>
+
+    <h2>Children</h2>
+    <p>Keepshire does not target children and does not collect personal data for a profile.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the date at the top of this page is updated and the new text is published here. Questions: <a href="mailto:hello@haresh.dev">hello@haresh.dev</a>.</p>
+  </article>
+
+  <footer class="site-footer">
+    <span>Keepshire · @keepshire</span>
+    <span>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/">Support</a>
+    </span>
+  </footer>
+</body>
+</html>
