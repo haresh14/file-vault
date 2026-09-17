@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Network
 @testable import File_Vault
 
 @MainActor
@@ -8,6 +9,7 @@ struct WebServerManagerTests {
     final class FakeWebServerManager: ObservableObject, WebServerManaging {
         @Published var isRunning = false
         @Published var serverURL = ""
+        @Published var certificateFingerprint = ""
         @Published var connectedDevices: [String] = []
         @Published var pairingCode = ""
         @Published var exportSessionExpiresAt: Date?
@@ -15,13 +17,15 @@ struct WebServerManagerTests {
         func startServer() {
             guard !isRunning else { return }
             isRunning = true
-            serverURL = "http://127.0.0.1:8080"
+            serverURL = "https://127.0.0.1:8080"
+            certificateFingerprint = "AA:BB:CC"
             pairingCode = "123456"
         }
 
         func stopServer() {
             isRunning = false
             serverURL = ""
+            certificateFingerprint = ""
             pairingCode = ""
             exportSessionExpiresAt = nil
             connectedDevices = []
@@ -48,7 +52,8 @@ struct WebServerManagerTests {
 
         manager.startServer()
         #expect(manager.isRunning)
-        #expect(manager.serverURL == "http://127.0.0.1:8080")
+        #expect(manager.serverURL == "https://127.0.0.1:8080")
+        #expect(manager.certificateFingerprint == "AA:BB:CC")
 
         manager.stopServer()
         #expect(!manager.isRunning)
@@ -387,14 +392,16 @@ struct WebServerManagerTests {
     }
 
     @Test func testPairingResponseSetsASessionCookie() {
+        let header = WebAccessControl.sessionCookieHeader(token: "abc")
         let response = WebHTTPResponse.text(
             statusCode: 200,
             body: "ok",
-            extraHeaders: ["Set-Cookie": "fv_session=abc; Path=/; SameSite=Strict; HttpOnly"]
+            extraHeaders: ["Set-Cookie": header]
         )
         let wire = String(decoding: response.serializedData, as: UTF8.self)
 
-        #expect(wire.contains("Set-Cookie: fv_session=abc; Path=/; SameSite=Strict; HttpOnly\r\n"))
+        #expect(header.contains("Secure"))
+        #expect(wire.contains("Set-Cookie: fv_session=abc; Path=/; SameSite=Strict; HttpOnly; Secure\r\n"))
         #expect(wire.hasSuffix("\r\n\r\nok"))
     }
 
@@ -442,6 +449,90 @@ struct WebServerManagerTests {
         #expect(WebHTMLTemplate.document(title: "T", style: "S", body: "B", script: "J").contains("<style>\nS\n</style>"))
         #expect(WebHTMLTemplate.document(title: "T", style: "S", body: "B", script: "J").contains("<script>\nJ\n</script>"))
         #expect(WebHTMLPages.success(uploadedFiles: ["a&b.txt"]).contains("• a&amp;b.txt"))
-        #expect(WebHTMLPages.status(fileCount: 3, formattedSize: "1 KB", serverURL: "http://127.0.0.1:8080").contains("3"))
+        #expect(WebHTMLPages.status(fileCount: 3, formattedSize: "1 KB", serverURL: "https://127.0.0.1:8080").contains("3"))
+    }
+
+    @Test func testSelfSignedCertificateIsValidAndIncludesTheLANAddress() throws {
+        let identity = try LANWebTLSIdentity.make(ipAddresses: ["10.0.0.42"])
+        defer { identity.removeFromKeychain() }
+
+        #expect(SecCertificateCreateWithData(nil, identity.certificateDER as CFData) != nil)
+        #expect(identity.fingerprint.split(separator: ":").count == 32)
+        #expect(identity.fingerprint == LANWebTLSIdentity.fingerprint(of: identity.certificateDER))
+        // SAN iPAddress for 10.0.0.42 is context tag 7, length 4, then the octets.
+        #expect(identity.certificateDER.contains(Data([0x87, 0x04, 10, 0, 0, 42])))
+    }
+
+    @Test func testTLSListenerCompletesAHandshake() async throws {
+        let identity = try LANWebTLSIdentity.make(ipAddresses: ["127.0.0.1"])
+        defer { identity.removeFromKeychain() }
+
+        let listener = try NWListener(using: identity.listenerParameters(), on: 0)
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: .global())
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 16) { _, _, _, _ in
+                connection.cancel()
+            }
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var finished = false
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    guard !finished else { return }
+                    finished = true
+                    continuation.resume()
+                case .failed(let error):
+                    guard !finished else { return }
+                    finished = true
+                    continuation.resume(throwing: error)
+                default:
+                    break
+                }
+            }
+            listener.start(queue: .global())
+        }
+        defer { listener.cancel() }
+
+        guard let port = listener.port else {
+            throw LANWebTLSIdentity.GenerationError.invalidCertificate
+        }
+
+        let tls = NWProtocolTLS.Options()
+        sec_protocol_options_set_verify_block(tls.securityProtocolOptions, { _, _, complete in
+            complete(true)
+        }, DispatchQueue.global())
+        let connection = NWConnection(host: "127.0.0.1", port: port, using: NWParameters(tls: tls, tcp: NWProtocolTCP.Options()))
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    var finished = false
+                    connection.stateUpdateHandler = { state in
+                        switch state {
+                        case .ready:
+                            guard !finished else { return }
+                            finished = true
+                            connection.cancel()
+                            continuation.resume()
+                        case .failed(let error):
+                            guard !finished else { return }
+                            finished = true
+                            continuation.resume(throwing: error)
+                        default:
+                            break
+                        }
+                    }
+                    connection.start(queue: .global())
+                }
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 8_000_000_000)
+                throw LANWebTLSIdentity.GenerationError.invalidCertificate
+            }
+            try await group.next()
+            group.cancelAll()
+        }
     }
 }

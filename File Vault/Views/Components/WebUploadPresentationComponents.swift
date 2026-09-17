@@ -24,6 +24,7 @@ struct WebUploadHeaderView: View {
 struct WebUploadStatusCard: View {
     let isRunning: Bool
     let serverURL: String
+    let certificateFingerprint: String
     let copyURL: () -> Void
 
     var body: some View {
@@ -61,9 +62,22 @@ struct WebUploadStatusCard: View {
                         .accessibilityIdentifier("webUpload.copyURL")
                         .accessibilityLabel("Copy server URL")
                     }
-                    Text("Share this URL with devices on your network")
+                    Text("Share this HTTPS address with devices on the same Wi-Fi. The browser will warn that the certificate is not from a public authority — that is expected.")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    if !certificateFingerprint.isEmpty {
+                        Text("Certificate fingerprint")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(certificateFingerprint)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("webUpload.certificateFingerprint")
+                        Text("After the warning, compare this fingerprint with the certificate the browser shows if you want to be sure you are talking to this phone.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }
@@ -307,9 +321,9 @@ struct WebUploadInstructionsCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 InstructionStep(number: "1", text: "Make sure your device is on the same WiFi network")
                 InstructionStep(number: "2", text: "Open a web browser on any device")
-                InstructionStep(number: "3", text: "Navigate to the server URL above")
-                InstructionStep(number: "4", text: "Drag and drop files or click to browse")
-                InstructionStep(number: "5", text: "Click 'Upload Files' to transfer securely")
+                InstructionStep(number: "3", text: "Open the HTTPS URL above and accept the certificate warning")
+                InstructionStep(number: "4", text: "Enter the 6-digit pairing code shown in File Vault")
+                InstructionStep(number: "5", text: "Drag and drop files or click to browse")
             }
         }
         .padding()
@@ -324,7 +338,7 @@ struct WebUploadSecurityNotice: View {
             Label("Security Notice", systemImage: "shield.checkered")
                 .font(.headline)
                 .foregroundColor(.orange)
-            Text("• Files are uploaded securely to your device only\n• Server only runs on your local network\n• No files are sent to external servers\n• Stop the server when not in use")
+            Text("• The browser talks to this phone over HTTPS with a certificate created on the device\n• The browser warning is expected; there is no public certificate authority on your LAN\n• Files stay on this device after upload\n• Stop the server when you are done")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -458,9 +472,9 @@ struct InstructionsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         DetailedInstructionStep(number: "1", title: "Network Connection", description: "Ensure both your iPhone and the device you want to upload from are connected to the same WiFi network.")
                         DetailedInstructionStep(number: "2", title: "Start the Server", description: "Tap 'Start Server' to begin accepting file uploads. The server will only run while this app is active.")
-                        DetailedInstructionStep(number: "3", title: "Access Upload Page", description: "On any device, open a web browser and navigate to the server URL. You can also scan the QR code for quick access.")
-                        DetailedInstructionStep(number: "4", title: "Upload Files", description: "Drag and drop files onto the upload area, or click to browse and select files. Multiple files can be uploaded at once.")
-                        DetailedInstructionStep(number: "5", title: "Secure Transfer", description: "Files are encrypted and stored securely in your vault. They never leave your local network during the upload process.")
+                        DetailedInstructionStep(number: "3", title: "Accept the HTTPS warning", description: "Open the https:// address (or scan the QR code). Safari: Show Details, then visit this website. Chrome: Advanced, then proceed. Compare the certificate fingerprint in File Vault if you want to confirm it is this phone.")
+                        DetailedInstructionStep(number: "4", title: "Pair the browser", description: "Type the 6-digit pairing code shown under Web Upload. The code changes every time you start the server.")
+                        DetailedInstructionStep(number: "5", title: "Upload Files", description: "Drag and drop files onto the upload area, or click to browse and select files. Multiple files can be uploaded at once.")
                     }
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Supported File Types").font(.title2).fontWeight(.bold)
@@ -469,7 +483,7 @@ struct InstructionsView: View {
                     }
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Troubleshooting").font(.title2).fontWeight(.bold)
-                        Text("• Make sure both devices are on the same WiFi network\n• Check that your firewall isn't blocking connections\n• Try restarting the server if connections fail\n• Ensure the app stays active during uploads")
+                        Text("• Make sure both devices are on the same WiFi network\n• Accept the HTTPS certificate warning once per session\n• Check that your firewall isn't blocking connections\n• Try restarting the server if connections fail\n• Ensure the app stays active during uploads")
                             .font(.subheadline).foregroundColor(.secondary)
                     }
                 }

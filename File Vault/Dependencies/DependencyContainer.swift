@@ -111,6 +111,7 @@ protocol SecurityManaging: ObservableObject {
 protocol WebServerManaging: ObservableObject {
     var isRunning: Bool { get }
     var serverURL: String { get }
+    var certificateFingerprint: String { get }
     var connectedDevices: [String] { get }
     var pairingCode: String { get }
     var exportSessionExpiresAt: Date? { get }

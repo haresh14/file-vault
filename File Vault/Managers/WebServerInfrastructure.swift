@@ -359,7 +359,7 @@ enum WebPairingPage {
         </style></head>
         <body><div class="card">
         <h1>Enter pairing code</h1>
-        <p>Open File Vault on your iPhone and type the 6-digit code shown under Web Upload.</p>
+        <p>Open File Vault on your iPhone and type the 6-digit code shown under Web Upload. You are already on HTTPS to this phone.</p>
         \(notice)
         <form method="POST" action="/pair">
         <input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus>

@@ -14,8 +14,8 @@
 
 | Field | Value |
 |--------|--------|
-| Last inventoried from source | 2026-09-16 |
-| Last verified against source | 2026-09-16 |
+| Last inventoried from source | 2026-09-17 |
+| Last verified against source | 2026-09-17 |
 | App version (About UI) | 1.0.0 |
 | Marketing version (Xcode) | 1.0 |
 | Bundle ID | `com.haresh.FileVault` |
@@ -30,7 +30,7 @@
 
 File Vault is a **local, encrypted file vault** for iOS. Users store photos, videos, audio, documents, and other files on-device. Access is gated by a passcode or password, optionally Face ID / Touch ID. Files are encrypted at rest with a key derived from the vault credential.
 
-There is **no cloud sync, no App Groups, no widgets, no Share Extension, and no App Intents**. The only network feature is an optional **LAN HTTP server** for browser upload/download on the same Wi‑Fi.
+There is **no cloud sync, no App Groups, no widgets, no Share Extension, and no App Intents**. The only network feature is an optional **LAN HTTPS server** for browser upload/download on the same Wi‑Fi.
 
 Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `AuthenticationCoordinator` → `MainTabView`), MVVM view models, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
 
@@ -65,7 +65,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | Core Data | `Folder`, `VaultItem` metadata |
 | CryptoKit | AES-GCM encrypt/decrypt |
 | CommonCrypto | PBKDF2-HMAC-SHA256 key derivation |
-| Security (Keychain) | Real and fake credentials; `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` |
+| Security (Keychain) | Real and fake credentials; `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`; LAN TLS identity for the duration of a web-upload session |
 | LocalAuthentication | Face ID / Touch ID |
 | PhotosUI | `PHPickerViewController` (images + videos, limit 50) |
 | Photos | `PHAsset` import path on `FileStorageManager` / `PhotoImportService` (primary UI path is `PHPicker` + `VaultImportService`) |
@@ -74,7 +74,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | MediaPlayer | Imported in `AudioPreviewView` but unused (no Now Playing / remote commands) |
 | QuickLook | Document / unsupported file preview |
 | PDFKit | Document preview |
-| Network | `NWListener` local HTTP server on port **8080** |
+| Network | `NWListener` local HTTPS server on port **8080** (TLS 1.2+, per-session self-signed cert) |
 | BackgroundTasks | `BGProcessingTask` `com.haresh.FileVault.upload-processing` |
 | UserNotifications | Upload completion (alert, badge, sound) |
 | CoreMotion | Shake-to-lock accelerometer |
@@ -293,25 +293,26 @@ Category files screens reuse search, sort, selection, context menu, and preview.
 
 Playback decrypts to a temporary file; original vault file stays encrypted.
 
-### 4.11 Web upload (LAN HTTP server)
+### 4.11 Web upload (LAN HTTPS server)
 
 | ID | Feature | Behavior | Apple APIs |
 |----|---------|----------|------------|
-| W1 | Start / stop server | Toggle; shows URL `http://<LAN-IP>:8080` | `NWListener`, port **8080**, `includePeerToPeer = true` |
+| W1 | Start / stop server | Toggle; shows URL `https://<LAN-IP>:8080` and the SHA-256 fingerprint of the session certificate | `NWListener` + `NWProtocolTLS`, port **8080**, `includePeerToPeer = true` |
+| W1b | TLS | Each start mints an ECDSA P-256 self-signed certificate with SAN for `localhost`, `127.0.0.1`, and the Wi-Fi IPv4 address. The private key is ThisDeviceOnly in Keychain and is deleted when the server stops. Browsers show a trust warning because there is no public CA. | `LANWebTLSIdentity`, Security |
 | W2 | Copy URL | Clipboard + light haptic | UIPasteboard |
-| W3 | QR code | QR of server URL | Core Image `CIQRCodeGenerator` |
-| W4 | Help / instructions | Same-WiFi upload steps | SwiftUI sheet |
+| W3 | QR code | QR of the HTTPS server URL | Core Image `CIQRCodeGenerator` |
+| W4 | Help / instructions | Same-WiFi upload steps, including how to accept the HTTPS warning | SwiftUI sheet |
 | W5 | Pairing | 6-digit code shown in the app; browser posts it to `/pair` (5 attempts) for a session cookie | `WebAccessControl` |
 | W5b | Export session | Downloads stay off until Face ID / Touch ID or the vault credential unlocks a 10-minute window; ends on background or Stop Downloads | LocalAuthentication, Keychain |
 | W6 | Browser UI | Folder browse, breadcrumbs, upload, manage when not fake login | `WebServerHTMLGenerator`, `WebServerHTMLComponents` |
 | W7 | Block fake login | UI disabled; HTTP 403 | — |
 | W8 | Background keep-alive | `UIBackgroundTask` named `WebServerUpload` while uploads in flight | UIKit background task |
 | W9 | BG processing stub | Registers `com.haresh.FileVault.upload-processing` | BackgroundTasks |
-| W10 | Background URLSession | Session id `com.haresh.FileVault.background-upload`; POST `/upload` | `URLSessionConfiguration.background` |
+| W10 | Background URLSession | Session id `com.haresh.FileVault.background-upload`; POST `/upload`; trusts only this session’s TLS certificate | `URLSessionConfiguration.background` |
 | W11 | Large uploads | `POST /upload` with Content-Length **> 100MB** (`100 * 1024 * 1024`) switches to `handleLargeFileUpload`. Browser can also `POST /upload/stream` | custom HTTP |
 | W12 | Gallery web-upload sheet | Same server controls as the tab, presented from Gallery Add Content | `WebUploadView` |
 
-HTTP routes. Every route except `POST /pair` requires the session token (header `X-Vault-Token`, session cookie on GET, or `?token=` on GET). Fake login returns 403 on every route.
+HTTP routes. Transport is TLS. Every route except `POST /pair` requires the session token (header `X-Vault-Token`, session cookie on GET, or `?token=` on GET). The session cookie is `HttpOnly`, `SameSite=Strict`, and `Secure`. Fake login returns 403 on every route.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -329,7 +330,7 @@ HTTP routes. Every route except `POST /pair` requires the session token (header 
 | POST | `/api/download/ticket` | Issue a one-shot download ticket for one file, one folder, or a selection (export session required) |
 | GET | `/download/t/{ticket}` | Redeem ticket (single use, client-bound, 60s) |
 
-Security notice in UI: local network only; files encrypted after arrival. Downloads use single-use tickets while an export session is open. Download Selected sends the whole selection on one ticket and returns a single `File Vault Selection.zip`. Folder and selection ZIPs stage files with complete file protection and delete the staging directory afterward.
+Security notice in UI: local network only; files encrypted after arrival. The hop from browser to phone is HTTPS with a per-session certificate created on the device (browser warning expected; fingerprint shown in the app). Downloads use single-use tickets while an export session is open. Download Selected sends the whole selection on one ticket and returns a single `File Vault Selection.zip`. Folder and selection ZIPs stage files with complete file protection and delete the staging directory afterward.
 
 ### 4.12 Notifications and haptics
 
@@ -415,7 +416,7 @@ Biometric max failures:           3 (reset after 30s)
 Shake threshold:                  2.5
 Password min length:              6
 Passcode length:                  exactly 4 or 6 digits
-Web server port:                  8080
+Web server port:                  8080 (HTTPS, TLS 1.2+)
 PHPicker selection limit:         50
 Thumbnail size / JPEG quality:    200×200 / 0.7, AES-GCM as `{uuid}.thumb`
 BG task id:                       com.haresh.FileVault.upload-processing
@@ -491,7 +492,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 **Web & background**
 
-- [ ] Start server; URL + QR open from another device on Wi‑Fi
+- [ ] Start server; HTTPS URL + QR open from another device on Wi‑Fi after accepting the certificate warning
 - [ ] Upload small and >100MB files; folder CRUD from browser
 - [ ] Downloads remain off by default; work when enabled
 - [ ] Fake login cannot start server
@@ -507,7 +508,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 **Build**
 
 - [ ] Warn-as-known: deprecations listed in [IOS_27_UPGRADE_PLAN.md](IOS_27_UPGRADE_PLAN.md) only
-- [ ] No new unprotected network endpoints (LAN server is opt-in; `POST /pair` is the only public route and is attempt-capped)
+- [ ] No new unprotected network endpoints (LAN server is opt-in HTTPS; `POST /pair` is the only public route and is attempt-capped)
 
 ---
 

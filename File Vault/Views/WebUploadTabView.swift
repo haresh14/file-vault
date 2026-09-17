@@ -17,6 +17,7 @@ struct WebUploadTabView: View {
                     WebUploadStatusCard(
                         isRunning: webServer.isRunning,
                         serverURL: webServer.serverURL,
+                        certificateFingerprint: webServer.certificateFingerprint,
                         copyURL: copyURL
                     )
                     WebUploadServerControls(

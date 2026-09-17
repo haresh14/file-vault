@@ -266,12 +266,13 @@ flowchart TB
 
 ## 6. LAN web server
 
-`WebServerManager` owns listener lifecycle, connections, and background tasks. Pure helpers live in infrastructure/HTML files.
+`WebServerManager` owns listener lifecycle, connections, and background tasks. Each start creates a self-signed TLS identity (`LANWebTLSIdentity`). Pure helpers live in infrastructure/HTML files.
 
 ```mermaid
 flowchart TB
     UI["WebUploadTabView / WebUploadView"] --> WSM["WebServerManager"]
     WSM --> Access["WebAccessControl"]
+    WSM --> TLS["LANWebTLSIdentity"]
     WSM --> Infra["WebServerInfrastructure"]
     WSM --> HTML["WebServerHTMLGenerator"]
     HTML --> Chunks["WebServerHTMLComponents"]
@@ -279,7 +280,7 @@ flowchart TB
     WSM --> FSM["FileStorageManager"]
     WSM --> CDM["CoreDataManager"]
     WSM --> Login["LoginStateManager"]
-    Browser["LAN browser :8080"] --> WSM
+    Browser["LAN browser https :8080"] --> WSM
 ```
 
 ## 7. Dependency injection

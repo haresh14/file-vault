@@ -53,8 +53,8 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 - Audio playback; PDF (PDFKit); other documents via QuickLook
 
 ### Web upload
-- Local HTTP server on port **8080**, URL copy, QR code
-- Browser must enter the 6-digit pairing code shown in the app
+- Local HTTPS server on port **8080**, URL copy, QR code, certificate fingerprint
+- The browser shows a trust warning (self-signed, expected); then enter the 6-digit pairing code shown in the app
 - Browser upload and folder management; downloads only after Face ID / vault credential opens a 10-minute export session
 - Each download uses a single-use ticket; a multi-item selection comes back as one ZIP
 

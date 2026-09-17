@@ -49,7 +49,7 @@ AES-GCM, Keychain, Core Data, PHPicker, `NWListener`, AVPlayer, PDFKit, QuickLoo
 | Extra `UIWindow` at `alert + 1` | Valid; appearance may differ under Liquid Glass | Opaque black cover |
 | `PHPickerViewController` | Supported | Keep (no `UIImagePickerController`) |
 | `NWListener` + `includePeerToPeer` | Supported | Keep |
-| Local HTTP on :8080 | May prompt for local network | `NSLocalNetworkUsageDescription` |
+| Local HTTPS on :8080 | May prompt for local network; browser warns on the self-signed cert | `NSLocalNetworkUsageDescription` |
 | `BGTaskScheduler.register` | Supported | Permitted-identifiers plist |
 | `LAContext` Face ID / Touch ID | `biometryType` can be `.opticID` | Map Optic ID as unavailable; Face ID / Touch ID / vault credential |
 | CryptoKit AES-GCM + CommonCrypto PBKDF2 | Supported | Keep |
@@ -67,7 +67,7 @@ Optic ID is not an unlock path on this iPhone/iPad app.
 3. Capture warnings, compare to [ios27-baseline-warnings.txt](ios27-baseline-warnings.txt).
 4. Re-run [FEATURES.md §9](FEATURES.md#9-upgrade-verification-checklist).
 
-Do not enable `SWIFT_STRICT_CONCURRENCY = complete`. Do not change Core Data, encryption, or the HTTP server as part of an SDK bump.
+Do not enable `SWIFT_STRICT_CONCURRENCY = complete`. Do not change Core Data, encryption, or the HTTPS server as part of an SDK bump.
 
 ## Verification extras on iOS 27
 
@@ -80,7 +80,7 @@ Do not enable `SWIFT_STRICT_CONCURRENCY = complete`. Do not change Core Data, en
 | PHPicker 50 items; Files picker | Picker dismiss |
 | Folder CRUD, swipe delete, share | Context menus + NavigationStack |
 | Photo paging/zoom; video scrub/speed/pinch; audio; PDF | Player + preview |
-| LAN server; other device uploads small + >100MB | Local network prompt |
+| LAN HTTPS server; other device uploads small + >100MB | Local network prompt; self-signed cert warning |
 | Screen recording overlay; screenshot notice | Scene screen vs `UIScreen.main` |
 | iPhone and iPad; iPad context menu icons | TabView + menu image policy |
 | Existing vault from an iOS 18.5 build still unlocks | Keychain + AES-GCM + Core Data |

@@ -186,6 +186,10 @@ final class WebAccessControl {
 
     static let sessionCookieName = "fv_session"
 
+    static func sessionCookieHeader(token: String) -> String {
+        "\(sessionCookieName)=\(token); Path=/; SameSite=Strict; HttpOnly; Secure"
+    }
+
     // MARK: - Download tickets
 
     /// One-shot, short-lived, client-bound link for a single file or folder.

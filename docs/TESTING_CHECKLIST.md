@@ -93,8 +93,8 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Web upload
 
-- [ ] Start server on port 8080; open URL from another device on the same Wi‑Fi
-- [ ] Browser asks for the 6-digit pairing code; uploads work after pairing
+- [ ] Start server on port 8080; open the **https** URL from another device on the same Wi‑Fi
+- [ ] Browser warns about the certificate; accept it, then enter the 6-digit pairing code; uploads work after pairing
 - [ ] Downloads stay hidden until Allow Downloads is confirmed with Face ID or the vault credential
 - [ ] After that, per-file/folder download icons and Download Selected appear; they vanish when the session ends
 - [ ] Download Selected with several files and folders picked returns one ZIP containing every pick

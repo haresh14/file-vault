@@ -17,6 +17,8 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     @Published var isRunning = false
     @Published var serverURL: String = ""
+    /// SHA-256 of the session TLS certificate, shown so a person can check the browser warning.
+    @Published var certificateFingerprint: String = ""
     @Published var connectedDevices: [String] = []
     /// Short code the user types in the browser to pair a device with this session.
     @Published var pairingCode: String = ""
@@ -24,6 +26,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     @Published var exportSessionExpiresAt: Date?
 
     let accessControl = WebAccessControl()
+    private(set) var tlsIdentity: LANWebTLSIdentity?
 
     private var listener: NWListener?
     private var connections: [NWConnection] = []
@@ -42,17 +45,35 @@ class WebServerManager: ObservableObject, WebServerManaging {
 
         accessControl.rotateToken()
         let code = accessControl.pairingCode ?? ""
-        DispatchQueue.main.async { self.pairingCode = code }
+        let lanIP = getLocalIPAddress()
+        var addresses = ["127.0.0.1"]
+        if let lanIP, !addresses.contains(lanIP) { addresses.append(lanIP) }
+
+        let identity: LANWebTLSIdentity
+        do {
+            identity = try LANWebTLSIdentity.make(ipAddresses: addresses)
+        } catch {
+            print("DEBUG: Failed to create TLS identity: \(error)")
+            accessControl.invalidate()
+            return
+        }
+        tlsIdentity?.removeFromKeychain()
+        tlsIdentity = identity
+
+        DispatchQueue.main.async {
+            self.pairingCode = code
+            self.certificateFingerprint = identity.fingerprint
+        }
 
         guard let port = NWEndpoint.Port(rawValue: UInt16(serverPort)) else {
             print("DEBUG: Invalid port: \(serverPort)")
+            identity.removeFromKeychain()
+            tlsIdentity = nil
             return
         }
-        
-        let parameters = NWParameters.tcp
-        parameters.allowLocalEndpointReuse = true
-        parameters.includePeerToPeer = true
-        
+
+        let parameters = identity.listenerParameters()
+
         do {
             let listener = try NWListener(using: parameters, on: port)
             print("DEBUG: Listener created successfully")
@@ -73,8 +94,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
                     }
                 case .failed(let error):
                     print("DEBUG: Server failed to start: \(error)")
+                    self?.tlsIdentity?.removeFromKeychain()
+                    self?.tlsIdentity = nil
                     DispatchQueue.main.async {
                         self?.isRunning = false
+                        self?.certificateFingerprint = ""
                     }
                 case .cancelled:
                     print("DEBUG: Server cancelled")
@@ -91,6 +115,9 @@ class WebServerManager: ObservableObject, WebServerManaging {
             print("DEBUG: Listener started")
         } catch {
             print("DEBUG: Failed to create listener: \(error)")
+            identity.removeFromKeychain()
+            tlsIdentity = nil
+            DispatchQueue.main.async { self.certificateFingerprint = "" }
         }
     }
     
@@ -101,10 +128,13 @@ class WebServerManager: ObservableObject, WebServerManaging {
         
         endBackgroundTask()
         accessControl.invalidate()
+        tlsIdentity?.removeFromKeychain()
+        tlsIdentity = nil
 
         DispatchQueue.main.async {
             self.isRunning = false
             self.serverURL = ""
+            self.certificateFingerprint = ""
             self.pairingCode = ""
             self.exportSessionExpiresAt = nil
             self.exportSessionTimer?.invalidate()
@@ -490,7 +520,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 statusCode: 200,
                 body: html,
                 extraHeaders: [
-                    "Set-Cookie": "\(WebAccessControl.sessionCookieName)=\(token); Path=/; SameSite=Strict; HttpOnly"
+                    "Set-Cookie": WebAccessControl.sessionCookieHeader(token: token)
                 ]
             )
         )
@@ -1392,7 +1422,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 statusCode: 200,
                 body: WebPairingPage.successHTML(),
                 extraHeaders: [
-                    "Set-Cookie": "\(WebAccessControl.sessionCookieName)=\(token); Path=/; SameSite=Strict; HttpOnly"
+                    "Set-Cookie": WebAccessControl.sessionCookieHeader(token: token)
                 ]
             )
         )
@@ -1599,7 +1629,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     
     private func updateServerURL() {
         if let localIP = getLocalIPAddress() {
-            serverURL = "http://\(localIP):\(serverPort)"
+            serverURL = "https://\(localIP):\(serverPort)"
         }
     }
     

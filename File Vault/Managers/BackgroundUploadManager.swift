@@ -126,6 +126,21 @@ class BackgroundUploadManager: NSObject {
 
 // MARK: - URLSessionDelegate
 extension BackgroundUploadManager: URLSessionDelegate {
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust,
+              let identity = WebServerManager.shared.tlsIdentity,
+              identity.matches(trust) else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: trust))
+    }
+
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         DispatchQueue.main.async {
             if let completionHandler = self.uploadCompletionHandlers[session.configuration.identifier ?? ""] {
