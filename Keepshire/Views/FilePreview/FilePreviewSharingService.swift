@@ -2,16 +2,42 @@
 //  FilePreviewSharingService.swift
 //  Keepshire
 //
-//  Service for handling file sharing from preview views
-//
 
 import SwiftUI
 import UIKit
 
 struct FilePreviewSharingService {
-    
-    /// Key window of the scene the user is currently interacting with, falling back to
-    /// another visible window in that same scene when no window reports itself as key.
+    static func shareFile(fileData: Data?, fileName: String?) {
+        guard let fileData, let fileName else { return }
+
+        let sharing = TemporarySharingService(fileManager: .default)
+        do {
+            let tempURL = try sharing.prepare(data: fileData, fileName: fileName)
+            let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            activityVC.completionWithItemsHandler = { _, _, _, _ in
+                sharing.cleanup(at: tempURL)
+            }
+
+            if let window = activeKeyWindow(),
+               let rootVC = window.rootViewController {
+                if let popover = activityVC.popoverPresentationController {
+                    popover.sourceView = window
+                    popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+                }
+
+                var presentingVC = rootVC
+                while let presented = presentingVC.presentedViewController {
+                    presentingVC = presented
+                }
+                presentingVC.present(activityVC, animated: true)
+            } else {
+                sharing.cleanup(at: tempURL)
+            }
+        } catch {
+            VaultLog.debug("Failed to share file: \(error)")
+        }
+    }
+
     private static func activeKeyWindow() -> UIWindow? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let ordered = scenes.filter { $0.activationState == .foregroundActive }
@@ -28,44 +54,5 @@ struct FilePreviewSharingService {
             }
         }
         return nil
-    }
-
-    /// Share a file using the native iOS share sheet
-    /// - Parameters:
-    ///   - fileData: The file data to share
-    ///   - fileName: The name of the file
-    static func shareFile(fileData: Data?, fileName: String?) {
-        guard let fileData = fileData,
-              let fileName = fileName else { return }
-        
-        // Create temporary file for sharing
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempURL = tempDir.appendingPathComponent(fileName)
-        
-        do {
-            try fileData.write(to: tempURL)
-            let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-            
-            // Present the share sheet
-            if let window = activeKeyWindow(),
-               let rootVC = window.rootViewController {
-                
-                // For iPad
-                if let popover = activityVC.popoverPresentationController {
-                    popover.sourceView = window
-                    popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
-                }
-                
-                // The preview itself is presented modally, so share from the topmost controller
-                var presentingVC = rootVC
-                while let presented = presentingVC.presentedViewController {
-                    presentingVC = presented
-                }
-
-                presentingVC.present(activityVC, animated: true)
-            }
-        } catch {
-            VaultLog.debug("Failed to share file: \(error)")
-        }
     }
 }

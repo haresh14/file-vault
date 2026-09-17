@@ -60,6 +60,21 @@ private struct KeepshireRootView: View {
         ContentView()
             .dependencies(dependencies)
             .environment(\.managedObjectContext, dependencies.coreDataManager.context)
+            .overlay {
+                if let error = dependencies.coreDataManager.persistentStoreLoadError {
+                    VStack(spacing: 12) {
+                        Text("Keepshire could not open its database.")
+                            .font(.headline)
+                        Text(error.localizedDescription)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(uiColor: .systemBackground))
+                }
+            }
             .onAppear {
                 if dependencies.appDataManager.isFirstLaunch {
                     VaultLog.debug("DEBUG: 🚀 First app launch detected - performing cleanup...")

@@ -105,7 +105,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 
 | Path / store | Protection | Encrypted by app? |
 |--------------|------------|-------------------|
-| `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
+| `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM. Files under 16 MB are a single combined sealed box. Larger files use a `KSHC` chunked layout (1 MB plaintext chunks). Filenames on disk are the item UUID, not the display name. Imports above 2 GB are rejected. |
 | `Documents/Thumbnails/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes named `{uuid}.thumb` (200×200 JPEG @ 0.7 before encryption) |
 | `Documents/Keepshire.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | Display names, MIME types, and sizes are AES-GCM sealed JSON on each row (`sealedMetadata`). Search uses the decrypted copies in RAM after unlock. The store, `Documents/Vault/`, and `Documents/Thumbnails/` are excluded from iCloud/computer backup. |
 | Keychain items `com.haresh.keepshire` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
@@ -114,8 +114,10 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 **Encryption details**
 
 - Key = PBKDF2-HMAC-SHA256 of the real credential (210,000 iterations, 16-byte random salt, 32-byte key). Salt and parameters live in Keychain account `vaultKeyDerivation` (`WhenUnlockedThisDeviceOnly`).
-- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files, thumbnails, and Core Data `sealedMetadata` JSON.
-- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped. Item and folder metadata blobs are re-sealed with the new key.
+- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files, thumbnails, and Core Data `sealedMetadata` JSON. Vault blobs at or above 16 MB are stored as versioned `KSHC` chunked sealed boxes so import does not hold the whole file in RAM.
+- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Re-encrypted copies are staged as `.migrating` files and committed only after every blob succeeds; a failure leaves the previous key and original ciphertext in place. Item and folder metadata blobs are re-sealed with the new key after that commit.
+- Core Data `save()` throws instead of crashing the process. A store that fails to load shows an error overlay on launch.
+- Share and preview decrypt into `tmp/keepshire-share/<session>/`. Those directories are removed when the share sheet finishes, when the vault locks, and on the next unlock.
 - If ciphertext exists but no derivation record is in Keychain, unlock derives a SHA-256 key long enough to open those files, then re-encrypts them with PBKDF2 and stores a salt.
 - Duplicate display names in a folder get a suffix (`name (n).ext`). Each item has its own UUID blob on disk. Display name, MIME type, and size live in sealed JSON; gallery search filters decrypted `fileName` values in memory.
 - Permanent delete removes the item's ciphertext and thumbnail from disk. Unlock also deletes vault files and thumbnails that no item claims; the sweep is skipped when the vault has no items.
@@ -468,7 +470,7 @@ These are confirmed absences. Do not treat them as regressions unless product ad
 
 | Target | Coverage (current files) |
 |--------|---------------------------|
-| KeepshireTests | Keychain (including derivation record), Core Data, storage/crypto/thumbnails/trash, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
+| KeepshireTests | Keychain (including derivation record), Core Data save-without-crash, storage/crypto/thumbnails/trash, chunked vault blobs, tmp share sweep, fail-closed passcode migration, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
 | KeepshireUITests | First-launch authentication, tab/navigation, fake-vault restrictions, add controls, and launch smoke tests |
 
 Upgrade work should run unit tests on the new SDK simulator and a smoke pass of UI tests. Tests are not a substitute for the checklist below.

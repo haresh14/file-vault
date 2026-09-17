@@ -226,7 +226,7 @@ struct SettingsView: View {
     private func performDeleteAllFiles() {
         FileStorageManager.shared.deleteAllVaultContent()
         CoreDataManager.shared.fetchAllFolders().forEach(CoreDataManager.shared.deleteFolder)
-        CoreDataManager.shared.save()
+        CoreDataManager.shared.persistChanges()
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             NotificationCenter.default.post(
@@ -267,7 +267,7 @@ struct SettingsView: View {
                     VaultLog.debug("Error permanently deleting trashed file: \(error)")
                 }
             }
-            CoreDataManager.shared.save()
+            CoreDataManager.shared.persistChanges()
             UserDefaults.standard.set(false, forKey: Constants.trashEnabledKey)
             trashEnabled = false
             loadTrashCount()

@@ -35,6 +35,8 @@ LAN web upload uses `NSLocalNetworkUsageDescription` in the same Info.plist.
 
 Notification authorization is requested when the user starts Web Upload. Do not move it back to app launch or unlock.
 
+`CoreDataManager.save()` throws. A failed SQLite load does not `fatalError`; the root view shows a database error overlay. Share plaintext lives under `tmp/keepshire-share/` and is swept on lock and unlock. Vault files at or above 16 MB use chunked AES-GCM (`KSHC`); imports above 2 GB are rejected. Passcode change stages `.migrating` copies and only commits the new key after every blob succeeds.
+
 ## App Store Compliance
 
 ### Export compliance

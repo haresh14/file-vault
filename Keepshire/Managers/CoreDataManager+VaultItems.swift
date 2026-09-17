@@ -14,8 +14,13 @@ extension CoreDataManager {
         item.createdAt = Date()
         item.updatedAt = Date()
         item.folder = folder
-        save()
-        return item
+        do {
+            try save()
+            return item
+        } catch {
+            context.rollback()
+            return nil
+        }
     }
 
     func createVaultItem(
@@ -25,7 +30,7 @@ extension CoreDataManager {
         thumbnailFileName: String? = nil,
         in folder: Folder? = nil,
         id: UUID? = nil
-    ) -> VaultItem {
+    ) throws -> VaultItem {
         let item = NSEntityDescription.insertNewObject(
             forEntityName: "VaultItem",
             into: context
@@ -38,13 +43,13 @@ extension CoreDataManager {
         item.createdAt = Date()
         item.updatedAt = Date()
         item.folder = folder
-        save()
+        try save()
         return item
     }
 
     func deleteVaultItem(_ item: VaultItem) {
         context.delete(item)
-        save()
+        persistChanges()
     }
 
     func fetchAllVaultItems() -> [VaultItem] {
@@ -65,13 +70,13 @@ extension CoreDataManager {
     func moveVaultItem(_ item: VaultItem, to folder: Folder?) {
         item.folder = folder
         item.updatedAt = Date()
-        save()
+        persistChanges()
     }
 
     func toggleFavorite(for item: VaultItem) {
         item.isFavorite.toggle()
         item.updatedAt = Date()
-        save()
+        persistChanges()
     }
 
     func fetchFavoriteVaultItems() -> [VaultItem] {

@@ -75,6 +75,7 @@ final class AuthenticationCoordinator: ObservableObject {
             isCheckingBiometric = false
             shouldShowPasscode = false
             loginStateManager.resetLoginState()
+            fileStorageManager.sweepTemporaryShareFiles()
 
             if isPasswordSet && !isAuthenticated {
                 checkBiometricAuthentication()
@@ -107,6 +108,7 @@ final class AuthenticationCoordinator: ObservableObject {
         isAuthenticated = true
         shouldShowPasscode = false
         biometricManager.resetFailureCount()
+        fileStorageManager.sweepTemporaryShareFiles()
         setupEncryptionKey()
     }
 
@@ -116,6 +118,7 @@ final class AuthenticationCoordinator: ObservableObject {
         isAuthenticated = false
         loginStateManager.resetLoginState()
         keychainManager.setLastBackgroundTime()
+        fileStorageManager.sweepTemporaryShareFiles()
 
         DispatchQueue.main.async {
             let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)

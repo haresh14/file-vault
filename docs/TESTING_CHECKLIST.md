@@ -60,7 +60,8 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 ## Change authentication
 
 - [ ] Change method in Settings re-encrypts files
-- [ ] Old credential cannot decrypt
+- [ ] If re-encrypt cannot finish, the old credential still opens files
+- [ ] Old credential cannot decrypt after a successful change
 - [ ] Fake password is cleared
 
 ## Vault encryption
@@ -75,7 +76,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Vault that had plaintext thumbs: first unlock still shows thumbnails (files are rewritten under AES-GCM)
 - [ ] After unlock, Gallery search still matches the original filename
 - [ ] Lock the device, inspect `Keepshire.sqlite` (or a Core Data dump): `fileName` / folder `name` are empty; `sealedMetadata` is present
-- [ ] `Documents/Vault`, `Documents/Thumbnails`, and `Keepshire.sqlite` have “Do not back up” set
+- [ ] Share a file, cancel the sheet, lock the app: no decrypted file remains under `tmp/keepshire-share/`
+- [ ] Import a video from Photos; the app stays running (does not jetsam on a large clip under 2 GB)
+- [ ] Files larger than 2 GB fail import with an error
 
 ## Files and folders
 

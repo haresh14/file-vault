@@ -178,7 +178,7 @@ class FileStorageManager: FileStorageManaging {
         metadataSealer.key = encryptionKey
         metadataSealer.revealLazily(in: coreDataManager.context)
         if metadataSealer.sealLegacyPlaintext(in: coreDataManager.context) {
-            coreDataManager.save()
+            coreDataManager.persistChanges()
         }
         migrateOnDiskNamesToUUID()
         encryptPlaintextThumbnails()
@@ -199,21 +199,33 @@ class FileStorageManager: FileStorageManaging {
         let totalItems = allItems.count
         
         VaultLog.debug("DEBUG: Found \(totalItems) items to migrate")
-        
-        for (index, item) in allItems.enumerated() {
-            // The migrateVaultItem function now handles errors internally and doesn't throw
-            // It will either migrate successfully or skip the file
-            try await migrateVaultItem(item, oldKey: oldKey, newKey: newKey)
-            
-            // Report progress
-            await MainActor.run {
-                progress(index + 1, totalItems)
+
+        var stagedNames: [String] = []
+        var didCommit = false
+        defer {
+            if !didCommit {
+                for name in stagedNames {
+                    try? fileManager.removeItem(at: vaultDirectory.appendingPathComponent(name))
+                    try? fileManager.removeItem(at: thumbnailsDirectory.appendingPathComponent(name))
+                }
             }
-            
-            // Small delay to allow UI updates to be visible
-            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
         }
-        
+
+        do {
+            for (index, item) in allItems.enumerated() {
+                stagedNames.append(contentsOf: try stageReencryptedCopies(item, oldKey: oldKey, newKey: newKey))
+                await MainActor.run {
+                    progress(index + 1, totalItems)
+                }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+
+            try commitStagedCopies(for: allItems)
+            didCommit = true
+        } catch {
+            throw FileStorageError.migrationFailed
+        }
+
         VaultLog.debug("DEBUG: Migration completed successfully")
 
         try keyDerivationStore.saveRecord(newRecord)
@@ -224,14 +236,105 @@ class FileStorageManager: FileStorageManaging {
             oldKey: oldKey,
             newKey: newKey
         )
-        coreDataManager.save()
+        try coreDataManager.save()
         
         VaultLog.debug("DEBUG: File migration completed successfully")
     }
     
-    /// Migrate a single vault item to the new encryption key
-    private func migrateVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) async throws {
-        reencryptVaultItem(vaultItem, oldKey: oldKey, newKey: newKey)
+    private func stageReencryptedCopies(
+        _ vaultItem: VaultItem,
+        oldKey: SymmetricKey,
+        newKey: SymmetricKey
+    ) throws -> [String] {
+        guard let sourceName = existingVaultFileName(for: vaultItem) else {
+            throw FileStorageError.migrationFailed
+        }
+        if sourceName.hasPrefix(".") || sourceName == ".DS_Store" {
+            return []
+        }
+
+        var staged: [String] = []
+        let destinationName = vaultItem.storedBlobName ?? sourceName
+        let stagedBlob = destinationName + ".migrating"
+        let plaintext = try encryptedFileStore.read(fileName: sourceName, key: oldKey)
+        try encryptedFileStore.write(plaintext, fileName: stagedBlob, key: newKey)
+        staged.append(stagedBlob)
+
+        if let destName = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName,
+           encryptedThumbnailStore.exists(fileName: destName)
+            || vaultItem.storedThumbnailCandidates.contains(where: { encryptedThumbnailStore.exists(fileName: $0) }) {
+            let stagedThumb = destName + ".migrating"
+            try stageThumbnail(vaultItem, destName: destName, stagedName: stagedThumb, oldKey: oldKey, newKey: newKey)
+            staged.append(stagedThumb)
+        }
+        return staged
+    }
+
+    private func stageThumbnail(
+        _ vaultItem: VaultItem,
+        destName: String,
+        stagedName: String,
+        oldKey: SymmetricKey,
+        newKey: SymmetricKey
+    ) throws {
+        var sourceName = destName
+        if !encryptedThumbnailStore.exists(fileName: destName) {
+            sourceName = vaultItem.storedThumbnailCandidates.first { encryptedThumbnailStore.exists(fileName: $0) } ?? destName
+        }
+        guard encryptedThumbnailStore.exists(fileName: sourceName) else { return }
+        let data = try Data(contentsOf: thumbnailsDirectory.appendingPathComponent(sourceName))
+        let jpeg: Data
+        if let decrypted = try? cryptoService.decrypt(data, using: oldKey) {
+            jpeg = decrypted
+        } else if isJPEGData(data) {
+            jpeg = data
+        } else {
+            throw FileStorageError.migrationFailed
+        }
+        try encryptedThumbnailStore.write(jpeg, fileName: stagedName, key: newKey)
+    }
+
+    private func commitStagedCopies(for items: [VaultItem]) throws {
+        for item in items {
+            let sourceName = existingVaultFileName(for: item)
+            guard let dest = item.storedBlobName ?? sourceName else { continue }
+            let stagedBlob = dest + ".migrating"
+            if encryptedFileStore.exists(fileName: stagedBlob) {
+                if dest != stagedBlob, encryptedFileStore.exists(fileName: dest) {
+                    try fileManager.removeItem(at: encryptedFileStore.url(for: dest))
+                }
+                try encryptedFileStore.move(from: stagedBlob, to: dest)
+                if let sourceName, sourceName != dest, encryptedFileStore.exists(fileName: sourceName) {
+                    try? fileManager.removeItem(at: encryptedFileStore.url(for: sourceName))
+                }
+            }
+            if let thumb = item.storedThumbnailName ?? item.thumbnailFileName {
+                let stagedThumb = thumb + ".migrating"
+                if encryptedThumbnailStore.exists(fileName: stagedThumb) {
+                    if encryptedThumbnailStore.exists(fileName: thumb) {
+                        try fileManager.removeItem(at: encryptedThumbnailStore.url(for: thumb))
+                    }
+                    try encryptedThumbnailStore.move(from: stagedThumb, to: thumb)
+                }
+            }
+        }
+    }
+
+    private func reencryptVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) throws {
+        guard let sourceName = existingVaultFileName(for: vaultItem) else {
+            throw FileStorageError.migrationFailed
+        }
+
+        if sourceName.hasPrefix(".") || sourceName == ".DS_Store" {
+            return
+        }
+
+        let destinationName = vaultItem.storedBlobName ?? sourceName
+        try encryptedFileStore.reencrypt(fileName: sourceName, oldKey: oldKey, newKey: newKey)
+        if destinationName != sourceName {
+            try encryptedFileStore.move(from: sourceName, to: destinationName)
+        }
+        try reencryptThumbnail(vaultItem, oldKey: oldKey, newKey: newKey)
     }
 
     private func deriveKey(for password: String) -> SymmetricKey {
@@ -256,7 +359,7 @@ class FileStorageManager: FileStorageManaging {
         guard let newKey = try? cryptoService.key(from: password, record: record) else { return }
 
         for item in coreDataManager.fetchAllVaultItems() {
-            reencryptVaultItem(item, oldKey: oldKey, newKey: newKey)
+            try? reencryptVaultItem(item, oldKey: oldKey, newKey: newKey)
         }
 
         do {
@@ -275,38 +378,7 @@ class FileStorageManager: FileStorageManaging {
         }
     }
 
-    private func reencryptVaultItem(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) {
-        guard let sourceName = existingVaultFileName(for: vaultItem) else {
-            VaultLog.debug("DEBUG: Skipping item with no on-disk file")
-            return
-        }
-
-        if sourceName.hasPrefix(".") || sourceName == ".DS_Store" {
-            VaultLog.debug("DEBUG: Skipping system file: \(sourceName)")
-            return
-        }
-
-        let fileURL = vaultDirectory.appendingPathComponent(sourceName)
-        let destinationName = vaultItem.storedBlobName ?? sourceName
-        let destinationURL = vaultDirectory.appendingPathComponent(destinationName)
-
-        do {
-            let encryptedData = try Data(contentsOf: fileURL)
-            let decryptedData = try cryptoService.decrypt(encryptedData, using: oldKey)
-            let newEncryptedData = try cryptoService.encrypt(decryptedData, using: newKey)
-            try newEncryptedData.write(to: destinationURL)
-            if destinationURL != fileURL {
-                try? fileManager.removeItem(at: fileURL)
-            }
-            VaultLog.debug("DEBUG: Successfully migrated file: \(sourceName)")
-        } catch {
-            VaultLog.debug("DEBUG: Failed to migrate file \(sourceName): \(error)")
-        }
-
-        reencryptThumbnail(vaultItem, oldKey: oldKey, newKey: newKey)
-    }
-
-    private func reencryptThumbnail(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) {
+    private func reencryptThumbnail(_ vaultItem: VaultItem, oldKey: SymmetricKey, newKey: SymmetricKey) throws {
         guard let destName = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName else { return }
         let destURL = thumbnailsDirectory.appendingPathComponent(destName)
         var sourceURL = destURL
@@ -328,16 +400,12 @@ class FileStorageManager: FileStorageManaging {
         } else if isJPEGData(data) {
             jpeg = data
         } else {
-            return
+            throw FileStorageError.migrationFailed
         }
 
-        do {
-            try encryptedThumbnailStore.write(jpeg, fileName: destName, key: newKey)
-            if sourceURL != destURL {
-                try? fileManager.removeItem(at: sourceURL)
-            }
-        } catch {
-            VaultLog.debug("DEBUG: Failed to migrate thumbnail \(destName): \(error)")
+        try encryptedThumbnailStore.write(jpeg, fileName: destName, key: newKey)
+        if sourceURL != destURL {
+            try? fileManager.removeItem(at: sourceURL)
         }
     }
 
@@ -359,7 +427,7 @@ class FileStorageManager: FileStorageManaging {
             }
         }
         if didChange {
-            coreDataManager.save()
+            coreDataManager.persistChanges()
         }
     }
 
@@ -437,7 +505,7 @@ class FileStorageManager: FileStorageManaging {
             }
             if item.thumbnailFileName != destName {
                 item.thumbnailFileName = destName
-                coreDataManager.save()
+                coreDataManager.persistChanges()
             }
             return true
         } catch {
@@ -588,7 +656,7 @@ class FileStorageManager: FileStorageManaging {
         let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
         let persisted = try persistNewBlob(data: data, displayName: uniqueFileName, fileType: fileType, key: key)
         
-        let vaultItem = coreDataManager.createVaultItem(
+        let vaultItem = try coreDataManager.createVaultItem(
             fileName: uniqueFileName,
             fileType: fileType,
             fileSize: Int64(data.count),
@@ -601,7 +669,33 @@ class FileStorageManager: FileStorageManaging {
         
         return vaultItem
     }
-    
+
+    func saveFile(fromFileURL url: URL, fileName: String, fileType: String, targetFolder: Folder? = nil) throws -> VaultItem {
+        guard let key = encryptionKey else {
+            throw FileStorageError.noEncryptionKey
+        }
+        let size = Int64((try url.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0)
+        if isDuplicateContent(fileSize: size, fileType: fileType, targetFolder: targetFolder) {
+            throw FileStorageError.duplicateFile
+        }
+        let uniqueFileName = resolveFilenameConflicts(fileName: fileName, targetFolder: targetFolder)
+        let persisted = try persistNewBlob(
+            fromFileURL: url,
+            displayName: uniqueFileName,
+            fileType: fileType,
+            fileSize: size,
+            key: key
+        )
+        return try coreDataManager.createVaultItem(
+            fileName: uniqueFileName,
+            fileType: fileType,
+            fileSize: size,
+            thumbnailFileName: persisted.thumbnailFileName,
+            in: targetFolder,
+            id: persisted.blobID
+        )
+    }
+
     // New method for background imports
     func saveFileInBackground(data: Data, fileName: String, fileType: String, targetFolder: Folder? = nil, completion: @escaping (Result<VaultItem, Error>) -> Void) {
         VaultLog.debug("DEBUG: saveFileInBackground called - fileName: \(fileName), fileType: \(fileType), dataSize: \(data.count)")
@@ -677,9 +771,39 @@ class FileStorageManager: FileStorageManaging {
         return (blobID, thumbnailFileName)
     }
 
+    private func persistNewBlob(
+        fromFileURL source: URL,
+        displayName: String,
+        fileType: String,
+        fileSize: Int64,
+        key: SymmetricKey
+    ) throws -> (blobID: UUID, thumbnailFileName: String?) {
+        let blobID = UUID()
+        let blobName = blobID.uuidString
+        try encryptedFileStore.write(fromFileURL: source, fileName: blobName, key: key)
+
+        var thumbnailFileName: String?
+        if fileType.hasPrefix("image/"), fileSize < Int64(VaultBlobFormat.inMemoryThreshold) {
+            let data = try Data(contentsOf: source, options: [.mappedIfSafe])
+            thumbnailFileName = try? thumbnailService.generateImageThumbnail(
+                from: data,
+                storageKey: blobName,
+                key: key
+            )
+        } else if fileType.hasPrefix("video/") {
+            thumbnailFileName = try? thumbnailService.generateVideoThumbnail(
+                fromFileURL: source,
+                storageKey: blobName,
+                displayFileName: displayName,
+                key: key
+            )
+        }
+        return (blobID, thumbnailFileName)
+    }
+
     func loadFile(vaultItem: VaultItem) throws -> Data {
         if migrateItemOnDisk(vaultItem) {
-            coreDataManager.save()
+            coreDataManager.persistChanges()
         }
         guard let key = encryptionKey else {
             throw FileStorageError.noEncryptionKey
@@ -745,7 +869,7 @@ class FileStorageManager: FileStorageManaging {
 
         vaultItem.fileName = newFileName
         vaultItem.updatedAt = Date()
-        coreDataManager.save()
+        try coreDataManager.save()
     }
     
     // MARK: - Share Management
@@ -767,10 +891,14 @@ class FileStorageManager: FileStorageManaging {
     func cleanupTemporaryFile(at url: URL) {
         temporarySharingService.cleanup(at: url)
     }
+
+    func sweepTemporaryShareFiles() {
+        temporarySharingService.sweepAll()
+    }
     
     func loadThumbnail(for vaultItem: VaultItem) -> Data? {
         if migrateItemOnDisk(vaultItem) {
-            coreDataManager.save()
+            coreDataManager.persistChanges()
         }
         upgradeThumbnailIfPlaintext(vaultItem)
         guard let name = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName else { return nil }
@@ -850,14 +978,18 @@ class FileStorageManager: FileStorageManaging {
                     completion(.failure(error))
                 }
             },
-            videoHandler: { data, fileName, fileType in
-                self.saveFileInBackground(
-                    data: data,
-                    fileName: fileName,
-                    fileType: fileType,
-                    targetFolder: targetFolder,
-                    completion: completion
-                )
+            videoHandler: { url, fileName, fileType in
+                do {
+                    let item = try self.saveFile(
+                        fromFileURL: url,
+                        fileName: fileName,
+                        fileType: fileType,
+                        targetFolder: targetFolder
+                    )
+                    completion(.success(item))
+                } catch {
+                    completion(.failure(error))
+                }
             },
             completion: completion
         )
@@ -915,7 +1047,7 @@ extension FileStorageManager {
 
 // MARK: - Errors
 
-enum FileStorageError: LocalizedError {
+enum FileStorageError: LocalizedError, Equatable {
     case noEncryptionKey
     case encryptionFailed
     case decryptionFailed
@@ -923,7 +1055,10 @@ enum FileStorageError: LocalizedError {
     case importFailed
     case duplicateFile
     case fileAlreadyExists
-    
+    case fileTooLarge
+    case saveFailed
+    case migrationFailed
+
     var errorDescription: String? {
         switch self {
         case .noEncryptionKey:
@@ -940,6 +1075,12 @@ enum FileStorageError: LocalizedError {
             return "File already exists in the target location."
         case .fileAlreadyExists:
             return "A file with this name already exists."
+        case .fileTooLarge:
+            return "This file is larger than 2 GB and cannot be imported."
+        case .saveFailed:
+            return "Keepshire could not save this file."
+        case .migrationFailed:
+            return "Keepshire could not re-encrypt every file. The previous passcode is still in use."
         }
     }
 } 

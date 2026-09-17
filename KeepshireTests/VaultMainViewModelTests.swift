@@ -74,7 +74,7 @@ struct VaultMainViewModelTests {
         #expect(viewModel.filteredItems.isEmpty, "Filtered items should be empty initially")
     }
 
-    @Test func testOrderingSearchSelectionAndMediaIndexParity() {
+    @Test func testOrderingSearchSelectionAndMediaIndexParity() throws {
         let coreData = TestCoreDataStore.reset()
         let storage = FakeFileStorageManager(coreDataManager: coreData)
         let login = FakeLoginStateManager()
@@ -83,7 +83,7 @@ struct VaultMainViewModelTests {
         let second = coreData.createVaultItem(fileType: "video/quicktime", fileName: "Alpha.mov", folder: nil)!
         second.createdAt = Date(timeIntervalSince1970: 2)
         _ = coreData.createVaultItem(fileType: "application/pdf", fileName: "Ignored.pdf", folder: nil)
-        coreData.save()
+        try coreData.save()
 
         let viewModel = VaultMainViewModel(
             coreDataManager: coreData,

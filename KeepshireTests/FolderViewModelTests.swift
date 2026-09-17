@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct FolderViewModelTests {
-    @Test func sortingSelectionAndMediaIndexMatchDisplayedOrder() {
+    @Test func sortingSelectionAndMediaIndexMatchDisplayedOrder() throws {
         let coreData = TestCoreDataStore.reset()
         let login = FakeLoginStateManager()
         let storage = FakeFileStorageManager(coreDataManager: coreData)
@@ -12,7 +12,7 @@ struct FolderViewModelTests {
         older.createdAt = Date(timeIntervalSince1970: 1)
         let newer = coreData.createVaultItem(fileType: "video/quicktime", fileName: "Alpha.mov", folder: nil)!
         newer.createdAt = Date(timeIntervalSince1970: 2)
-        coreData.save()
+        try coreData.save()
 
         let viewModel = FolderViewModel(
             folder: nil,

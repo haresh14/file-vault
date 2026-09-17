@@ -129,6 +129,10 @@ final class FakeFileStorageManager: FileStorageManaging {
         return coreDataManager.createVaultItem(fileType: fileType, fileName: fileName, folder: targetFolder)!
     }
 
+    func saveFile(fromFileURL url: URL, fileName: String, fileType: String, targetFolder: Folder?) throws -> VaultItem {
+        try saveFile(data: Data(contentsOf: url), fileName: fileName, fileType: fileType, targetFolder: targetFolder)
+    }
+
     func loadFile(vaultItem: VaultItem) throws -> Data { Data() }
     func deleteFile(vaultItem: VaultItem) throws {}
     func permanentlyDeleteFile(vaultItem: VaultItem) throws {}
@@ -148,6 +152,7 @@ final class FakeFileStorageManager: FileStorageManaging {
     func renameFile(vaultItem: VaultItem, newFileName: String) throws {}
     func prepareForSharing(vaultItem: VaultItem) throws -> URL { URL(fileURLWithPath: "/tmp/test") }
     func cleanupTemporaryFile(at url: URL) {}
+    func sweepTemporaryShareFiles() {}
     func clearAllStoredFiles() {}
     func getStorageInfo() -> (fileCount: Int, usedSpace: Int64) { (0, 0) }
 }

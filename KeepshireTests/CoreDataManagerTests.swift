@@ -42,6 +42,11 @@ struct CoreDataManagerTests {
     
     // MARK: - VaultItem CRUD Tests
     
+    @Test func saveWithoutChangesDoesNotThrow() throws {
+        let manager = makeManager()
+        try manager.save()
+    }
+
     @Test func testCreateVaultItem() async throws {
         let manager = makeManager()
         
@@ -54,7 +59,7 @@ struct CoreDataManagerTests {
         vaultItem.createdAt = Date()
         
         // Save context
-        manager.save()
+        try manager.save()
         
         // Verify item was saved
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -66,7 +71,7 @@ struct CoreDataManagerTests {
         
         // Cleanup
         manager.context.delete(vaultItem)
-        manager.save()
+        try manager.save()
     }
     
     @Test func testFetchVaultItems() async throws {
@@ -84,7 +89,7 @@ struct CoreDataManagerTests {
             testItems.append(vaultItem)
         }
         
-        manager.save()
+        try manager.save()
         
         // Fetch all items
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -104,7 +109,7 @@ struct CoreDataManagerTests {
         for item in testItems {
             manager.context.delete(item)
         }
-        manager.save()
+        try manager.save()
     }
     
     @Test func testUpdateVaultItem() async throws {
@@ -118,13 +123,13 @@ struct CoreDataManagerTests {
         vaultItem.fileSize = 100
         vaultItem.createdAt = Date()
         
-        manager.save()
+        try manager.save()
         
         // Update the item
         vaultItem.fileName = "updated.txt"
         vaultItem.fileSize = 200
         
-        manager.save()
+        try manager.save()
         
         // Verify update
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -137,7 +142,7 @@ struct CoreDataManagerTests {
         
         // Cleanup
         manager.context.delete(vaultItem)
-        manager.save()
+        try manager.save()
     }
     
     @Test func testDeleteVaultItem() async throws {
@@ -151,7 +156,7 @@ struct CoreDataManagerTests {
         vaultItem.fileSize = 100
         vaultItem.createdAt = Date()
         
-        manager.save()
+        try manager.save()
         
         // Verify item exists
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -162,7 +167,7 @@ struct CoreDataManagerTests {
         
         // Delete the item
         manager.context.delete(vaultItem)
-        manager.save()
+        try manager.save()
         
         // Verify item is deleted
         results = try manager.context.fetch(fetchRequest)
@@ -180,7 +185,7 @@ struct CoreDataManagerTests {
         folder.name = "Test Folder"
         folder.createdAt = Date()
         
-        manager.save()
+        try manager.save()
         
         // Verify folder was saved
         let fetchRequest = NSFetchRequest<Folder>(entityName: "Folder")
@@ -192,7 +197,7 @@ struct CoreDataManagerTests {
         
         // Cleanup
         manager.context.delete(folder)
-        manager.save()
+        try manager.save()
     }
     
     @Test func testFolderVaultItemRelationship() async throws {
@@ -217,7 +222,7 @@ struct CoreDataManagerTests {
             vaultItems.append(vaultItem)
         }
         
-        manager.save()
+        try manager.save()
         
         // Verify relationships
         #expect(folder.items?.count == 3, "Folder should have 3 vault items")
@@ -231,7 +236,7 @@ struct CoreDataManagerTests {
             manager.context.delete(item)
         }
         manager.context.delete(folder)
-        manager.save()
+        try manager.save()
     }
     
     // MARK: - Context Management Tests
@@ -248,7 +253,7 @@ struct CoreDataManagerTests {
         vaultItem.createdAt = Date()
         
         // Test that save doesn't throw
-        manager.save()
+        try manager.save()
         
         // Verify item was saved by fetching it
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -259,14 +264,14 @@ struct CoreDataManagerTests {
         
         // Cleanup
         manager.context.delete(vaultItem)
-        manager.save()
+        try manager.save()
     }
     
     @Test func testSaveContextWithoutChanges() async throws {
         let manager = makeManager()
         
         // Test saving context without any changes
-        manager.save()
+        try manager.save()
         
         // Should not throw or cause issues
         #expect(true, "Save context should handle no changes gracefully")
@@ -290,7 +295,7 @@ struct CoreDataManagerTests {
         }
         
         // Save all at once
-        manager.save()
+        try manager.save()
         
         // Verify all items were saved
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -303,7 +308,7 @@ struct CoreDataManagerTests {
         for item in testItems {
             manager.context.delete(item)
         }
-        manager.save()
+        try manager.save()
     }
     
     @Test func testBatchDelete() async throws {
@@ -321,14 +326,14 @@ struct CoreDataManagerTests {
             testItems.append(vaultItem)
         }
         
-        manager.save()
+        try manager.save()
         
         // Delete all items
         for item in testItems {
             manager.context.delete(item)
         }
         
-        manager.save()
+        try manager.save()
         
         // Verify all items were deleted
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -357,7 +362,7 @@ struct CoreDataManagerTests {
             testItems.append(vaultItem)
         }
         
-        manager.save()
+        try manager.save()
         
         // Fetch with sort descriptor
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -378,31 +383,31 @@ struct CoreDataManagerTests {
         for item in testItems {
             manager.context.delete(item)
         }
-        manager.save()
+        try manager.save()
     }
 
     @Test func testFacadeFetchOrderingAndTrashFiltering() async throws {
         let manager = makeManager()
-        let older = manager.createVaultItem(
+        let older = try manager.createVaultItem(
             fileName: "older.txt",
             fileType: "text/plain",
             fileSize: 1
         )
         older.createdAt = Date(timeIntervalSince1970: 100)
-        let newer = manager.createVaultItem(
+        let newer = try manager.createVaultItem(
             fileName: "newer.txt",
             fileType: "text/plain",
             fileSize: 2
         )
         newer.createdAt = Date(timeIntervalSince1970: 200)
-        let trashed = manager.createVaultItem(
+        let trashed = try manager.createVaultItem(
             fileName: "trashed.txt",
             fileType: "text/plain",
             fileSize: 3
         )
         trashed.createdAt = Date(timeIntervalSince1970: 300)
         trashed.isTrashed = true
-        manager.save()
+        try manager.save()
 
         #expect(manager.fetchAllVaultItems().map(\.fileName) == [
             "trashed.txt", "newer.txt", "older.txt"
@@ -446,7 +451,7 @@ struct CoreDataManagerTests {
             testItems.append(vaultItem)
         }
         
-        manager.save()
+        try manager.save()
         
         // Fetch only image files
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -464,7 +469,7 @@ struct CoreDataManagerTests {
         for item in testItems {
             manager.context.delete(item)
         }
-        manager.save()
+        try manager.save()
     }
     
     // MARK: - Error Handling Tests
@@ -477,12 +482,12 @@ struct CoreDataManagerTests {
         // Don't set required fields
         
         // Try to save - this might not throw in this case, but we test the mechanism
-        manager.save()
+        try manager.save()
         
         // Clean up if it was created
         if vaultItem.managedObjectContext != nil {
             manager.context.delete(vaultItem)
-            manager.save()
+            try manager.save()
         }
         
         #expect(true, "Should handle invalid save gracefully")
@@ -508,7 +513,7 @@ struct CoreDataManagerTests {
         }
         
         // Save all
-        manager.save()
+        try manager.save()
         
         // Fetch all
         let fetchRequest = NSFetchRequest<VaultItem>(entityName: "VaultItem")
@@ -525,6 +530,6 @@ struct CoreDataManagerTests {
         for item in testItems {
             manager.context.delete(item)
         }
-        manager.save()
+        try manager.save()
     }
 } 

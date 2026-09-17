@@ -161,10 +161,7 @@ struct FilePreviewView: View {
     // MARK: - File Sharing
     
     private func shareFile() {
-        FilePreviewSharingService.shareFile(
-            fileData: fileData,
-            fileName: vaultItem.fileName
-        )
+        ShareManager.shared.shareVaultItem(vaultItem)
     }
     
     // MARK: - Data Loading

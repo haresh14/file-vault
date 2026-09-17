@@ -98,7 +98,7 @@ class TrashViewModel: ObservableObject, MediaViewerManageable {
             item.trashedAt = nil
         }
         
-        CoreDataManager.shared.save()
+        CoreDataManager.shared.persistChanges()
         exitSelectionMode()
         loadDeletedItems()
         

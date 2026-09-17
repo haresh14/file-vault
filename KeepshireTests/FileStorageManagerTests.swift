@@ -201,7 +201,7 @@ struct FileStorageManagerTests {
             fileName: "legacy.txt",
             key: crypto.legacySHA256Key(from: password)
         )
-        let item = storage.coreDataManager.createVaultItem(
+        let item = try storage.coreDataManager.createVaultItem(
             fileName: "legacy.txt",
             fileType: "text/plain",
             fileSize: Int64(payload.count)
@@ -515,7 +515,7 @@ struct FileStorageManagerTests {
 
     @Test func testLegacyPlaintextMetadataSealsOnUnlock() async throws {
         let storage = try makeStorage()
-        let item = storage.coreDataManager.createVaultItem(
+        let item = try storage.coreDataManager.createVaultItem(
             fileName: "legacy-meta.txt",
             fileType: "text/plain",
             fileSize: 4
@@ -570,7 +570,7 @@ struct FileStorageManagerTests {
             item.createdAt = Date()
         }
         let sealStart = CFAbsoluteTimeGetCurrent()
-        storage.coreDataManager.save()
+        try storage.coreDataManager.save()
         let sealSeconds = CFAbsoluteTimeGetCurrent() - sealStart
 
         context.reset()
@@ -729,7 +729,7 @@ struct FileStorageManagerTests {
 
         item.isTrashed = false
         item.trashedAt = nil
-        storage.coreDataManager.save()
+        try storage.coreDataManager.save()
         #expect(storage.coreDataManager.fetchVaultItems(in: nil).contains(item))
 
         manager.moveToTrash(vaultItem: item)
