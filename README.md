@@ -59,6 +59,7 @@ New to Xcode? See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for opening
 - The browser shows a trust warning (self-signed, expected); then enter the 6-digit pairing code shown in the app
 - Browser upload and folder management; downloads only after Face ID / vault credential opens a 10-minute export session
 - Each download uses a single-use ticket; a multi-item selection comes back as one ZIP
+- The server needs the app open; it pauses while the device is locked and tells the browser to unlock the iPhone
 
 ### Extra security (Settings)
 - Screenshot blanking (vault stays on screen; Photos gets a black image) and App Switcher overlay

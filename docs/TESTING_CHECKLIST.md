@@ -95,7 +95,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 - [ ] Fresh install: launch and unlock do not request notification permission; starting Web Upload requests it once
 - [ ] Upload with the app on screen: in-app completion banner appears, no duplicate system banner
-- [ ] Upload while the app is in the App Switcher or the screen is locked: a system notification arrives, as long as the transfer finishes within the short window iOS allows a backgrounded app
+- [ ] Upload while the app is in the App Switcher: a system notification arrives, as long as the transfer finishes within the short window iOS allows a backgrounded app
+- [ ] Lock the device, then upload from the browser: the page says the iPhone is locked instead of a file-permission error, and any export session has ended
+- [ ] Unlock the device and retry the same upload: it succeeds without restarting the server
 - [ ] With notifications refused in Settings: starting the server shows a banner that opens this app's Settings page when tapped
 - [ ] Banners without an action still let taps reach the screen underneath
 - [ ] Start server on port 8080; open the **https** URL from another device on the same Wi‑Fi

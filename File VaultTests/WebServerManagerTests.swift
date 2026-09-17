@@ -170,6 +170,24 @@ struct WebServerManagerTests {
         }
     }
 
+    @Test func testRoutesTouchingVaultFilesRequireAnUnlockedDevice() {
+        let locked: [WebRequestRoute] = [
+            .uploadPage, .upload, .streamUpload, .createFolder, .renameFolder,
+            .deleteFolder, .deleteFile, .bulkDelete, .issueDownloadTicket, .ticketDownload
+        ]
+        for route in locked {
+            #expect(route.needsUnlockedDevice)
+        }
+
+        for route in [WebRequestRoute.testPage, .pair, .sessionState, .status, .notFound] {
+            #expect(!route.needsUnlockedDevice)
+        }
+
+        #expect(WebRequestRoute.upload.expectsJSON)
+        #expect(!WebRequestRoute.ticketDownload.expectsJSON)
+        #expect(WebRequestRouter.deviceLockedResponse.serializedData.contains(Data("503".utf8)))
+    }
+
     @Test func testMalformedRequestsAndFakeLoginRouting() {
         #expect(WebHTTPRequest.parse(Data("GET /\r\n\r\n".utf8)) == nil)
         #expect(WebHTTPRequest.parse(Data("not http".utf8)) == nil)

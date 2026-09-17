@@ -33,14 +33,28 @@ class WebServerManager: ObservableObject, WebServerManaging {
     private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
     private var activeUploads: Set<String> = []
     private var exportSessionTimer: Timer?
+    /// Mirrors `UIApplication.isProtectedDataAvailable`, which connection handlers cannot
+    /// read directly because they run off the main thread.
+    private let protectedDataLock = NSLock()
+    private var protectedDataAvailable = true
 
     private init() {
+        // UIApplication reports protected data as unavailable until the app finishes
+        // launching, and this singleton is built before that. Start optimistic and let
+        // the lifecycle refreshes below correct it.
         setupAppLifecycleObservers()
+    }
+
+    private var isProtectedDataAvailable: Bool {
+        protectedDataLock.lock()
+        defer { protectedDataLock.unlock() }
+        return protectedDataAvailable
     }
     
     func startServer() {
         VaultLog.debug("DEBUG: startServer called")
 
+        refreshProtectedDataAvailability()
         accessControl.rotateToken()
         let code = accessControl.pairingCode ?? ""
         let lanIP = getLocalIPAddress()
@@ -186,6 +200,42 @@ class WebServerManager: ObservableObject, WebServerManaging {
             name: UIApplication.didBecomeActiveNotification,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(protectedDataWillBecomeUnavailable),
+            name: UIApplication.protectedDataWillBecomeUnavailableNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(protectedDataDidBecomeAvailable),
+            name: UIApplication.protectedDataDidBecomeAvailableNotification,
+            object: nil
+        )
+    }
+
+    @objc private func protectedDataWillBecomeUnavailable() {
+        setProtectedDataAvailable(false)
+        // Downloads must not stay armed while the phone is locked.
+        endExportSession()
+    }
+
+    @objc private func protectedDataDidBecomeAvailable() {
+        setProtectedDataAvailable(true)
+    }
+
+    /// Reads the live value on the main thread. The cached copy exists because connection
+    /// handlers run off the main thread and cannot touch UIApplication.
+    private func refreshProtectedDataAvailability() {
+        setProtectedDataAvailable(UIApplication.shared.isProtectedDataAvailable)
+    }
+
+    private func setProtectedDataAvailable(_ available: Bool) {
+        protectedDataLock.lock()
+        protectedDataAvailable = available
+        protectedDataLock.unlock()
     }
     
     @objc private func appWillEnterBackground() {
@@ -199,6 +249,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     @objc private func appDidBecomeActive() {
         // Background processing is no longer needed when app is active
         endBackgroundTask()
+        refreshProtectedDataAvailability()
     }
     
     private func startBackgroundTask() {
@@ -386,6 +437,11 @@ class WebServerManager: ObservableObject, WebServerManaging {
             return
         }
 
+        if route.needsUnlockedDevice, !isProtectedDataAvailable {
+            sendDeviceLockedResponse(route: route, connection: connection)
+            return
+        }
+
         switch route {
         case .fakeLoginForbidden:
             sendPreparedResponse(connection: connection, response: WebRequestRouter.fakeLoginResponse)
@@ -429,7 +485,20 @@ class WebServerManager: ObservableObject, WebServerManaging {
     }
     
     // MARK: - HTTP Response Helpers
-    
+
+    private func sendDeviceLockedResponse(route: WebRequestRoute, connection: NWConnection) {
+        if route.expectsJSON {
+            sendJSONResponse(
+                connection: connection,
+                statusCode: 503,
+                success: false,
+                message: WebRequestRouter.deviceLockedMessage
+            )
+        } else {
+            sendPreparedResponse(connection: connection, response: WebRequestRouter.deviceLockedResponse)
+        }
+    }
+
     private func sendHTTPResponse(connection: NWConnection, statusCode: Int, contentType: String = "text/html; charset=utf-8", body: String) {
         sendPreparedResponse(
             connection: connection,

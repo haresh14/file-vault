@@ -268,7 +268,7 @@ flowchart TB
 
 ## 6. LAN web server
 
-`WebServerManager` owns listener lifecycle, connections, and finite background time for active uploads. No background mode or scheduled processing task is declared. Each start creates a self-signed TLS identity (`LANWebTLSIdentity`). Pure helpers live in infrastructure/HTML files.
+`WebServerManager` owns listener lifecycle, connections, and finite background time for active uploads. No background mode or scheduled processing task is declared. Each start creates a self-signed TLS identity (`LANWebTLSIdentity`). It tracks protected-data availability so routes that touch vault files answer with a locked-device message while the device is locked. Pure helpers live in infrastructure/HTML files.
 
 ```mermaid
 flowchart TB

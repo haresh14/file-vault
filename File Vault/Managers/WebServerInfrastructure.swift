@@ -178,6 +178,32 @@ enum WebRequestRoute: Equatable {
     case notFound
 }
 
+extension WebRequestRoute {
+    /// Vault files and thumbnails carry complete file protection, so iOS refuses to read or
+    /// write them while the device is locked. These routes answer with a plain explanation
+    /// instead of letting a file-permission error reach the browser.
+    var needsUnlockedDevice: Bool {
+        switch self {
+        case .uploadPage, .upload, .streamUpload, .createFolder, .renameFolder, .deleteFolder,
+             .deleteFile, .bulkDelete, .issueDownloadTicket, .ticketDownload:
+            return true
+        case .testPage, .pair, .sessionState, .status, .fakeLoginForbidden, .notFound:
+            return false
+        }
+    }
+
+    /// The browser calls these with fetch and reads `success` / `message` out of JSON.
+    var expectsJSON: Bool {
+        switch self {
+        case .upload, .streamUpload, .createFolder, .renameFolder, .deleteFolder,
+             .deleteFile, .bulkDelete, .issueDownloadTicket, .sessionState:
+            return true
+        case .uploadPage, .testPage, .pair, .ticketDownload, .status, .fakeLoginForbidden, .notFound:
+            return false
+        }
+    }
+}
+
 enum WebRequestRouter {
     static let fakeLoginResponse = WebHTTPResponse.text(
         statusCode: 403,
@@ -192,6 +218,14 @@ enum WebRequestRouter {
     static let exportSessionResponse = WebHTTPResponse.text(
         statusCode: 403,
         body: "<html><body><h2>Downloads are off</h2><p>Start an export session in File Vault on your iPhone to download files.</p></body></html>"
+    )
+
+    static let deviceLockedMessage =
+        "iPhone is locked. Unlock it to continue, then try again."
+
+    static let deviceLockedResponse = WebHTTPResponse.text(
+        statusCode: 503,
+        body: "<html><body><h2>iPhone is locked</h2><p>\(deviceLockedMessage)</p></body></html>"
     )
 
     static func route(_ request: WebHTTPRequest, fakeLoginActive: Bool = false) -> WebRequestRoute {

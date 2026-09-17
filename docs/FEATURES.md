@@ -77,7 +77,6 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | QuickLook | Document / unsupported file preview |
 | PDFKit | Document preview |
 | Network | `NWListener` local HTTPS server on port **8080** (TLS 1.2+, per-session self-signed cert) |
-| BackgroundTasks | `BGProcessingTask` `com.haresh.FileVault.upload-processing` |
 | UserNotifications | Upload completion (alert, badge, sound) |
 | CoreMotion | Shake-to-lock accelerometer |
 | Core Image | QR code generation (`CIQRCodeGenerator`) |
@@ -312,6 +311,7 @@ Playback decrypts to a temporary file; original vault file stays encrypted.
 | W9 | Background URLSession | Session id `com.haresh.FileVault.background-upload`; POST `/upload`; trusts only this session’s TLS certificate | `URLSessionConfiguration.background` |
 | W10 | Large uploads | `POST /upload` with Content-Length **> 100MB** (`100 * 1024 * 1024`) switches to `handleLargeFileUpload`. Browser can also `POST /upload/stream` | custom HTTP |
 | W11 | Gallery web-upload sheet | Same server controls as the tab, presented from Gallery Add Content | `WebUploadView` |
+| W12 | Device locked | While the device is locked, vault files are unreadable and unwritable, so every route that touches them answers **503** with “iPhone is locked. Unlock it to continue, then try again.” Any open export session ends. Routes resume as soon as the device unlocks | `protectedDataWillBecomeUnavailableNotification` |
 
 HTTP routes. Transport is TLS. Every route except `POST /pair` requires the session token (header `X-Vault-Token`, session cookie on GET, or `?token=` on GET). The session cookie is `HttpOnly`, `SameSite=Strict`, and `Secure`. Fake login returns 403 on every route.
 
