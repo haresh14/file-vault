@@ -1,0 +1,39 @@
+---
+description: Keep project docs aligned with current implementation; write as finished product docs, never as changelogs.
+alwaysApply: true
+---
+
+# Documentation must match the product now
+
+After any change that affects behavior, architecture, public APIs, tests, UI, configuration, or integrations, update the relevant existing docs in the same work. If a doc still describes something the code no longer does, fix the doc even if the user did not ask.
+
+Find docs that already exist in the repo (for example `README`, `docs/`, `CONTRIBUTING`, architecture or testing guides). Do not create new doc files unless the user asks. Skip generated or machine-owned artifacts (warning dumps, lockfiles, snapshots) unless the task is to regenerate them.
+
+Do not invent features, TODOs-as-docs, or “coming soon”. If nothing user- or developer-facing changed, leave docs alone.
+
+## Write the current product, not the update
+
+Docs describe what exists today. They are not release notes, migration notes, or a history of this chat.
+
+- Present tense. No “now”, “previously”, “we removed”, “as of this refactor”, “updated to”.
+- If a capability is gone, delete every mention of it. Do not explain that it was removed.
+- If a capability is new, document it as if it has always been part of the product.
+- Search all docs for stale names, counts, options, routes, and file paths; remove leftovers.
+
+```markdown
+❌ BAD (changelog)
+The 4-digit passcode option was removed. Users now choose 6-digit or password.
+
+✅ GOOD (current product)
+First-launch choice: 6-digit passcode or password (minimum 6 characters).
+```
+
+```markdown
+❌ BAD
+The storage manager was split; a new file store now handles ciphertext.
+
+✅ GOOD
+The storage manager is the public facade. The encrypted file store reads and writes ciphertext on disk.
+```
+
+When a list, table, diagram, or checklist would still include the deleted thing, rewrite it so that item is simply absent.
