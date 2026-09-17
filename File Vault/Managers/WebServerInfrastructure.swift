@@ -212,12 +212,12 @@ enum WebRequestRouter {
 
     static let unauthorizedResponse = WebHTTPResponse.text(
         statusCode: 401,
-        body: "<html><body><h2>Not authorized</h2><p>Open the address shown in File Vault on your iPhone. The link carries a one-time session code that expires when the server stops.</p></body></html>"
+        body: "<html><body><h2>Not authorized</h2><p>Open the address shown in Keepshire on your iPhone. The link carries a one-time session code that expires when the server stops.</p></body></html>"
     )
 
     static let exportSessionResponse = WebHTTPResponse.text(
         statusCode: 403,
-        body: "<html><body><h2>Downloads are off</h2><p>Start an export session in File Vault on your iPhone to download files.</p></body></html>"
+        body: "<html><body><h2>Downloads are off</h2><p>Start an export session in Keepshire on your iPhone to download files.</p></body></html>"
     )
 
     static let deviceLockedMessage =
@@ -381,7 +381,7 @@ enum WebPairingPage {
         return """
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>File Vault</title>
+        <title>Keepshire</title>
         <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #111; color: #f5f5f7; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         .card { background: #1c1c1e; padding: 32px; border-radius: 16px; width: 320px; text-align: center; }
@@ -393,7 +393,7 @@ enum WebPairingPage {
         </style></head>
         <body><div class="card">
         <h1>Enter pairing code</h1>
-        <p>Open File Vault on your iPhone and type the 6-digit code shown under Web Upload. You are already on HTTPS to this phone.</p>
+        <p>Open Keepshire on your iPhone and type the 6-digit code shown under Web Upload. You are already on HTTPS to this phone.</p>
         \(notice)
         <form method="POST" action="/pair">
         <input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus>

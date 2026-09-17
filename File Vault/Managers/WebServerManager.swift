@@ -1346,7 +1346,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         }
 
         guard let ticket = accessControl.issueTicket(for: target, client: clientIdentity(for: connection)) else {
-            sendJSONResponse(connection: connection, statusCode: 403, success: false, message: "Start an export session in File Vault to download files")
+            sendJSONResponse(connection: connection, statusCode: 403, success: false, message: "Start an export session in Keepshire to download files")
             return
         }
         sendJSONResponse(
@@ -1414,7 +1414,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 sendFileResponse(
                     connection: connection,
                     data: zipData,
-                    fileName: "File Vault Selection.zip",
+                    fileName: "Keepshire Selection.zip",
                     contentType: "application/zip"
                 )
             } catch {
@@ -1454,8 +1454,8 @@ class WebServerManager: ObservableObject, WebServerManaging {
         let submitted = WebFormDecoder.value(named: "code", in: request.body) ?? ""
         guard let token = accessControl.redeemPairingCode(submitted) else {
             let message = accessControl.isPairingLocked
-                ? "Too many attempts. Restart the server in File Vault to get a new code."
-                : "That code is not right. Check File Vault on your iPhone."
+                ? "Too many attempts. Restart the server in Keepshire to get a new code."
+                : "That code is not right. Check Keepshire on your iPhone."
             servePairingPage(connection: connection, message: message, statusCode: 401)
             return
         }
@@ -1546,7 +1546,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
     /// Zips a mixed selection of loose files and folders into one archive.
     private func createZipFromSelection(items: [VaultItem], folders: [Folder]) throws -> Data {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let stagingDir = tempDir.appendingPathComponent("File Vault Selection")
+        let stagingDir = tempDir.appendingPathComponent("Keepshire Selection")
         try FileManager.default.createDirectory(
             at: stagingDir,
             withIntermediateDirectories: true,
@@ -1564,7 +1564,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
             try createFolderStructure(folder: folder, in: stagingDir, relativePath: "")
         }
 
-        let zipFileURL = tempDir.appendingPathComponent("File Vault Selection.zip")
+        let zipFileURL = tempDir.appendingPathComponent("Keepshire Selection.zip")
         try createZipFile(from: stagingDir, to: zipFileURL)
         return try Data(contentsOf: zipFileURL)
     }

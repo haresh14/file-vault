@@ -1,6 +1,8 @@
-# File Vault
+# Keepshire
 
 A local, encrypted iOS vault for photos, videos, audio, documents, and other files. Access is protected by a 4-digit passcode, 6-digit passcode, or password, with optional Face ID / Touch ID.
+
+Home screen and in-app name: **Keepshire**. App Store listing name: **Keepshire: Private Photo Vault**. Handle: **@keepshire**.
 
 There is no cloud sync. The only network feature is an optional LAN web server for uploads from other devices on the same Wi‑Fi.
 
@@ -14,8 +16,11 @@ The full technical inventory (for OS upgrades and regressions) is in [docs/FEATU
 | Devices | iPhone and iPad |
 | Language | Swift 5.0 (Xcode project setting) |
 | Dependencies | None (no SPM / CocoaPods) |
-| Bundle ID | `com.haresh.FileVault` |
+| Bundle ID | `com.haresh.keepshire` |
+| Test bundle IDs | `com.haresh.keepshire.tests`, `com.haresh.keepshire.uitests` |
 | Version | Marketing **1.0**; About reads the version and build from the bundle |
+
+The Xcode project file is still `File Vault.xcodeproj`. This bundle ID is a new app: existing `com.haresh.FileVault` installs do not migrate Keychain or vault files. TestFlight is a fresh vault.
 
 ## Quick start
 

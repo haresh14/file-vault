@@ -26,7 +26,7 @@ struct LANWebTLSIdentity {
     /// Network.framework to serve TLS. Call `removeFromKeychain()` when the server stops.
     static func make(ipAddresses: [String], dnsNames: [String] = ["localhost"]) throws -> LANWebTLSIdentity {
         let tag = Data(UUID().uuidString.utf8)
-        let label = "FileVault.LAN.TLS.\(UUID().uuidString)"
+        let label = "Keepshire.LAN.TLS.\(UUID().uuidString)"
 
         var error: Unmanaged<CFError>?
         let attributes: [String: Any] = [
@@ -53,7 +53,7 @@ struct LANWebTLSIdentity {
             der = try SelfSignedCertificate.der(
                 publicKeyBits: publicBits,
                 privateKey: privateKey,
-                commonName: "File Vault",
+                commonName: AppMetadata.displayName,
                 ipAddresses: ipAddresses,
                 dnsNames: dnsNames,
                 notBefore: now.addingTimeInterval(-300),

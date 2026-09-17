@@ -1,6 +1,6 @@
-# File Vault — Feature Catalog
+# Keepshire — Feature Catalog
 
-**Purpose:** This is the canonical technical inventory of every product and system feature in File Vault. Use it as the baseline for **any** iOS/Xcode upgrade (iOS 27, 28, 29, …). Do not treat README marketing bullets as complete.
+**Purpose:** This is the canonical technical inventory of every product and system feature in Keepshire. Use it as the baseline for **any** iOS/Xcode upgrade (iOS 27, 28, 29, …). Do not treat README marketing bullets as complete.
 
 **How to use this document for an OS upgrade**
 
@@ -18,7 +18,12 @@
 | Last verified against source | 2026-09-17 |
 | App version (About UI) | Bundle marketing version + build number |
 | Marketing version (Xcode) | 1.0 |
-| Bundle ID | `com.haresh.FileVault` |
+| Bundle ID | `com.haresh.keepshire` |
+| Test bundle IDs | `com.haresh.keepshire.tests`, `com.haresh.keepshire.uitests` |
+| Home-screen name | Keepshire (`CFBundleDisplayName`) |
+| App Store name | Keepshire: Private Photo Vault |
+| App Store subtitle | Hide photos, videos & files |
+| Handle | @keepshire |
 | Deployment target | **iOS 18.5** |
 | Swift language version (project) | 5.0 |
 | Devices | iPhone and iPad (`TARGETED_DEVICE_FAMILY` 1,2) |
@@ -28,11 +33,24 @@
 
 ## 1. Product overview
 
-File Vault is a **local, encrypted file vault** for iOS. Users store photos, videos, audio, documents, and other files on-device. Access is gated by a passcode or password, optionally Face ID / Touch ID. Files are encrypted at rest with a key derived from the vault credential.
+Keepshire is a **local, encrypted file vault** for iOS. Users store photos, videos, audio, documents, and other files on-device. Access is gated by a passcode or password, optionally Face ID / Touch ID. Files are encrypted at rest with a key derived from the vault credential.
 
 There is **no cloud sync, no App Groups, no widgets, no Share Extension, and no App Intents**. The only network feature is an optional **LAN HTTPS server** for browser upload/download on the same Wi‑Fi.
 
 Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `AuthenticationCoordinator` → `MainTabView`), MVVM view models, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
+
+The Xcode project, scheme, and source folder remain `File Vault`; the Core Data model remains `FileVault`. Those are repository names, not the product name. `com.haresh.keepshire` is a different app from any previous `com.haresh.FileVault` install: Keychain and vault files do not migrate.
+
+### 1.1 App Store Connect listing
+
+These values live in App Store Connect, not in the binary (except the home-screen name).
+
+| Field | Value |
+|--------|--------|
+| Name (30) | Keepshire: Private Photo Vault |
+| Subtitle (30) | Hide photos, videos & files |
+| Keywords | `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock` |
+| Handle | @keepshire |
 
 ---
 
@@ -45,8 +63,9 @@ Architecture: SwiftUI app (`FileVaultApp` → `ContentView` → `AuthenticationC
 | `IPHONEOS_DEPLOYMENT_TARGET` | 18.5 | Set on the project, app target, and unit-test target. The UI-test target does not set its own value (inherits the project 18.5). |
 | `SWIFT_VERSION` | 5.0 | Project setting (not “Swift 5.9+”) |
 | `GENERATE_INFOPLIST_FILE` | NO | Checked-in `File Vault/Info.plist` |
-| `NSFaceIDUsageDescription` | `Use Face ID to unlock your secure vault` | Face ID unlock |
-| `NSLocalNetworkUsageDescription` | `File Vault uses the local network so you can upload files from a browser on the same Wi-Fi.` | LAN web upload |
+| `CFBundleDisplayName` | Keepshire | Home-screen and SpringBoard name |
+| `NSFaceIDUsageDescription` | `Use Face ID to unlock Keepshire` | Face ID unlock |
+| `NSLocalNetworkUsageDescription` | `Keepshire uses the local network so you can upload files from a browser on the same Wi-Fi.` | LAN web upload |
 | `ITSAppUsesNonExemptEncryption` | `YES` | AES-GCM at rest and LAN TLS; App Store Connect export answers must match |
 | `PrivacyInfo.xcprivacy` | UserDefaults CA92.1; no tracking or collected data | App-only preferences; no account or analytics |
 | `UIBackgroundModes` | Not declared | In-flight LAN uploads use finite `beginBackgroundTask` time |
@@ -89,7 +108,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 | `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
 | `Documents/Thumbnails/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes named `{uuid}.thumb` (200×200 JPEG @ 0.7 before encryption) |
 | `Documents/FileVault.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | Display names, MIME types, and sizes are AES-GCM sealed JSON on each row (`sealedMetadata`). Search uses the decrypted copies in RAM after unlock. The store, `Documents/Vault/`, and `Documents/Thumbnails/` are excluded from iCloud/computer backup. |
-| Keychain items `com.filevault.app` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
+| Keychain items `com.haresh.keepshire` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
 | UserDefaults | Standard suite | Settings, auth type, lock timeout, trash flag, security logs, biometric enabled |
 
 **Encryption details**
@@ -150,7 +169,7 @@ Every item below is a **must-keep** behavior unless product explicitly drops it.
 | A2 | 4-digit passcode setup | Numeric only, exact length 4, confirm step, OTP-style fields + custom number pad | `PasscodeSetupView`, `OTPStylePasscodeView`, `CustomNumberPadView` | SwiftUI |
 | A3 | 6-digit passcode setup | Same as A2, length 6 | same | SwiftUI |
 | A4 | Password setup | Minimum **6** characters, confirmation, strength UI | `PasswordSetupView` | SwiftUI |
-| A5 | Store credential | Saved in Keychain, this-device-only, not iCloud Keychain sync | `KeychainManager.savePassword`, service `com.filevault.app`, account `userPassword` | Security.framework |
+| A5 | Store credential | Saved in Keychain, this-device-only, not iCloud Keychain sync | `KeychainManager.savePassword`, service `com.haresh.keepshire`, account `userPassword` | Security.framework |
 | A6 | Unlock with passcode/password | Custom UI, not system passcode sheet | `PasscodeView` | SwiftUI |
 | A7 | Enable Face ID / Touch ID | Settings toggle; disabled if hardware/enrollment unavailable. `LABiometryType` only maps `.faceID` and `.touchID`; any other type (including Optic ID if present) is treated as `.none` | `BiometricAuthManager`, UserDefaults `biometricEnabled` | LocalAuthentication (`LAContext`) |
 | A8 | Biometric unlock | Prompt on foreground if enabled; cancel title **"Use Password"**; `localizedFallbackTitle = ""` (no Enter Password / device-passcode fallback on the biometric policy). Success always sets **real** login | `AuthenticationCoordinator` | `LAPolicy.deviceOwnerAuthenticationWithBiometrics` |
@@ -308,7 +327,7 @@ Playback decrypts to a temporary file; original vault file stays encrypted.
 | W6 | Browser UI | Folder browse, breadcrumbs, upload, manage when not fake login | `WebServerHTMLGenerator`, `WebServerHTMLComponents` |
 | W7 | Block fake login | UI disabled; HTTP 403 | — |
 | W8 | Background keep-alive | `UIBackgroundTask` named `WebServerUpload` while uploads are in flight, so a transfer that is already running survives a short trip away from the app. The server needs the app open; it does not accept new uploads once iOS suspends the app | UIKit background task |
-| W9 | Background URLSession | Session id `com.haresh.FileVault.background-upload`; POST `/upload`; trusts only this session’s TLS certificate | `URLSessionConfiguration.background` |
+| W9 | Background URLSession | Session id `com.haresh.keepshire.background-upload`; POST `/upload`; trusts only this session’s TLS certificate | `URLSessionConfiguration.background` |
 | W10 | Large uploads | `POST /upload` with Content-Length **> 100MB** (`100 * 1024 * 1024`) switches to `handleLargeFileUpload`. Browser can also `POST /upload/stream` | custom HTTP |
 | W11 | Gallery web-upload sheet | Same server controls as the tab, presented from Gallery Add Content | `WebUploadView` |
 | W12 | Device locked | While the device is locked, vault files are unreadable and unwritable, so every route that touches them answers **503** with “iPhone is locked. Unlock it to continue, then try again.” Any open export session ends. Routes resume as soon as the device unlocks | `protectedDataWillBecomeUnavailableNotification` |
@@ -331,7 +350,7 @@ HTTP routes. Transport is TLS. Every route except `POST /pair` requires the sess
 | POST | `/api/download/ticket` | Issue a one-shot download ticket for one file, one folder, or a selection (export session required) |
 | GET | `/download/t/{ticket}` | Redeem ticket (single use, client-bound, 60s) |
 
-Security notice in UI: local network only; files encrypted after arrival. The hop from browser to phone is HTTPS with a per-session certificate created on the device (browser warning expected; fingerprint shown in the app). Downloads use single-use tickets while an export session is open. Download Selected sends the whole selection on one ticket and returns a single `File Vault Selection.zip`. Folder and selection ZIPs stage files with complete file protection and delete the staging directory afterward.
+Security notice in UI: local network only; files encrypted after arrival. The hop from browser to phone is HTTPS with a per-session certificate created on the device (browser warning expected; fingerprint shown in the app). Downloads use single-use tickets while an export session is open. Download Selected sends the whole selection on one ticket and returns a single `Keepshire Selection.zip`. Folder and selection ZIPs stage files with complete file protection and delete the staging directory afterward.
 
 ### 4.12 Notifications and haptics
 
@@ -407,7 +426,7 @@ Store name: `FileVault`. Class codegen: manual (`Folder+CoreData*`, `VaultItem+C
 ## 6. Constants (do not change accidentally in an OS upgrade)
 
 ```
-Keychain service:                 com.filevault.app
+Keychain service:                 com.haresh.keepshire
 Keychain accessibility:           kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 Encryption:                       AES-GCM; key = PBKDF2-HMAC-SHA256 (210k, 16-byte salt)
 Keychain derivation account:      vaultKeyDerivation
@@ -420,8 +439,7 @@ Passcode length:                  exactly 4 or 6 digits
 Web server port:                  8080 (HTTPS, TLS 1.2+)
 PHPicker selection limit:         50
 Thumbnail size / JPEG quality:    200×200 / 0.7, AES-GCM as `{uuid}.thumb`
-BG task id:                       com.haresh.FileVault.upload-processing
-Background URLSession id:         com.haresh.FileVault.background-upload
+Background URLSession id:         com.haresh.keepshire.background-upload
 Streaming upload threshold:       100 MB
 Security log cap:                 100 entries
 ```
@@ -506,7 +524,8 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 **Data integrity**
 
-- [ ] Existing vault from previous OS still unlocks with same credential (PBKDF2 salt in Keychain, or SHA-256 ciphertext rewritten on first unlock)
+- [ ] Existing vault from a previous OS **on the same bundle ID** `com.haresh.keepshire` still unlocks with the same credential (PBKDF2 salt in Keychain, or SHA-256 ciphertext rewritten on first unlock)
+- [ ] A leftover `com.haresh.FileVault` install is a separate app and does not share this vault
 - [ ] Thumbnails still load; Core Data store migrates without loss
 - [ ] Keychain items survive the upgrade (same bundle ID), including `vaultKeyDerivation`
 
@@ -521,10 +540,9 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 
 Recorded so upgrades do not “fix” the wrong thing:
 
-1. Keychain service `com.filevault.app` ≠ bundle id `com.haresh.FileVault`.
-2. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
-3. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
-4. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
+1. `FileVaultApp` notes that background URLSession events are not handled via `AppDelegate`.
+2. MIME mismatches: `isAudio` includes `audio/x-m4a` / ogg / flac, but `determineFileType` maps `.m4a` → `audio/mp4` and has **no** ogg/flac/zip/rtf/Office cases (those become `application/octet-stream` → **Other** unless another importer supplies a MIME).
+3. `LoginStateManager.visibleSettingSections` omits Trash and does not drive `SettingsView` (the view uses `canAccessFullSettings` instead).
 
 ---
 

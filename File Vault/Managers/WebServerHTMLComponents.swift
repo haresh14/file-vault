@@ -162,7 +162,7 @@ enum WebHTMLChunks {
 enum WebHTMLPages {
     static func status(fileCount: Int, formattedSize: String, serverURL: String) -> String {
         WebHTMLTemplate.document(
-            title: "File Vault - Status",
+            title: "Keepshire - Status",
             style: WebHTMLChunks.statusStyle,
             body: """
             <div class="container">
@@ -179,7 +179,7 @@ enum WebHTMLPages {
     static func success(uploadedFiles: [String]) -> String {
         let files = uploadedFiles.map { "• \(WebHTMLEscaping.text($0))" }.joined(separator: "<br>")
         return WebHTMLTemplate.document(
-            title: "Upload Successful - File Vault",
+            title: "Upload Successful - Keepshire",
             style: WebHTMLChunks.successStyle,
             body: "<div class=\"container\"><h1>Upload Successful!</h1><div class=\"file-list\">\(files)</div></div>",
             script: WebHTMLChunks.successScript

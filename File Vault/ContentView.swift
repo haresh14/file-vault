@@ -117,7 +117,7 @@ struct EnhancedPrivacyOverlay: View {
                     .font(.system(size: 80))
                     .foregroundColor(.white)
                 
-                Text("File Vault")
+                Text(AppMetadata.displayName)
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.white)

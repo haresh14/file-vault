@@ -2,6 +2,8 @@
 
 Use this checklist against a simulator or device. Automated coverage lives in `File VaultTests` (run serially) and `File VaultUITests`.
 
+Home screen shows **Keepshire**. Face ID and local-network prompts use that name. This bundle ID is a fresh vault.
+
 ## Pre-test
 
 - [ ] Project opens in Xcode
@@ -104,7 +106,7 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Browser warns about the certificate; accept it, then enter the 6-digit pairing code; uploads work after pairing
 - [ ] Downloads stay hidden until Allow Downloads is confirmed with Face ID or the vault credential
 - [ ] After that, per-file/folder download icons and Download Selected appear; they vanish when the session ends
-- [ ] Download Selected with several files and folders picked returns one ZIP containing every pick
+- [ ] Download Selected with several files and folders picked returns one ZIP named Keepshire Selection.zip containing every pick
 - [ ] Upload small and large files
 
 ## Device security
@@ -123,6 +125,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## App Store compliance
 
+- [ ] Home screen icon is labeled Keepshire
+- [ ] Face ID prompt says “unlock Keepshire”
+- [ ] Local-network prompt names Keepshire
 - [ ] iPad does not offer a second app window
 - [ ] Archive contains `PrivacyInfo.xcprivacy` with UserDefaults reason CA92.1 and no tracking declaration
 - [ ] Archive Info.plist has `ITSAppUsesNonExemptEncryption = YES`

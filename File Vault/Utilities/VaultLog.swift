@@ -7,7 +7,7 @@ import OSLog
 /// paths, and security state never reach a production console.
 enum VaultLog {
     private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "FileVault",
+        subsystem: Bundle.main.bundleIdentifier ?? "com.haresh.keepshire",
         category: "application"
     )
 

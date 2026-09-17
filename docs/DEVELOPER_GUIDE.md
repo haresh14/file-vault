@@ -1,4 +1,4 @@
-# iOS Development Guide for File Vault
+# iOS Development Guide for Keepshire
 
 This guide provides detailed step-by-step instructions for common iOS development tasks.
 
@@ -9,6 +9,8 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 4. [Building and Running the App](#building-and-running-the-app)
 5. [Understanding the Project Structure](#understanding-the-project-structure)
 6. [Common Xcode Tasks](#common-xcode-tasks)
+
+The home-screen name is Keepshire (`CFBundleDisplayName`). The Xcode project, scheme, and source folder remain `File Vault`. Bundle ID is `com.haresh.keepshire`. That identifier is a new app: vault files and Keychain items from `com.haresh.FileVault` do not migrate.
 
 ## Opening the Project
 
@@ -23,7 +25,7 @@ This guide provides detailed step-by-step instructions for common iOS developmen
 
 ## Adding Privacy Permissions
 
-Face ID usage is declared in `File Vault/Info.plist` as `NSFaceIDUsageDescription`: `Use Face ID to unlock your secure vault`.
+Face ID usage is declared in `File Vault/Info.plist` as `NSFaceIDUsageDescription`: `Use Face ID to unlock Keepshire`.
 
 Photo library access uses `PHPickerViewController`. Do not add `NSPhotoLibraryUsageDescription`.
 
@@ -43,7 +45,7 @@ Notification authorization is requested when the user starts Web Upload. Do not 
 
 ### Privacy and support URLs
 
-Set `PRIVACY_POLICY_URL` and `SUPPORT_URL` in the app target's build settings to real hosted HTTPS pages. Empty or invalid values hide the corresponding About link. Configure the same URLs in App Store Connect.
+Set `PRIVACY_POLICY_URL` and `SUPPORT_URL` in the app target's build settings to real hosted HTTPS pages. Empty or invalid values hide the corresponding About link. Configure the same URLs in App Store Connect. Listing fields that are not in the binary: name **Keepshire: Private Photo Vault**, subtitle **Hide photos, videos & files**, keywords `gallery,locker,album,encrypted,passcode,secure,folder,document,audio,secret,lock`.
 
 The hosted privacy policy must state:
 

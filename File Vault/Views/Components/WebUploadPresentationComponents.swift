@@ -322,7 +322,7 @@ struct WebUploadInstructionsCard: View {
                 InstructionStep(number: "1", text: "Make sure your device is on the same WiFi network")
                 InstructionStep(number: "2", text: "Open a web browser on any device")
                 InstructionStep(number: "3", text: "Open the HTTPS URL above and accept the certificate warning")
-                InstructionStep(number: "4", text: "Enter the 6-digit pairing code shown in File Vault")
+                InstructionStep(number: "4", text: "Enter the 6-digit pairing code shown in Keepshire")
                 InstructionStep(number: "5", text: "Drag and drop files or click to browse")
             }
         }
@@ -472,7 +472,7 @@ struct InstructionsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         DetailedInstructionStep(number: "1", title: "Network Connection", description: "Ensure both your iPhone and the device you want to upload from are connected to the same WiFi network.")
                         DetailedInstructionStep(number: "2", title: "Start the Server", description: "Tap 'Start Server' to begin accepting file uploads. The server will only run while this app is active.")
-                        DetailedInstructionStep(number: "3", title: "Accept the HTTPS warning", description: "Open the https:// address (or scan the QR code). Safari: Show Details, then visit this website. Chrome: Advanced, then proceed. Compare the certificate fingerprint in File Vault if you want to confirm it is this phone.")
+                        DetailedInstructionStep(number: "3", title: "Accept the HTTPS warning", description: "Open the https:// address (or scan the QR code). Safari: Show Details, then visit this website. Chrome: Advanced, then proceed. Compare the certificate fingerprint in Keepshire if you want to confirm it is this phone.")
                         DetailedInstructionStep(number: "4", title: "Pair the browser", description: "Type the 6-digit pairing code shown under Web Upload. The code changes every time you start the server.")
                         DetailedInstructionStep(number: "5", title: "Upload Files", description: "Drag and drop files onto the upload area, or click to browse and select files. Multiple files can be uploaded at once.")
                     }

@@ -53,7 +53,7 @@ class KeychainManager: KeychainManaging {
     private let authTypeKey = "authenticationType"
     
     private init() {
-        service = "com.filevault.app"
+        service = "com.haresh.keepshire"
         defaults = .standard
     }
 

@@ -6,7 +6,7 @@ import UIKit
 class BackgroundUploadManager: NSObject {
     static let shared = BackgroundUploadManager()
     
-    private let backgroundSessionIdentifier = "com.haresh.FileVault.background-upload"
+    private let backgroundSessionIdentifier = "com.haresh.keepshire.background-upload"
     private lazy var backgroundSession: URLSession = {
         let config = URLSessionConfiguration.background(withIdentifier: backgroundSessionIdentifier)
         config.allowsCellularAccess = true

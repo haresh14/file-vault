@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Keepshire</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -11,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Keepshire</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -23,9 +25,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Use Face ID to unlock your secure vault</string>
+	<string>Use Face ID to unlock Keepshire</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>File Vault uses the local network so you can upload files from a browser on the same Wi-Fi.</string>
+	<string>Keepshire uses the local network so you can upload files from a browser on the same Wi-Fi.</string>
 	<key>PrivacyPolicyURL</key>
 	<string>$(PRIVACY_POLICY_URL)</string>
 	<key>SupportURL</key>

@@ -1,6 +1,9 @@
 import Foundation
 
 enum AppMetadata {
+    /// Home-screen and in-app product name. App Store listing uses a longer name.
+    static let displayName = "Keepshire"
+
     static var versionDisplay: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String

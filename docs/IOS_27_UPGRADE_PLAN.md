@@ -1,6 +1,6 @@
-# iOS 27 compatibility (File Vault)
+# iOS 27 compatibility (Keepshire)
 
-Keep File Vault building with the **iOS 27 SDK (Xcode 27)** without changing product behavior. Every item in [FEATURES.md](FEATURES.md) must still work.
+Keep Keepshire building with the **iOS 27 SDK (Xcode 27)** without changing product behavior. Every item in [FEATURES.md](FEATURES.md) must still work.
 
 **Out of scope unless a new OS release forces it:**
 
@@ -18,7 +18,7 @@ Keep File Vault building with the **iOS 27 SDK (Xcode 27)** without changing pro
 | Deployment target | **iOS 18.5** |
 | Swift language mode | **5.0** |
 | Info.plist | Checked-in `File Vault/Info.plist` |
-| Face ID | `NSFaceIDUsageDescription` = `Use Face ID to unlock your secure vault` |
+| Face ID | `NSFaceIDUsageDescription` = `Use Face ID to unlock Keepshire` |
 | Local network | `NSLocalNetworkUsageDescription` for LAN web upload |
 | Background modes | None declared; LAN uploads use finite foreground-app background time |
 | Launch screen | Explicit `UILaunchScreen` dictionary |

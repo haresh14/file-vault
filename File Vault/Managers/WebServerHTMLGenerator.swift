@@ -105,7 +105,7 @@ extension WebServerManager {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>File Vault - File Explorer</title>
+            <title>Keepshire - File Explorer</title>
             <style>
                 * {
                     margin: 0;
@@ -819,7 +819,7 @@ extension WebServerManager {
         <body>
             <div class="container">
                 <div class="header">
-                    <h1 class="title">🔐 File Vault</h1>
+                    <h1 class="title">🔐 Keepshire</h1>
                 </div>
                 
                 <div class="explorer-container">
@@ -1271,7 +1271,7 @@ extension WebServerManager {
                     uploadSpinner.style.display = 'block';
                     uploadSuccessIcon.style.display = 'none';
                     uploadProgressText.textContent = 'Uploading files...';
-                    uploadProgressDetail.textContent = 'Keep the File Vault app open during upload...';
+                    uploadProgressDetail.textContent = 'Keep the Keepshire app open during upload...';
                     uploadProgressPercentage.style.display = 'none';
                 }
                 
@@ -2158,7 +2158,7 @@ extension WebServerManager {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>File Vault - Status</title>
+            <title>Keepshire - Status</title>
             <style>
                 * {
                     margin: 0;
@@ -2326,7 +2326,7 @@ extension WebServerManager {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Upload Successful - File Vault</title>
+            <title>Upload Successful - Keepshire</title>
             <style>
                 * {
                     margin: 0;

@@ -1,6 +1,6 @@
 # Component graph
 
-How File Vault is composed. `FileStorageManager`, `CoreDataManager`, `SecurityManager`, and `WebServerManager` are the public manager entry points; focused files behind them do the work.
+How Keepshire is composed. `FileStorageManager`, `CoreDataManager`, `SecurityManager`, and `WebServerManager` are the public manager entry points; focused files behind them do the work.
 
 ## 1. Runtime layers
 
