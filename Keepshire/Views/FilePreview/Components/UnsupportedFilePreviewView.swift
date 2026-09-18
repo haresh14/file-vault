@@ -42,7 +42,7 @@ struct UnsupportedFilePreviewView: View {
                     onShowQuickLook()
                 }
                 .padding()
-                .background(Color.blue)
+                .background(KeepshireTheme.accent)
                 .foregroundColor(.white)
                 .cornerRadius(10)
                 

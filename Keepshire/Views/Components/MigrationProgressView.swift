@@ -45,7 +45,7 @@ struct MigrationProgressView: View {
         VStack(spacing: 16) {
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
                 .symbolEffect(.pulse)
             
             Text("Updating Encryption")
@@ -62,12 +62,12 @@ struct MigrationProgressView: View {
                 Circle()
                     .stroke(lineWidth: 8)
                     .opacity(0.2)
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                 
                 Circle()
                     .trim(from: 0.0, to: CGFloat(min(progressPercentage, 1.0)))
                     .stroke(style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round))
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                     .rotationEffect(.degrees(270))
                     .animation(.linear, value: progressPercentage)
                 
@@ -85,7 +85,7 @@ struct MigrationProgressView: View {
             
             // Progress Bar (alternative visual)
             ProgressView(value: progressPercentage)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                .progressViewStyle(LinearProgressViewStyle(tint: KeepshireTheme.accent))
                 .frame(height: 6)
         }
     }

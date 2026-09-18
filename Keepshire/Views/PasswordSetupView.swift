@@ -73,7 +73,7 @@ struct PasswordSetupView: View {
         VStack(spacing: 16) {
             Image(systemName: isFakePasswordSetup ? "theatermasks.fill" : "key.fill")
                 .font(.system(size: 60))
-                .foregroundColor(isFakePasswordSetup ? .orange : .blue)
+                .foregroundColor(isFakePasswordSetup ? .orange : KeepshireTheme.accent)
             
             Text(isFakePasswordSetup ? 
                  "Create a fake password that shows an empty vault when used" :
@@ -198,7 +198,7 @@ struct PasswordSetupView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isButtonEnabled ? Color.blue : Color.gray)
+                    .fill(isButtonEnabled ? KeepshireTheme.accent : Color.gray)
             )
         }
         .disabled(!isButtonEnabled)
@@ -324,7 +324,7 @@ enum PasswordStrength {
         switch self {
         case .weak: return .red
         case .medium: return .orange
-        case .strong: return .green
+        case .strong: return KeepshireTheme.success
         }
     }
     

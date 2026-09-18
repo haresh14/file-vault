@@ -8,7 +8,7 @@ struct WebUploadHeaderView: View {
         VStack(spacing: 12) {
             Image(systemName: "globe")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
             Text("Web Upload")
                 .font(.largeTitle)
                 .fontWeight(.bold)
@@ -31,11 +31,11 @@ struct WebUploadStatusCard: View {
         VStack(spacing: 16) {
             HStack {
                 Circle()
-                    .fill(isRunning ? Color.green : Color.red)
+                    .fill(isRunning ? KeepshireTheme.success : Color.red)
                     .frame(width: 12, height: 12)
                 Text(isRunning ? "Server Running" : "Server Stopped")
                     .font(.headline)
-                    .foregroundColor(isRunning ? .green : .red)
+                    .foregroundColor(isRunning ? KeepshireTheme.success : .red)
                     .accessibilityIdentifier("webUpload.status")
                 Spacer()
             }
@@ -48,16 +48,16 @@ struct WebUploadStatusCard: View {
                     HStack {
                         Text(serverURL)
                             .font(.system(.body, design: .monospaced))
-                            .foregroundColor(.blue)
+                            .foregroundColor(KeepshireTheme.accent)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.blue.opacity(0.1))
+                            .background(KeepshireTheme.accent.opacity(0.1))
                             .cornerRadius(8)
                             .accessibilityIdentifier("webUpload.serverURL")
                             .accessibilityLabel("Server URL")
                         Button(action: copyURL) {
                             Image(systemName: "doc.on.doc")
-                                .foregroundColor(.blue)
+                                .foregroundColor(KeepshireTheme.accent)
                         }
                         .accessibilityIdentifier("webUpload.copyURL")
                         .accessibilityLabel("Copy server URL")
@@ -125,7 +125,7 @@ struct WebUploadServerControls: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(isRunning ? Color.red : Color.green)
+                    .background(isRunning ? Color.red : KeepshireTheme.success)
                     .cornerRadius(12)
                 }
                 .accessibilityIdentifier("webUpload.toggleServer")
@@ -150,10 +150,10 @@ struct WebUploadServerControls: View {
         Button(action: action) {
             Label(title, systemImage: icon)
                 .font(.subheadline)
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue.opacity(0.1))
+                .background(KeepshireTheme.accent.opacity(0.1))
                 .cornerRadius(8)
         }
         .accessibilityIdentifier(identifier)
@@ -175,7 +175,7 @@ struct WebExportUnlockSheet: View {
             VStack(spacing: 20) {
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 48))
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                 Text("Allow downloads for 10 minutes")
                     .font(.headline)
                 Text("Confirm it's you before the browser can pull files out of the vault.")
@@ -188,7 +188,7 @@ struct WebExportUnlockSheet: View {
                         Label(biometricButtonTitle, systemImage: biometricButtonIcon)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.blue.opacity(0.1))
+                            .background(KeepshireTheme.accent.opacity(0.1))
                             .cornerRadius(10)
                     }
                     .accessibilityIdentifier("webUpload.exportFaceID")
@@ -296,7 +296,7 @@ struct WebUploadExportSessionCard: View {
             if let expiresAt {
                 Text("Allowed until \(expiresAt.formatted(date: .omitted, time: .shortened))")
                     .font(.subheadline)
-                    .foregroundColor(.green)
+                    .foregroundColor(KeepshireTheme.success)
                 Button("Stop Downloads", action: endSession)
                     .accessibilityIdentifier("webUpload.endExportSession")
             } else {
@@ -359,7 +359,7 @@ struct InstructionStep: View {
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .frame(width: 20, height: 20)
-                .background(Color.blue)
+                .background(KeepshireTheme.accent)
                 .clipShape(Circle())
             Text(text)
                 .font(.subheadline)
@@ -388,9 +388,9 @@ struct WebUploadQRCodeView: View {
                 qrCode
                 Text(url)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                     .padding()
-                    .background(Color.blue.opacity(0.1))
+                    .background(KeepshireTheme.accent.opacity(0.1))
                     .cornerRadius(8)
                 Button("Copy URL") {
                     UIPasteboard.general.string = url
@@ -400,7 +400,7 @@ struct WebUploadQRCodeView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
+                .background(KeepshireTheme.accent)
                 .cornerRadius(12)
                 Spacer()
             }
@@ -512,7 +512,7 @@ struct DetailedInstructionStep: View {
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .frame(width: 32, height: 32)
-                .background(Color.blue)
+                .background(KeepshireTheme.accent)
                 .clipShape(Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline)

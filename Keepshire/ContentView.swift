@@ -81,17 +81,13 @@ struct ContentView: View {
 struct BiometricCheckView: View {
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            KeepshireTheme.brandWash
+                .ignoresSafeArea()
             
             VStack(spacing: 20) {
                 Image(systemName: "faceid")
                     .font(.system(size: 60))
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                 
                 Text("Checking Authentication...")
                     .font(.headline)
@@ -108,8 +104,9 @@ struct BiometricCheckView: View {
 struct EnhancedPrivacyOverlay: View {
     var body: some View {
         ZStack {
-            Color.black
-                .opacity(0.8)
+            // Opaque on purpose: this is the app-switcher cover, so nothing from
+            // the vault may show through it.
+            KeepshireTheme.brandScrim
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {

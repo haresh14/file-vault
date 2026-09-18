@@ -161,7 +161,7 @@ struct TrashView: View {
             VStack(spacing: 20) {
                 Image(systemName: "trash")
                     .font(.system(size: 80))
-                    .foregroundColor(.green)
+                    .foregroundColor(KeepshireTheme.success)
                 
                 Text("Trash is Empty")
                     .font(.title)
@@ -178,7 +178,7 @@ struct TrashView: View {
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.clockwise.circle.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(KeepshireTheme.accent)
                         .font(.title2)
                     Text("Select items and restore to their original location")
                         .font(.subheadline)
@@ -214,7 +214,7 @@ struct TrashView: View {
                         Text("Restore (\(viewModel.selectedItems.count))")
                             .font(.caption)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 }

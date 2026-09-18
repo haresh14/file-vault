@@ -130,7 +130,7 @@ struct VaultToolbarView: ToolbarContent {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
             }
         }
     }
@@ -157,7 +157,7 @@ struct VaultToolbarView: ToolbarContent {
             }
         } label: {
             Image(systemName: "ellipsis.circle")
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
         }
         .accessibilityIdentifier("vault.actions")
         .accessibilityLabel("Vault actions")

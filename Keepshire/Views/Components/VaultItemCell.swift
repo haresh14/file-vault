@@ -106,7 +106,7 @@ struct VaultItemCell: View {
                                 
                                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                                     .font(.body)
-                                    .foregroundColor(isSelected ? .blue : .gray)
+                                    .foregroundColor(isSelected ? KeepshireTheme.accent : .gray)
                             }
                             .padding(2)
                         }

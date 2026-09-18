@@ -55,7 +55,7 @@ struct AuthTypeSelectionView: View {
         VStack(spacing: 16) {
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
             
             Text("Select how you'd like to secure your vault")
                 .font(.subheadline)
@@ -97,7 +97,7 @@ struct AuthTypeSelectionView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue)
+                    .fill(KeepshireTheme.accent)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -138,7 +138,7 @@ struct AuthTypeCard: View {
                     .fill(Color(.systemGray6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                            .stroke(isSelected ? KeepshireTheme.accent : Color.clear, lineWidth: 2)
                     )
             )
         }
@@ -151,14 +151,14 @@ struct AuthTypeCard: View {
     private var iconView: some View {
         Image(systemName: iconName)
             .font(.title2)
-            .foregroundColor(.blue)
+            .foregroundColor(KeepshireTheme.accent)
             .frame(width: 30, height: 30)
     }
     
     private var selectionIndicator: some View {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
             .font(.title2)
-            .foregroundColor(isSelected ? .blue : .secondary)
+            .foregroundColor(isSelected ? KeepshireTheme.accent : .secondary)
     }
     
     private var iconName: String {

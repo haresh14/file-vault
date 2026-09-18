@@ -76,18 +76,14 @@ struct PasscodeView: View {
     // MARK: - View Components
     
     private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
+        KeepshireTheme.brandWash
+            .ignoresSafeArea()
     }
     
     private var lockIcon: some View {
         Image(systemName: "lock.fill")
             .font(.system(size: 60))
-            .foregroundColor(.blue)
+            .foregroundColor(KeepshireTheme.accent)
             .padding(.bottom, 20)
     }
     
@@ -223,7 +219,7 @@ struct PasscodeView: View {
     private var cancelButton: some View {
         if let onCancel = onCancel {
             Button("Cancel", action: onCancel)
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
         }
     }
     
@@ -236,7 +232,7 @@ struct PasscodeView: View {
                         .font(.title2)
                     Text("Use \(biometricDisplayName)")
                 }
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
             }
             .padding(.bottom, 30)
         }
@@ -245,7 +241,7 @@ struct PasscodeView: View {
     // MARK: - Computed Properties
     
     private var buttonBackgroundColor: Color {
-        isButtonDisabled ? Color.gray : Color.blue
+        isButtonDisabled ? Color.gray : KeepshireTheme.accent
     }
     
     private var isButtonDisabled: Bool {

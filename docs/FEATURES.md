@@ -150,7 +150,7 @@ On **every** successful unlock (biometric, real passcode, or fake passcode), `Fi
 
 ### 3.3 Background / lock
 
-- On resign active / background: `ContentView` shows `EnhancedPrivacyOverlay` (dark lock-shield cover). Separately, if screenshot protection is on, `SecurityManager` presents a full-screen black `UIWindow` overlay. Both can appear together. `setLastBackgroundTime()` is recorded.
+- On resign active / background: `ContentView` shows `EnhancedPrivacyOverlay`, an **opaque** lock-shield cover in the brand gradient (`KeepshireTheme.brandScrim`); it hides the vault completely rather than tinting it. Separately, if screenshot protection is on, `SecurityManager` presents a full-screen black `UIWindow` overlay. Both can appear together. `setLastBackgroundTime()` is recorded.
 - On foreground: if `shouldRequireAuthentication()` → lock, reset fake-login state, re-prompt.
 - Immediate (0s): always re-auth.
 - Never (−1): no auto re-auth.
@@ -178,7 +178,7 @@ Every item below is a **must-keep** behavior unless product explicitly drops it.
 | A9 | Biometric lockout | After **3** failures, blocked for **30 seconds** | `maxFailureAttempts`, `failureResetInterval` | LocalAuthentication |
 | A10 | Change authentication | Verify current credential → pick new type → set new credential → re-encrypt all files | `ChangeAuthenticationView`, `MigrationProgressView` | CryptoKit + Core Data |
 | A11 | Auto-lock timeout | Picker: Immediately, 5s, 10s, 15s, 30s, 1 min, 5 min, Never | `KeychainManager.LockTimeout` | Scene phase / UIApplication notifications |
-| A12 | Privacy overlay when leaving app | Blur/cover so app switcher does not show vault contents | `EnhancedPrivacyOverlay` in `ContentView` | `scenePhase`, `willResignActive` |
+| A12 | Privacy overlay when leaving app | Opaque branded cover so app switcher does not show vault contents | `EnhancedPrivacyOverlay` in `ContentView` | `scenePhase`, `willResignActive` |
 
 **Not wired in the main unlock UI:** `authenticateWithDevicePasscode` exists on `BiometricAuthManager` but is unused.
 
@@ -386,7 +386,8 @@ Fake login: **About only**.
 |----|---------|----------|
 | X1 | Alerts | SwiftUI `.alert` on folder, gallery, category, trash, and settings screens; `FolderViewModel` implements `AlertManageable` |
 | X2 | Sheets | SwiftUI `.sheet` / `.fullScreenCover` for pickers, add content, web upload, trash, and auth change |
-| X3 | Dark mode | System SwiftUI colors (`Color(.systemGray6)`, etc.); no custom theme engine |
+| X3 | Dark mode | System SwiftUI colors (`Color(.systemGray6)`, etc.) plus `KeepshireTheme`, which supplies light/dark brand colours from the asset catalog (`AccentColor`, `BrandGreen`). No custom theme engine and no per-user theme setting |
+| X3a | Brand palette | Colours are sampled from the app icon. Teal accent for actions, selection, folders, and progress; green reserved for success/protected states; the icon gradient appears only on authentication, the privacy cover, and branded empty states. File-type and category colours stay distinct on purpose |
 | X4 | Orientations | iPhone: portrait + landscape; iPad: all four |
 | X5 | Localization | English source strings use string catalogs in the app and Share Extension; layouts use leading/trailing semantics and the numeric keypad intentionally stays left-to-right. |
 | X6 | Accessibility | Auth choices, secret passcode entry count, number pad, vault/folder rows, preview actions, trash actions, web upload, and player controls have VoiceOver labels. Number-pad keys and passcode fields scale with Dynamic Type and retain 44-point targets. |

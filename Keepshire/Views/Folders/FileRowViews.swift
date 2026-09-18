@@ -20,7 +20,7 @@ struct SelectableFileRowView: View {
         HStack {
             if isSelectionMode {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .blue : .gray)
+                    .foregroundColor(isSelected ? KeepshireTheme.accent : .gray)
                     .font(.title2)
             }
 

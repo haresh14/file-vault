@@ -125,7 +125,7 @@ struct CategoryFilesToolbar: ToolbarContent {
                         Divider()
                         Button(role: .destructive, action: delete) { Label("Delete", systemImage: "trash") }
                     } label: {
-                        Image(systemName: "ellipsis.circle").foregroundColor(.blue)
+                        Image(systemName: "ellipsis.circle").foregroundColor(KeepshireTheme.accent)
                     }
                 }
             } else {
@@ -136,7 +136,7 @@ struct CategoryFilesToolbar: ToolbarContent {
                         Button(action: enterSelection) { Label("Select Items", systemImage: "checkmark.circle") }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle").foregroundColor(.blue)
+                    Image(systemName: "ellipsis.circle").foregroundColor(KeepshireTheme.accent)
                 }
             }
         }

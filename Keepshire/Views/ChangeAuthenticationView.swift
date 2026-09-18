@@ -48,7 +48,7 @@ struct ChangeAuthenticationView: View {
                     Button(action: { dismiss() }) {
                         Text("Cancel")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.blue)
+                            .foregroundColor(KeepshireTheme.accent)
                     }
                 }
             }
@@ -95,7 +95,7 @@ struct ChangeAuthenticationView: View {
         VStack(spacing: 16) {
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 50))
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
             
             Text("Verify Current Authentication")
                 .font(.title2)
@@ -173,7 +173,7 @@ struct ChangeAuthenticationView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.shield.fill")
                 .font(.system(size: 50))
-                .foregroundColor(.green)
+                .foregroundColor(KeepshireTheme.success)
             
             Text("Choose New Authentication")
                 .font(.title2)
@@ -218,7 +218,7 @@ struct ChangeAuthenticationView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue)
+                    .fill(KeepshireTheme.accent)
             )
         }
         .buttonStyle(PlainButtonStyle())

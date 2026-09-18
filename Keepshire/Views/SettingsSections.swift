@@ -65,7 +65,7 @@ struct SettingsAuthenticationSection: View {
                     Text("Fake Password")
                     Spacer()
                     Text(isFakePasswordSet ? "Set" : "Not Set")
-                        .foregroundColor(isFakePasswordSet ? .green : .secondary)
+                        .foregroundColor(isFakePasswordSet ? KeepshireTheme.success : .secondary)
                         .font(.caption)
                 }
                 Text("Create a decoy password that shows an empty vault when used")
@@ -104,7 +104,7 @@ struct SettingsAuthenticationSection: View {
         let isFaceID = BiometricAuthManager.shared.biometricType() == .faceID
         return HStack {
             Image(systemName: isAvailable ? (isFaceID ? "faceid" : "touchid") : "exclamationmark.circle")
-                .foregroundColor(isAvailable ? .green : .orange)
+                .foregroundColor(isAvailable ? KeepshireTheme.success : .orange)
             Text(isAvailable ? "\(isFaceID ? "Face ID" : "Touch ID") Available" : "Biometric authentication not available")
                 .foregroundColor(.secondary)
                 .font(.caption)

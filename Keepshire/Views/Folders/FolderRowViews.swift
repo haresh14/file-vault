@@ -16,12 +16,12 @@ struct SelectableFolderRowView: View {
         HStack {
             if isSelectionMode {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .blue : .gray)
+                    .foregroundColor(isSelected ? KeepshireTheme.accent : .gray)
                     .font(.title2)
             }
 
             Image(systemName: "folder.fill")
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
                 .font(.title2)
 
             VStack(alignment: .leading, spacing: 2) {

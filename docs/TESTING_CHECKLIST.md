@@ -40,7 +40,7 @@ Default timeout is **30 seconds**. Options: Immediately, 5s, 10s, 15s, 30s, 1 mi
 
 ## Privacy overlay
 
-- [ ] App Switcher preview does not show vault contents (lock cover)
+- [ ] App Switcher preview does not show vault contents (lock cover); the cover is fully opaque, with no vault content faintly visible through it
 
 ## Biometrics
 

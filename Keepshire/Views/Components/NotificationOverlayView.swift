@@ -127,7 +127,7 @@ struct UploadProgressCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "icloud.and.arrow.up")
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                 
                 Text("Background Upload")
                     .font(.headline)
@@ -140,7 +140,7 @@ struct UploadProgressCardView: View {
             }
             
             ProgressView(value: progressPercent)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                .progressViewStyle(LinearProgressViewStyle(tint: KeepshireTheme.accent))
             
             HStack {
                 Text("\(progress.processedFiles) of \(progress.totalFiles) files")

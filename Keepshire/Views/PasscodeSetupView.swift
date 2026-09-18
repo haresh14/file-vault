@@ -93,7 +93,7 @@ struct PasscodeSetupView: View {
         VStack(spacing: 16) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(KeepshireTheme.accent)
             
             Text(isConfirming ? 
                  "Re-enter your \(digitCount)-digit \(isFakePasswordSetup ? "fake " : "")passcode" : 

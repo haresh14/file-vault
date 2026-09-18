@@ -38,7 +38,7 @@ where SortType.RawValue == String, SortType: SortOptionProtocol {
                             if option.hashValue == currentSortOption.hashValue {
                                 Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
                                     .font(.body)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(KeepshireTheme.accent)
                             }
                         }
                         .padding(.horizontal, 24)

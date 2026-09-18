@@ -29,7 +29,7 @@ struct FolderBreadcrumbView: View {
                         Image(systemName: "house.fill").font(.caption)
                         Text("Home").font(.caption)
                     }
-                        .foregroundColor(.blue)
+                        .foregroundColor(KeepshireTheme.accent)
                 }
                 if let folder {
                     let breadcrumbs = folder.breadcrumbPath
@@ -47,7 +47,7 @@ struct FolderBreadcrumbView: View {
                             } label: {
                                 Text(breadcrumb.displayName)
                                     .font(.caption)
-                                    .foregroundColor(index == breadcrumbs.count - 1 ? .primary : .blue)
+                                    .foregroundColor(index == breadcrumbs.count - 1 ? .primary : KeepshireTheme.accent)
                                     .fontWeight(index == breadcrumbs.count - 1 ? .semibold : .regular)
                             }
                             .disabled(index == breadcrumbs.count - 1)
@@ -190,7 +190,7 @@ struct FolderContentToolbar: ToolbarContent {
                         Divider()
                         Button(role: .destructive, action: delete) { Label("Delete", systemImage: "trash") }
                     } label: {
-                        Image(systemName: "ellipsis.circle").foregroundColor(.blue)
+                        Image(systemName: "ellipsis.circle").foregroundColor(KeepshireTheme.accent)
                     }
                 }
             } else {
@@ -204,7 +204,7 @@ struct FolderContentToolbar: ToolbarContent {
                         Button(action: selectItems) { Label("Select Items", systemImage: "checkmark.circle") }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle").foregroundColor(.blue)
+                    Image(systemName: "ellipsis.circle").foregroundColor(KeepshireTheme.accent)
                 }
             }
         }

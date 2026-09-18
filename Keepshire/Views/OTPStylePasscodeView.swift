@@ -107,7 +107,7 @@ struct DigitDisplay: View {
                     .fill(Color(.systemGray6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isActive ? Color.blue : Color.clear, lineWidth: 2)
+                            .stroke(isActive ? KeepshireTheme.accent : Color.clear, lineWidth: 2)
                     )
                     .frame(
                         width: min(fieldWidth, 66),

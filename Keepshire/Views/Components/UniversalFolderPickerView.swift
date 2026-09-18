@@ -68,7 +68,7 @@ struct UniversalFolderPickerView: View {
                             navigationPath.removeAll()
                             loadCurrentLevelFolders()
                         }
-                        .foregroundColor(.blue)
+                        .foregroundColor(KeepshireTheme.accent)
                         
                         ForEach(Array(navigationPath.enumerated()), id: \.element.objectID) { index, folder in
                             HStack(spacing: 4) {
@@ -80,7 +80,7 @@ struct UniversalFolderPickerView: View {
                                     navigationPath = Array(navigationPath.prefix(index + 1))
                                     loadCurrentLevelFolders()
                                 }
-                                .foregroundColor(.blue)
+                                .foregroundColor(KeepshireTheme.accent)
                             }
                         }
                     }
@@ -132,7 +132,7 @@ struct UniversalFolderPickerView: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
-            .background(Color.green)
+            .background(KeepshireTheme.success)
             .cornerRadius(12)
         }
         .disabled(!canMoveToCurrentFolder())
@@ -148,7 +148,7 @@ struct UniversalFolderPickerView: View {
         }) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(KeepshireTheme.accent)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(folder.displayName)
