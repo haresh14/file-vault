@@ -114,6 +114,7 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 - [ ] iPad Folder tab shows folder sidebar and selected-folder content; phone navigation is unchanged
 - [ ] Rotate iPad through all supported orientations; only one scene/window is offered
+- [ ] Deferred until the end: nested folders in the sidebar; Gallery, Categories, Trash, Settings, and preview layouts on iPad
 - [ ] Pseudolanguage and right-to-left launch: labels fit, navigation direction mirrors, keypad stays ordered 1–9
 
 ## Gallery performance and diagnostics
