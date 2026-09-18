@@ -464,8 +464,13 @@ struct WebServerManagerTests {
         ])
 
         #expect(breadcrumbs == "<a onclick=\"navigateToFolder('')\">📁 Root</a> > <a onclick=\"navigateToFolder('one')\">Parent &amp; More</a> > <a onclick=\"navigateToFolder('two')\">&lt;Child &#39;2&#39;&gt;</a>")
-        #expect(WebHTMLTemplate.document(title: "T", style: "S", body: "B", script: "J").contains("<style>\nS\n</style>"))
-        #expect(WebHTMLTemplate.document(title: "T", style: "S", body: "B", script: "J").contains("<script>\nJ\n</script>"))
+        let document = WebHTMLTemplate.document(title: "T", style: "S", body: "B", script: "J")
+        #expect(document.contains("<style>\nS\n</style>"))
+        #expect(document.contains("<script>\nJ\n</script>"))
+        #expect(document.contains(##"<meta name="theme-color" content="#007797">"##))
+        #expect(WebHTMLChunks.statusStyle.contains("#007797"))
+        #expect(WebHTMLChunks.statusStyle.contains("#2CDDAE"))
+        #expect(WebHTMLChunks.statusStyle.contains("#76D55C"))
         #expect(WebHTMLPages.success(uploadedFiles: ["a&b.txt"]).contains("• a&amp;b.txt"))
         #expect(WebHTMLPages.status(fileCount: 3, formattedSize: "1 KB", serverURL: "https://127.0.0.1:8080").contains("3"))
     }

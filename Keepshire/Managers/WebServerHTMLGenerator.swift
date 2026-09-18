@@ -105,6 +105,7 @@ extension WebServerManager {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="theme-color" content="#007797">
             <title>Keepshire - File Explorer</title>
             <style>
                 * {
@@ -115,7 +116,7 @@ extension WebServerManager {
                 
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #007797 0%, #2CDDAE 55%, #76D55C 100%);
                     min-height: 100vh;
                     padding: 20px;
                 }
@@ -156,7 +157,7 @@ extension WebServerManager {
                 }
                 
                 .breadcrumbs a {
-                    color: #667eea;
+                    color: #007797;
                     text-decoration: none;
                     cursor: pointer;
                 }
@@ -212,7 +213,7 @@ extension WebServerManager {
                     margin: 0;
                     cursor: pointer;
                     transform: scale(1.2);
-                    accent-color: #667eea;
+                    accent-color: #007797;
                     width: 18px;
                     height: 18px;
                 }
@@ -221,7 +222,7 @@ extension WebServerManager {
                     margin: 0 8px 0 0;
                     cursor: pointer;
                     transform: scale(1.3);
-                    accent-color: #667eea;
+                    accent-color: #007797;
                     width: 16px;
                     height: 16px;
                 }
@@ -248,21 +249,21 @@ extension WebServerManager {
                 }
                 
                 .upload-button {
-                    background: #667eea;
+                    background: #007797;
                     color: white;
                 }
                 
                 .upload-button:hover {
-                    background: #5a6fd8;
+                    background: #00647F;
                 }
                 
                 .new-folder-btn {
-                    background: #28a745;
+                    background: #007797;
                     color: white;
                 }
                 
                 .new-folder-btn:hover {
-                    background: #218838;
+                    background: #00647F;
                 }
                 
                 .file-actions {
@@ -286,7 +287,7 @@ extension WebServerManager {
                 }
                 
                 .download-btn:hover {
-                    background: rgba(40, 167, 69, 0.2);
+                    background: rgba(60, 142, 42, 0.2);
                 }
                 
                 .rename-btn:hover {
@@ -320,7 +321,7 @@ extension WebServerManager {
                 }
                 
                 .file-item[onclick]:hover {
-                    background: #e3f2fd;
+                    background: #E0F5F1;
                     transform: translateY(-1px);
                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                 }
@@ -330,20 +331,20 @@ extension WebServerManager {
                 }
                 
                 .file-item.folder-item {
-                    background: linear-gradient(135deg, #f8f9ff 0%, #e8f4fd 100%);
-                    border-left: 4px solid #667eea;
+                    background: linear-gradient(135deg, #F5FBFA 0%, #E6F7F4 100%);
+                    border-left: 4px solid #007797;
                     font-weight: 500;
                 }
                 
                 .file-item.folder-item:hover {
-                    background: linear-gradient(135deg, #e8f4fd 0%, #d6eaff 100%);
+                    background: linear-gradient(135deg, #E6F7F4 0%, #CCEFE9 100%);
                     transform: translateY(-1px);
-                    box-shadow: 0 3px 12px rgba(102, 126, 234, 0.15);
+                    box-shadow: 0 3px 12px rgba(0, 119, 151, 0.18);
                 }
                 
                 .file-item.folder-item .file-icon {
                     font-size: 22px;
-                    color: #667eea;
+                    color: #007797;
                 }
                 
                 .file-item.folder-item .file-name {
@@ -458,13 +459,13 @@ extension WebServerManager {
                 }
                 
                 .upload-area:hover {
-                    border-color: #667eea;
-                    background: #f0f4ff;
+                    border-color: #007797;
+                    background: #EBF9F6;
                 }
                 
                 .upload-area.dragover {
-                    border-color: #667eea;
-                    background: #e6f0ff;
+                    border-color: #007797;
+                    background: #DCF5F0;
                     transform: scale(1.02);
                 }
                 
@@ -490,7 +491,7 @@ extension WebServerManager {
                 }
                 
                 .btn {
-                    background: #667eea;
+                    background: #007797;
                     color: white;
                     border: none;
                     padding: 10px 20px;
@@ -502,7 +503,7 @@ extension WebServerManager {
                 }
                 
                 .btn:hover {
-                    background: #5a6fd8;
+                    background: #00647F;
                 }
                 
                 .btn-secondary {
@@ -533,12 +534,12 @@ extension WebServerManager {
                 }
                 
                 .selected-file-item.uploading {
-                    border-color: #007bff;
-                    background: #f0f8ff;
+                    border-color: #007797;
+                    background: #EBF9F6;
                 }
                 
                 .selected-file-item.completed {
-                    border-color: #28a745;
+                    border-color: #3C8E2A;
                     background: linear-gradient(135deg, #d4edda 0%, #f0fff0 100%);
                 }
                 
@@ -595,11 +596,11 @@ extension WebServerManager {
                 }
                 
                 .selected-file-item.uploading .file-status .status-text {
-                    color: #007bff;
+                    color: #007797;
                 }
                 
                 .selected-file-item.completed .file-status .status-text {
-                    color: #28a745;
+                    color: #327823;
                 }
                 
                 .selected-file-item.failed .file-status .status-text {
@@ -623,7 +624,7 @@ extension WebServerManager {
                 
                 .file-progress-fill {
                     height: 100%;
-                    background: linear-gradient(90deg, #007bff, #0056b3);
+                    background: linear-gradient(90deg, #007797, #005E78);
                     width: 0%;
                     transition: width 0.3s ease;
                     border-radius: 3px;
@@ -680,7 +681,7 @@ extension WebServerManager {
                 
                 .progress-fill {
                     height: 100%;
-                    background: #667eea;
+                    background: #007797;
                     width: 0%;
                     transition: width 0.3s ease;
                 }
@@ -731,7 +732,7 @@ extension WebServerManager {
                     width: 50px;
                     height: 50px;
                     border: 4px solid #f3f3f3;
-                    border-top: 4px solid #667eea;
+                    border-top: 4px solid #007797;
                     border-radius: 50%;
                     animation: spin 1s linear infinite;
                     margin: 0 auto 20px;
@@ -744,7 +745,7 @@ extension WebServerManager {
                 
                 .success-icon-large {
                     font-size: 60px;
-                    color: #28a745;
+                    color: #3C8E2A;
                     margin-bottom: 20px;
                 }
                 
@@ -764,12 +765,12 @@ extension WebServerManager {
                 .progress-percentage {
                     font-size: 24px;
                     font-weight: 700;
-                    color: #667eea;
+                    color: #007797;
                     margin-bottom: 15px;
                 }
                 
                 .secondary-btn {
-                    background: #2196F3;
+                    background: #007797;
                     color: white;
                     border: none;
                     padding: 8px 16px;
@@ -780,7 +781,7 @@ extension WebServerManager {
                 }
                 
                 .secondary-btn:hover {
-                    background: #1976D2;
+                    background: #00647F;
                 }
                 
                 @media (max-width: 768px) {
@@ -864,7 +865,7 @@ extension WebServerManager {
                         <!-- Upload Type Toggle -->
                         <div style="text-align: center; margin-bottom: 15px;">
                             <div style="display: inline-flex; background: #f8f9fa; border-radius: 8px; padding: 4px; border: 1px solid #dee2e6;">
-                                <label style="display: flex; align-items: center; padding: 8px 16px; margin: 0; cursor: pointer; border-radius: 6px; transition: all 0.2s; background: #007bff; color: white;">
+                                <label style="display: flex; align-items: center; padding: 8px 16px; margin: 0; cursor: pointer; border-radius: 6px; transition: all 0.2s; background: #007797; color: white;">
                                     <input type="radio" name="uploadType" value="files" checked style="display: none;">
                                     <span style="font-size: 14px; font-weight: 500;">📄 Files</span>
                                 </label>
@@ -880,7 +881,7 @@ extension WebServerManager {
                             <div class="upload-text">Click to browse</div>
                             <div class="upload-hint">Or drag and drop here</div>
                             <div class="upload-mode-indicator" id="uploadModeIndicator" style="margin-top: 10px;">
-                                <small style="color: #007bff; font-weight: 500;">Ready to select files</small>
+                                <small style="color: #007797; font-weight: 500;">Ready to select files</small>
                             </div>
                         </div>
                         
@@ -925,7 +926,7 @@ extension WebServerManager {
                         <input type="text" id="folderNameInput" placeholder="Enter folder name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
                         <div style="margin-top: 15px; text-align: right;">
                             <button onclick="hideNewFolderDialog()" style="margin-right: 10px; padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
-                            <button onclick="createFolder()" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Create</button>
+                            <button onclick="createFolder()" style="padding: 8px 16px; background: #007797; color: white; border: none; border-radius: 4px; cursor: pointer;">Create</button>
                         </div>
                     </div>
                 </div>
@@ -942,7 +943,7 @@ extension WebServerManager {
                         <input type="text" id="renameFolderInput" placeholder="Enter new name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
                         <div style="margin-top: 15px; text-align: right;">
                             <button onclick="hideRenameDialog()" style="margin-right: 10px; padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
-                            <button onclick="renameFolder()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">Rename</button>
+                            <button onclick="renameFolder()" style="padding: 8px 16px; background: #007797; color: white; border: none; border-radius: 4px; cursor: pointer;">Rename</button>
                         </div>
                     </div>
                 </div>
@@ -1064,7 +1065,7 @@ extension WebServerManager {
                         const label = radio.closest('label');
                         if (label) {
                             if (radio.value === selectedMode) {
-                                label.style.background = '#007bff';
+                                label.style.background = '#007797';
                                 label.style.color = 'white';
                             } else {
                                 label.style.background = 'transparent';
@@ -1075,9 +1076,9 @@ extension WebServerManager {
                     
                     // Update mode indicator text
                     if (selectedMode === 'files') {
-                        uploadModeIndicator.innerHTML = '<small style="color: #007bff; font-weight: 500;">Ready to select files 📄</small>';
+                        uploadModeIndicator.innerHTML = '<small style="color: #007797; font-weight: 500;">Ready to select files 📄</small>';
                     } else {
-                        uploadModeIndicator.innerHTML = '<small style="color: #28a745; font-weight: 500;">Ready to select folders 📁</small>';
+                        uploadModeIndicator.innerHTML = '<small style="color: #3C8E2A; font-weight: 500;">Ready to select folders 📁</small>';
                     }
                 }
                 
@@ -2158,6 +2159,7 @@ extension WebServerManager {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="theme-color" content="#007797">
             <title>Keepshire - Status</title>
             <style>
                 * {
@@ -2168,7 +2170,7 @@ extension WebServerManager {
                 
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #007797 0%, #2CDDAE 55%, #76D55C 100%);
                     min-height: 100vh;
                     display: flex;
                     align-items: center;
@@ -2215,7 +2217,7 @@ extension WebServerManager {
                 .stat-number {
                     font-size: 32px;
                     font-weight: 700;
-                    color: #667eea;
+                    color: #007797;
                     margin-bottom: 5px;
                 }
                 
@@ -2226,7 +2228,7 @@ extension WebServerManager {
                 }
                 
                 .btn {
-                    background: linear-gradient(45deg, #667eea, #764ba2);
+                    background: #007797;
                     color: white;
                     border: none;
                     padding: 15px 30px;
@@ -2252,11 +2254,11 @@ extension WebServerManager {
                 }
                 
                 .server-info {
-                    background: #e8f4fd;
+                    background: #E6F7F4;
                     border-radius: 15px;
                     padding: 20px;
                     margin: 20px 0;
-                    border-left: 4px solid #667eea;
+                    border-left: 4px solid #007797;
                 }
                 
                 .server-info h3 {
@@ -2270,7 +2272,7 @@ extension WebServerManager {
                     padding: 10px;
                     border-radius: 8px;
                     font-size: 14px;
-                    color: #667eea;
+                    color: #007797;
                     word-break: break-all;
                 }
                 
@@ -2326,6 +2328,7 @@ extension WebServerManager {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="theme-color" content="#007797">
             <title>Upload Successful - Keepshire</title>
             <style>
                 * {
@@ -2336,7 +2339,7 @@ extension WebServerManager {
                 
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #007797 0%, #2CDDAE 55%, #76D55C 100%);
                     min-height: 100vh;
                     display: flex;
                     align-items: center;
@@ -2360,7 +2363,7 @@ extension WebServerManager {
                 }
                 
                 h1 {
-                    color: #28a745;
+                    color: #327823;
                     margin-bottom: 20px;
                     font-size: 32px;
                     font-weight: 600;
@@ -2392,7 +2395,7 @@ extension WebServerManager {
                 }
                 
                 .btn {
-                    background: linear-gradient(45deg, #667eea, #764ba2);
+                    background: #007797;
                     color: white;
                     border: none;
                     padding: 15px 30px;

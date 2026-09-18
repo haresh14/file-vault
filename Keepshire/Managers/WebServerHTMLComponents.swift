@@ -136,6 +136,7 @@ enum WebHTMLTemplate {
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="theme-color" content="#007797">
         <title>\(WebHTMLEscaping.text(title))</title>
         <style>
         \(style)
@@ -151,8 +152,32 @@ enum WebHTMLTemplate {
 
 enum WebHTMLChunks {
     static let statusStyle = """
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    .container { max-width: 500px; margin: 0 auto; }
+    * { box-sizing: border-box; }
+    body {
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #333;
+        background: linear-gradient(135deg, #007797 0%, #2CDDAE 55%, #76D55C 100%);
+    }
+    .container {
+        max-width: 500px;
+        margin: 40px auto;
+        padding: 32px;
+        border-radius: 20px;
+        background: white;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.14);
+    }
+    a { color: #007797; font-weight: 600; }
+    .stat-number { color: #007797; font-size: 2rem; font-weight: 700; }
+    .server-url, .file-list {
+        margin: 16px 0;
+        padding: 16px;
+        border-radius: 12px;
+        background: #F5FBFA;
+        word-break: break-word;
+    }
     """
 
     static let successStyle = statusStyle

@@ -135,6 +135,7 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Web upload
 
+- [ ] Explorer, upload dialog, progress overlay, status page, and success page use the Keepshire teal/mint/green palette; destructive actions remain red
 - [ ] Fresh install: launch and unlock do not request notification permission; starting Web Upload requests it once
 - [ ] Upload with the app on screen: in-app completion banner appears, no duplicate system banner
 - [ ] Upload while the app is in the App Switcher: a system notification arrives, as long as the transfer finishes within the short window iOS allows a backgrounded app
