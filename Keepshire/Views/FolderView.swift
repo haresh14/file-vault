@@ -52,12 +52,14 @@ struct FolderView: View {
             }
         } else {
             NavigationStack(path: $navigationPath) {
+                // FolderContentView already titles itself ("Folders" at the root, the
+                // folder name when pushed). Setting a second title here competes with
+                // it, which drops the title on first layout and flashes the root title
+                // over each pushed folder.
                 FolderContentView(
                     folder: nil,
                     navigationPath: $navigationPath
                 )
-                .navigationTitle("Folders")
-                .navigationBarTitleDisplayMode(.large)
             }
         }
     }

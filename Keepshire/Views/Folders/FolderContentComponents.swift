@@ -59,7 +59,6 @@ struct FolderContentList: View {
     let selectedFolders: Set<Folder>
     let selectedFiles: Set<VaultItem>
     let isSelectionMode: Bool
-    @Binding var navigationPath: NavigationPath
     let tapFolder: (Folder) -> Void
     let renameFolder: (Folder) -> Void
     let selectFolder: (Folder) -> Void
@@ -133,9 +132,6 @@ struct FolderContentList: View {
                 }
             }
         }
-        .navigationDestination(for: Folder.self) { folder in
-            FolderContentView(folder: folder, navigationPath: $navigationPath)
-        }
     }
 }
 
@@ -156,8 +152,10 @@ struct FolderContentToolbar: ToolbarContent {
     let selectItems: () -> Void
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            if isSelectionMode {
+        // Declared conditionally rather than always-present-but-empty: an empty leading
+        // item still claims the slot that holds the back button and the large title.
+        if isSelectionMode {
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button("Select All", action: selectAll)
             }
         }

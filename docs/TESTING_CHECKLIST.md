@@ -88,6 +88,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Import up to 50 photos/videos; document picker
 - [ ] Nested folders: create, rename, move, delete
 - [ ] Gallery and category search; folder search matches files and immediate child folders
+- [ ] On a physical device, the Folder search field is visible on the tab's first appearance and collapses once the list is scrolled, matching Gallery and the system apps
+- [ ] Folder search still works from the empty and no-results states
+- [ ] Folder tab shows its title on first load, and pushing into a nested folder does not flash "Folders" before the folder name
 - [ ] VoiceOver announces passcode progress without speaking digits
 - [ ] Largest Dynamic Type keeps the number pad and Continue controls usable
 - [ ] Sort, multi-select, favorite, share, rename, move

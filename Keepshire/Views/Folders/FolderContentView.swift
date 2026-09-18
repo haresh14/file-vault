@@ -26,22 +26,38 @@ struct FolderContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        // The list is always the view's content, even when empty, and the empty state
+        // is layered on top. Swapping the list out for a plain stack made the
+        // navigation bar re-bind its large title and search field on every change,
+        // which is what made the title and search drawer come and go.
+        contentList
+        .overlay {
+            if isShowingEmptyState {
+                FolderContentEmptyState(configuration: emptyStateConfiguration)
+            }
+        }
+        // The breadcrumb is a horizontal ScrollView. Stacking it above the list in a
+        // VStack makes the navigation bar bind its large title and search drawer to
+        // that strip instead of the list, which is why both went missing. As a safe
+        // area inset it stays pinned without becoming the primary scroll view.
+        .safeAreaInset(edge: .top, spacing: 0) {
             FolderBreadcrumbView(folder: folder, navigationPath: $navigationPath)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(Color(.systemGray6))
-            if loginStateManager.shouldShowEmptyVault
-                || (viewModel.folders.isEmpty && viewModel.files.isEmpty)
-                || viewModel.isShowingNoSearchResults {
-                FolderContentEmptyState(configuration: emptyStateConfiguration)
-            } else {
-                contentList
-            }
         }
         .navigationTitle(folder?.displayName ?? "Folders")
-        .navigationBarTitleDisplayMode(.large)
+        // Inline, unlike the other tabs. A large title is laid out from the list's
+        // scroll offset, and the pinned breadcrumb inset sits in the space it expands
+        // into, so the title landed above/below the breadcrumb or vanished depending
+        // on scroll position. An inline title is drawn in the bar regardless.
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $viewModel.searchText, prompt: "Search this folder")
+        // Belongs to the view, not to the rows: a destination declared inside the list
+        // disappears whenever the list has no content to render it from.
+        .navigationDestination(for: Folder.self) { destination in
+            FolderContentView(folder: destination, navigationPath: $navigationPath)
+        }
         .toolbar { toolbar }
         .modifier(FolderContentAlertsModifier(
             viewModel: viewModel,
@@ -85,14 +101,19 @@ struct FolderContentView: View {
         }
     }
 
+    private var isShowingEmptyState: Bool {
+        loginStateManager.shouldShowEmptyVault
+            || (viewModel.folders.isEmpty && viewModel.files.isEmpty)
+            || viewModel.isShowingNoSearchResults
+    }
+
     private var contentList: some View {
         FolderContentList(
-            folders: viewModel.sortedFolders,
-            files: viewModel.sortedFiles,
+            folders: isShowingEmptyState ? [] : viewModel.sortedFolders,
+            files: isShowingEmptyState ? [] : viewModel.sortedFiles,
             selectedFolders: viewModel.selectedFolders,
             selectedFiles: viewModel.selectedFiles,
             isSelectionMode: viewModel.isSelectionMode,
-            navigationPath: $navigationPath,
             tapFolder: { item in
                 viewModel.isSelectionMode ? toggleFolderSelection(item) : navigationPath.append(item)
             },
