@@ -10,8 +10,40 @@ import CoreData
 
 struct TrashView: View {
     @StateObject private var viewModel = TrashViewModel()
+    @State private var previewItem: VaultItem?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     var body: some View {
+        Group {
+            if horizontalSizeClass == .regular {
+                HStack(spacing: 0) {
+                    trashContent
+                        .frame(minWidth: 360, maxWidth: .infinity)
+                    Divider()
+                    VaultPreviewDetail(
+                        item: previewItem,
+                        mediaItems: viewModel.getMediaFiles(),
+                        onClose: { previewItem = nil }
+                    )
+                    .frame(minWidth: 320, idealWidth: 500, maxWidth: .infinity)
+                }
+            } else {
+                trashContent
+            }
+        }
+        .onChange(of: horizontalSizeClass) { _, sizeClass in
+            if sizeClass == .regular {
+                viewModel.showUnifiedMediaViewer = false
+                viewModel.mediaViewerIndex = -1
+                viewModel.showFilePreview = false
+                viewModel.filePreviewItem = nil
+            } else {
+                previewItem = nil
+            }
+        }
+    }
+
+    private var trashContent: some View {
         VStack(spacing: 0) {
             if viewModel.deletedItems.isEmpty {
                 emptyTrashView
@@ -27,6 +59,8 @@ struct TrashView: View {
                     onItemTap: { item in
                         if viewModel.isSelectionMode {
                             viewModel.toggleSelection(item)
+                        } else if horizontalSizeClass == .regular {
+                            previewItem = item
                         } else {
                             viewModel.viewFile(item)
                         }

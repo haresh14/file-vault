@@ -189,10 +189,19 @@
     "Checking Authentication..." : {
 
     },
+    "Choose a category from the sidebar." : {
+
+    },
+    "Choose a file to preview it here." : {
+
+    },
     "Choose New Authentication" : {
 
     },
     "Close" : {
+
+    },
+    "Close preview" : {
 
     },
     "Complete App Reset" : {
@@ -619,6 +628,12 @@
 
     },
     "Select" : {
+
+    },
+    "Select a Category" : {
+
+    },
+    "Select a File" : {
 
     },
     "Select All" : {

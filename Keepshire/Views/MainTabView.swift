@@ -9,7 +9,6 @@ import SwiftUI
 
 struct MainTabView: View {
     @StateObject private var webServer = WebServerManager.shared
-    @State private var showSettings = false
     @State private var selectedTab = 0
     
     var body: some View {

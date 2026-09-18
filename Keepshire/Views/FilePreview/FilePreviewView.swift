@@ -12,6 +12,7 @@ import QuickLook
 /// - Note: Navigation only works for media files (images/videos), not documents
 struct FilePreviewView: View {
     let vaultItem: VaultItem
+    let onClose: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var fileData: Data?
     @State private var isLoading = true
@@ -21,6 +22,11 @@ struct FilePreviewView: View {
     @State private var isFavorite = false
     // File info gesture handler (for non-media files)
     @StateObject private var gestureHandler = FileInfoGestureHandler()
+
+    init(vaultItem: VaultItem, onClose: (() -> Void)? = nil) {
+        self.vaultItem = vaultItem
+        self.onClose = onClose
+    }
     
     // Helper function to toggle favorite status
     private func toggleFavorite() {
@@ -78,7 +84,7 @@ struct FilePreviewView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         cleanup()
-                        dismiss()
+                        close()
                     }
                     .foregroundColor(.white)
                 }
@@ -194,6 +200,45 @@ struct FilePreviewView: View {
             try? FileManager.default.removeItem(at: url)
             temporaryFileURL = nil
         }
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+    }
+}
+
+struct VaultPreviewDetail: View {
+    let item: VaultItem?
+    let mediaItems: [VaultItem]
+    let onClose: () -> Void
+
+    var body: some View {
+        Group {
+            if let item {
+                if item.isImage || item.isVideo {
+                    let availableMedia = mediaItems.isEmpty ? [item] : mediaItems
+                    let initialIndex = availableMedia.firstIndex(of: item) ?? 0
+                    UnifiedMediaViewerView(
+                        mediaItems: availableMedia,
+                        initialIndex: initialIndex,
+                        onDismiss: onClose
+                    )
+                } else {
+                    FilePreviewView(vaultItem: item, onClose: onClose)
+                }
+            } else {
+                ContentUnavailableView(
+                    "Select a File",
+                    systemImage: "doc.viewfinder",
+                    description: Text("Choose a file to preview it here.")
+                )
+            }
+        }
+        .id(item?.objectID)
     }
 }
 

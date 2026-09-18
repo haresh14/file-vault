@@ -9,6 +9,8 @@ struct FolderContentView: View {
 
     let folder: Folder?
     @Binding var navigationPath: NavigationPath
+    let onNavigateToFolder: ((Folder?) -> Void)?
+    let onPreviewFile: ((VaultItem, [VaultItem]) -> Void)?
     @StateObject private var viewModel: FolderViewModel
     @StateObject private var loginStateManager = LoginStateManager.shared
     @State private var showFileRenameAlert = false
@@ -18,10 +20,14 @@ struct FolderContentView: View {
     init(
         folder: Folder?,
         navigationPath: Binding<NavigationPath>,
+        onNavigateToFolder: ((Folder?) -> Void)? = nil,
+        onPreviewFile: ((VaultItem, [VaultItem]) -> Void)? = nil,
         dependencies: DependencyContainer = .shared
     ) {
         self.folder = folder
         _navigationPath = navigationPath
+        self.onNavigateToFolder = onNavigateToFolder
+        self.onPreviewFile = onPreviewFile
         _viewModel = StateObject(wrappedValue: FolderViewModel(folder: folder, dependencies: dependencies))
     }
 
@@ -41,7 +47,11 @@ struct FolderContentView: View {
         // that strip instead of the list, which is why both went missing. As a safe
         // area inset it stays pinned without becoming the primary scroll view.
         .safeAreaInset(edge: .top, spacing: 0) {
-            FolderBreadcrumbView(folder: folder, navigationPath: $navigationPath)
+            FolderBreadcrumbView(
+                folder: folder,
+                navigationPath: $navigationPath,
+                onNavigateToFolder: onNavigateToFolder
+            )
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(Color(.systemGray6))
@@ -115,7 +125,13 @@ struct FolderContentView: View {
             selectedFiles: viewModel.selectedFiles,
             isSelectionMode: viewModel.isSelectionMode,
             tapFolder: { item in
-                viewModel.isSelectionMode ? toggleFolderSelection(item) : navigationPath.append(item)
+                if viewModel.isSelectionMode {
+                    toggleFolderSelection(item)
+                } else if let onNavigateToFolder {
+                    onNavigateToFolder(item)
+                } else {
+                    navigationPath.append(item)
+                }
             },
             renameFolder: startRenaming,
             selectFolder: { item in
@@ -126,7 +142,13 @@ struct FolderContentView: View {
             deleteFolder: deleteFolder,
             swipeDeleteFolder: { viewModel.prepareSwipeDeleteAlert(for: [$0]) },
             tapFile: { item in
-                viewModel.isSelectionMode ? toggleFileSelection(item) : viewModel.viewFile(item)
+                if viewModel.isSelectionMode {
+                    toggleFileSelection(item)
+                } else if let onPreviewFile {
+                    onPreviewFile(item, viewModel.sortedFiles.filter { $0.isImage || $0.isVideo })
+                } else {
+                    viewModel.viewFile(item)
+                }
             },
             selectFile: { item in
                 if !viewModel.isSelectionMode { viewModel.enterSelectionMode() }

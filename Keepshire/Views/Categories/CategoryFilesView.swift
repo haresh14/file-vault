@@ -7,6 +7,7 @@ struct CategoryFilesView: View {
     }
 
     let categoryType: CategoryType
+    let onPreviewFile: ((VaultItem, [VaultItem]) -> Void)?
     @StateObject private var viewModel: CategoryFilesViewModel
     @State private var showSortActionSheet = false
     @State private var showDeleteAlert = false
@@ -15,8 +16,13 @@ struct CategoryFilesView: View {
     @State private var renameText = ""
     @State private var itemToRename: VaultItem?
 
-    init(categoryType: CategoryType, dependencies: DependencyContainer = .shared) {
+    init(
+        categoryType: CategoryType,
+        onPreviewFile: ((VaultItem, [VaultItem]) -> Void)? = nil,
+        dependencies: DependencyContainer = .shared
+    ) {
         self.categoryType = categoryType
+        self.onPreviewFile = onPreviewFile
         _viewModel = StateObject(
             wrappedValue: CategoryFilesViewModel(categoryType: categoryType, dependencies: dependencies)
         )
@@ -45,12 +51,14 @@ struct CategoryFilesView: View {
                 sortAscending: viewModel.sortAscending,
                 select: selectSortOption
             )
+            .presentationSizing(.form)
         }
         .sheet(isPresented: $showMoveSheet) {
             CategoryFilesMoveSheet(selectedFiles: viewModel.selectedItems) { destination in
                 viewModel.moveSelectedItems(to: destination)
                 showMoveSheet = false
             }
+            .presentationSizing(.form)
         }
         .fullScreenCover(isPresented: mediaViewerPresented) {
             UnifiedMediaViewerView(
@@ -80,7 +88,13 @@ struct CategoryFilesView: View {
             selectedItems: viewModel.selectedItems,
             isSelectionMode: viewModel.isSelectionMode,
             showFavoriteIndicator: categoryType != .favorites,
-            open: viewModel.viewFile,
+            open: { item in
+                if let onPreviewFile {
+                    onPreviewFile(item, viewModel.getMediaFiles())
+                } else {
+                    viewModel.viewFile(item)
+                }
+            },
             select: viewModel.toggleSelection,
             longPress: { item in
                 if !viewModel.isSelectionMode {

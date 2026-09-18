@@ -10,6 +10,7 @@ import SwiftUI
 // MARK: - File Info Panel View
 
 struct FileInfoPanel: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let vaultItem: VaultItem
     let isVisible: Bool
     let panelOffset: CGFloat
@@ -113,14 +114,17 @@ struct FileInfoPanel: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 30)
         }
-        .frame(height: 350)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: horizontalSizeClass == .regular ? .infinity : 350
+        )
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: horizontalSizeClass == .regular ? 0 : 20)
                 .fill(Color.black.opacity(0.9))
                 .ignoresSafeArea(edges: .bottom)
         )
-        .offset(y: panelOffset)
-        .transition(.move(edge: .bottom))
+        .offset(y: horizontalSizeClass == .regular ? 0 : panelOffset)
+        .transition(.move(edge: horizontalSizeClass == .regular ? .trailing : .bottom))
         .animation(.interactiveSpring(), value: panelOffset)
     }
 }
@@ -261,6 +265,7 @@ class FileInfoGestureHandler: ObservableObject {
 // MARK: - File Info Layout Container
 
 struct FileInfoLayoutContainer<Content: View>: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let content: Content
     let vaultItem: VaultItem
     let gestureHandler: FileInfoGestureHandler
@@ -288,23 +293,32 @@ struct FileInfoLayoutContainer<Content: View>: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Main content area - gets pushed up when info panel is shown
-            content
-                .frame(height: gestureHandler.showInfoPanel ? geometry.size.height - 350 : geometry.size.height)
-                .clipped()
-                .animation(.easeInOut(duration: 0.3), value: gestureHandler.showInfoPanel)
-            
-            // Info panel content - slides up from bottom
-            if gestureHandler.showInfoPanel {
-                FileInfoPanel(
-                    vaultItem: vaultItem,
-                    isVisible: gestureHandler.showInfoPanel,
-                    panelOffset: gestureHandler.infoPanelOffset,
-                    onFavoriteToggle: onFavoriteToggle
-                )
+        Group {
+            if horizontalSizeClass == .regular {
+                HStack(spacing: 0) {
+                    content
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+
+                    if gestureHandler.showInfoPanel {
+                        Divider()
+                        infoPanel
+                            .frame(width: min(360, geometry.size.width * 0.4))
+                    }
+                }
+            } else {
+                VStack(spacing: 0) {
+                    content
+                        .frame(height: gestureHandler.showInfoPanel ? geometry.size.height - 350 : geometry.size.height)
+                        .clipped()
+
+                    if gestureHandler.showInfoPanel {
+                        infoPanel
+                    }
+                }
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: gestureHandler.showInfoPanel)
         .gesture(
             DragGesture()
                 .onChanged { value in
@@ -313,6 +327,15 @@ struct FileInfoLayoutContainer<Content: View>: View {
                 .onEnded { value in
                     gestureHandler.handleGestureEnded(value: value, isScrollDisabled: isScrollDisabled, onDismiss: onDismiss)
                 }
+        )
+    }
+
+    private var infoPanel: some View {
+        FileInfoPanel(
+            vaultItem: vaultItem,
+            isVisible: gestureHandler.showInfoPanel,
+            panelOffset: gestureHandler.infoPanelOffset,
+            onFavoriteToggle: onFavoriteToggle
         )
     }
 }

@@ -115,9 +115,14 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## iPad and localization
 
-- [ ] iPad Folder tab shows folder sidebar and selected-folder content; phone navigation is unchanged
-- [ ] Rotate iPad through all supported orientations; only one scene/window is offered
-- [ ] Deferred until the end: nested folders in the sidebar; Gallery, Categories, Trash, Settings, and preview layouts on iPad
+- [ ] Regular-width iPad Folder tab shows the nested folder outline, folder content, and selected-file preview; sidebar and breadcrumbs stay synchronized
+- [ ] Gallery and Trash show grid + preview detail; Categories show category + files + preview columns
+- [ ] Settings sidebar opens Authentication, Security, Data/Trash, Web/Background, and About without exposing full settings in the fake vault
+- [ ] Media and document previews have an explicit close control and file information remains usable with pointer/keyboard input
+- [ ] Web Upload and shared sheets use readable form widths rather than stretching edge to edge
+- [ ] Rotate iPad through all supported orientations and resize through Stage Manager/Split View; compact width falls back to the phone stack without stale selection
+- [ ] iPhone navigation, tab identifiers, search, selection, and full-screen previews are unchanged
+- [ ] Only one scene/window is offered
 - [ ] Pseudolanguage and right-to-left launch: labels fit, navigation direction mirrors, keypad stays ordered 1–9
 
 ## Gallery performance and diagnostics

@@ -12,8 +12,12 @@ import CoreData
 struct CategoryView: View {
     /// Owns the data-loading logic so that this view remains declarative.
     @StateObject private var viewModel = CategoryViewModel()
+    @State private var selectedCategory: CategoryType?
+    @State private var previewItem: VaultItem?
+    @State private var previewMediaItems: [VaultItem] = []
 
     @Environment(\.managedObjectContext) var context
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     // Item filtering is now handled by CategoryViewModel.
     
@@ -26,33 +30,90 @@ struct CategoryView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 150), spacing: 16)
-                ], spacing: 16) {
-                    ForEach(CategoryType.allCases, id: \.self) { categoryType in
-                        NavigationLink(destination: CategoryFilesView(
-                            categoryType: categoryType
-                        )
-                        // Ensure a unique identity per category to avoid SwiftUI reuse issues
-                        .id(categoryType)) {
-                            CategoryCard(
-                                categoryType: categoryType,
-                                itemCount: getItemCount(for: categoryType)
-                            )
+        if horizontalSizeClass == .regular {
+            NavigationSplitView {
+                List(CategoryType.allCases, id: \.self) { categoryType in
+                    Button {
+                        selectedCategory = categoryType
+                        clearPreview()
+                    } label: {
+                        Label {
+                            HStack {
+                                Text(categoryType.rawValue)
+                                Spacer()
+                                Text("\(getItemCount(for: categoryType))")
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: categoryType.systemImage)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selectedCategory == categoryType ? Color.accentColor : Color.primary)
                 }
-                .padding()
+                .navigationTitle("Categories")
+                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            } content: {
+                if let selectedCategory {
+                    CategoryFilesView(
+                        categoryType: selectedCategory,
+                        onPreviewFile: showPreview
+                    )
+                    .id(selectedCategory)
+                    .navigationSplitViewColumnWidth(min: 360, ideal: 500)
+                } else {
+                    ContentUnavailableView(
+                        "Select a Category",
+                        systemImage: "square.grid.2x2",
+                        description: Text("Choose a category from the sidebar.")
+                    )
+                }
+            } detail: {
+                VaultPreviewDetail(
+                    item: previewItem,
+                    mediaItems: previewMediaItems,
+                    onClose: clearPreview
+                )
             }
-                    .navigationTitle("Categories")
-        .navigationBarTitleDisplayMode(.large)
-
-
-        // Data refresh handled inside CategoryViewModel, so no explicit observers here.
+        } else {
+            NavigationStack {
+                categoryGrid
+            }
         }
+    }
+
+    private var categoryGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [
+                GridItem(.adaptive(minimum: 150), spacing: 16)
+            ], spacing: 16) {
+                ForEach(CategoryType.allCases, id: \.self) { categoryType in
+                    NavigationLink(destination: CategoryFilesView(
+                        categoryType: categoryType
+                    )
+                    .id(categoryType)) {
+                        CategoryCard(
+                            categoryType: categoryType,
+                            itemCount: getItemCount(for: categoryType)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Categories")
+        .navigationBarTitleDisplayMode(.large)
+    }
+
+    private func showPreview(_ item: VaultItem, mediaItems: [VaultItem]) {
+        previewItem = item
+        previewMediaItems = mediaItems
+    }
+
+    private func clearPreview() {
+        previewItem = nil
+        previewMediaItems = []
     }
     
     // loadVaultItems removed – logic now lives in CategoryViewModel.
