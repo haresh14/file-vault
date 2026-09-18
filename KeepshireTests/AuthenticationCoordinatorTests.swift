@@ -32,6 +32,7 @@ struct AuthenticationCoordinatorTests {
         #expect(coordinator.isPasswordSet)
         #expect(coordinator.isAuthenticated)
         #expect(storage.encryptionPasswords == ["vault-password"])
+        #expect(storage.pendingShareImportCalls == 1)
     }
 
     @Test func backgroundAndForegroundPreservePrivacyAndLockBehavior() {
@@ -48,6 +49,7 @@ struct AuthenticationCoordinatorTests {
             storage: storage
         )
         coordinator.handlePasscodeSet()
+        #expect(storage.pendingShareImportCalls == 0)
 
         coordinator.handleWillResignActive()
         #expect(coordinator.shouldShowPrivacyOverlay)
@@ -58,6 +60,36 @@ struct AuthenticationCoordinatorTests {
         #expect(!coordinator.shouldShowPrivacyOverlay)
         #expect(coordinator.shouldShowPasscode)
         #expect(!login.isFakeLogin)
+    }
+
+    @Test func foregroundingInsideTheLockWindowStillImportsSharedFiles() {
+        let keychain = FakeAuthenticationKeychain()
+        keychain.password = "vault-password"
+        keychain.requireAuthentication = false
+        let storage = FakeFileStorageManager(coreDataManager: TestCoreDataStore.reset())
+        let coordinator = makeCoordinator(keychain: keychain, storage: storage)
+        coordinator.handlePasscodeSet()
+        #expect(storage.pendingShareImportCalls == 1)
+
+        coordinator.handleWillEnterForeground()
+
+        #expect(coordinator.isAuthenticated)
+        #expect(storage.pendingShareImportCalls == 2)
+    }
+
+    @Test func foregroundingInsideTheLockWindowSkipsImportForFakeLogin() {
+        let keychain = FakeAuthenticationKeychain()
+        keychain.password = "vault-password"
+        keychain.requireAuthentication = false
+        let login = FakeLoginStateManager()
+        login.setLoginState(isFakeLogin: true)
+        let storage = FakeFileStorageManager(coreDataManager: TestCoreDataStore.reset())
+        let coordinator = makeCoordinator(keychain: keychain, login: login, storage: storage)
+        coordinator.handlePasscodeSet()
+
+        coordinator.handleWillEnterForeground()
+
+        #expect(storage.pendingShareImportCalls == 0)
     }
 
     private func makeCoordinator(

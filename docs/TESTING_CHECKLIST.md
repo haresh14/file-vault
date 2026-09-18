@@ -53,9 +53,12 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Unlock
 
-1. [ ] Wrong credential → error, fields clear
-2. [ ] Correct credential → tabs
-3. [ ] Fake password (if set) → empty UI, no add, no web server, Settings About only
+1. [ ] Fresh install selects 6-digit passcode by default and shows the no-recovery warning
+2. [ ] 4-digit remains selectable and is described as weaker
+3. [ ] Setup warns before saving: forgotten passcode/password means files cannot be recovered
+4. [ ] Wrong credential → error, fields clear
+5. [ ] Correct credential → tabs
+6. [ ] Fake password (if set) → empty UI, no add, no web server, Settings About only
 
 ## Change authentication
 
@@ -84,7 +87,9 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 - [ ] Import up to 50 photos/videos; document picker
 - [ ] Nested folders: create, rename, move, delete
-- [ ] Gallery and category search; folder tab has no search
+- [ ] Gallery and category search; folder search matches files and immediate child folders
+- [ ] VoiceOver announces passcode progress without speaking digits
+- [ ] Largest Dynamic Type keeps the number pad and Continue controls usable
 - [ ] Sort, multi-select, favorite, share, rename, move
 - [ ] Trash restore / empty / disable with contents
 - [ ] Trash off: delete a file and confirm its `Documents/Vault/` blob and `Documents/Thumbnails/` thumb are gone
@@ -95,6 +100,29 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Photo pinch, pan, double-tap zoom, swipe between items
 - [ ] Video play/pause, scrubber, ±15s, speed, pinch/double-tap zoom
 - [ ] Audio; PDF; other documents via QuickLook
+
+## Share Extension
+
+- [ ] Share an image, video, PDF, and generic file to Keepshire
+- [ ] Before unlock, files remain only in the App Group inbox
+- [ ] Fake-vault unlock does not import or remove pending files
+- [ ] Real-vault unlock encrypts pending files into the root folder and removes the inbox session
+- [ ] Sharing and returning to an already-unlocked vault (inside the auto-lock window) still imports
+- [ ] Force-quit during staging/import; retry does not lose a pending file
+
+## iPad and localization
+
+- [ ] iPad Folder tab shows folder sidebar and selected-folder content; phone navigation is unchanged
+- [ ] Rotate iPad through all supported orientations; only one scene/window is offered
+- [ ] Pseudolanguage and right-to-left launch: labels fit, navigation direction mirrors, keypad stays ordered 1–9
+
+## Gallery performance and diagnostics
+
+- [ ] Gallery shows every photo and video after unlock, and excludes documents and audio
+- [ ] Gallery search and every sort option cover the whole vault, not just what is on screen
+- [ ] Locking clears decrypted thumbnail memory; thumbnails reload after unlock
+- [ ] Changing the passcode does not show a thumbnail decrypted under the old key
+- [ ] MetricKit diagnostic delivery records only its delivery date; no vault analytics or file metadata are logged
 
 ## Web upload
 

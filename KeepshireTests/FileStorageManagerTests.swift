@@ -333,6 +333,23 @@ struct FileStorageManagerTests {
         #expect(onDisk != jpeg)
     }
 
+    @Test func testThumbnailCachePopulatesAndClearsOnLock() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "thumbnail-cache")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "cached.png",
+            fileType: "image/png"
+        )
+
+        #expect(!manager.isThumbnailCached(for: item))
+        #expect(manager.loadThumbnail(for: item) != nil)
+        #expect(manager.isThumbnailCached(for: item))
+        manager.clearThumbnailCache()
+        #expect(!manager.isThumbnailCached(for: item))
+    }
+
     @Test func testWrongKeyDoesNotRevealThumbnail() async throws {
         let storage = try makeStorage()
         let manager = storage.fileStorageManager

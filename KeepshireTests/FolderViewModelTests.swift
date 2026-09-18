@@ -50,6 +50,45 @@ struct FolderViewModelTests {
         #expect(viewModel.sortedFiles.isEmpty)
     }
 
+    @Test func searchFiltersFolderAndFileNamesAndSelectAllUsesVisibleResults() {
+        let coreData = TestCoreDataStore.reset()
+        let trip = coreData.createFolder(name: "Summer Trip", parent: nil)!
+        _ = coreData.createFolder(name: "Receipts", parent: nil)
+        let beach = coreData.createVaultItem(
+            fileType: "image/jpeg",
+            fileName: "Beach.jpg",
+            folder: nil
+        )!
+        _ = coreData.createVaultItem(
+            fileType: "application/pdf",
+            fileName: "Invoice.pdf",
+            folder: nil
+        )
+        let viewModel = FolderViewModel(
+            folder: nil,
+            coreDataManager: coreData,
+            fileStorageManager: FakeFileStorageManager(coreDataManager: coreData),
+            loginStateManager: FakeLoginStateManager()
+        )
+
+        viewModel.searchText = "trip"
+        #expect(viewModel.sortedFolders == [trip])
+        #expect(viewModel.sortedFiles.isEmpty)
+
+        viewModel.searchText = "beach"
+        #expect(viewModel.sortedFolders.isEmpty)
+        #expect(viewModel.sortedFiles == [beach])
+        viewModel.selectAll()
+        #expect(viewModel.selectedFolders.isEmpty)
+        #expect(viewModel.selectedFiles == Set([beach]))
+
+        viewModel.searchText = "missing"
+        #expect(viewModel.isShowingNoSearchResults)
+        viewModel.searchText = ""
+        #expect(viewModel.sortedFolders.count == 2)
+        #expect(viewModel.sortedFiles.count == 2)
+    }
+
     @Test func importsPassCurrentFolderAndExposeProgress() {
         let coreData = TestCoreDataStore.reset()
         let folder = coreData.createFolder(name: "Imports", parent: nil)!

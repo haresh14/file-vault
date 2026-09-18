@@ -1,0 +1,827 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "(%@)" : {
+
+    },
+    "%@ Available" : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %lld items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld items"
+          }
+        }
+      }
+    },
+    "%@x" : {
+
+    },
+    "%lld" : {
+
+    },
+    "%lld failed" : {
+
+    },
+    "%lld items" : {
+
+    },
+    "%lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "%lld of %lld digits entered" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld digits entered"
+          }
+        }
+      }
+    },
+    "%lld of %lld files" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld files"
+          }
+        }
+      }
+    },
+    "%lld percent" : {
+
+    },
+    "%lld-digit passcode" : {
+
+    },
+    "%lld%%" : {
+
+    },
+    "• %@" : {
+
+    },
+    "• Images: JPEG, PNG, HEIC, GIF\n• Videos: MP4, MOV, M4V\n• Documents: PDF, DOC, DOCX, TXT\n• And many more..." : {
+
+    },
+    "• Make sure both devices are on the same WiFi network\n• Accept the HTTPS certificate warning once per session\n• Check that your firewall isn't blocking connections\n• Try restarting the server if connections fail\n• Ensure the app stays active during uploads" : {
+
+    },
+    "• Screenshots: the vault stays on screen; Photos gets a blank image\n• Screen recording: a black cover while a recording is in progress\n• Shake to Lock: locks the app when the device is shaken vigorously\n• Flip to Lock: locks the app when the device is flipped face-down" : {
+
+    },
+    "• The browser talks to this phone over HTTPS with a certificate created on the device\n• The browser warning is expected; there is no public certificate authority on your LAN\n• Files stay on this device after upload\n• Stop the server when you are done" : {
+
+    },
+    "●" : {
+
+    },
+    "About" : {
+
+    },
+    "Access your secure vault" : {
+
+    },
+    "Add Content" : {
+
+    },
+    "Add Files" : {
+
+    },
+    "Add to favorites" : {
+
+    },
+    "Advanced Security" : {
+
+    },
+    "After the warning, compare this fingerprint with the certificate the browser shows if you want to be sure you are talking to this phone." : {
+
+    },
+    "All Folders" : {
+
+    },
+    "Allow Downloads" : {
+
+    },
+    "Allow downloads for 10 minutes" : {
+
+    },
+    "Allow Downloads for 10 Minutes" : {
+
+    },
+    "Allowed until %@" : {
+
+    },
+    "App is in background to ensure your privacy." : {
+
+    },
+    "App Reset" : {
+
+    },
+    "Are you sure you want to delete %lld item(s)? This action cannot be undone." : {
+
+    },
+    "Are you sure you want to permanently delete %lld item(s)? This action cannot be undone." : {
+
+    },
+    "Are you sure you want to permanently delete all %lld items in trash? This action cannot be undone." : {
+
+    },
+    "Auto-Lock" : {
+
+    },
+    "Back" : {
+
+    },
+    "Background Upload" : {
+
+    },
+    "Biometric Authentication" : {
+
+    },
+    "Biometric authentication is not available on this device. This feature requires Face ID or Touch ID." : {
+
+    },
+    "Biometric authentication not available" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Categories" : {
+
+    },
+    "Category" : {
+
+    },
+    "Certificate fingerprint" : {
+
+    },
+    "Change Authentication" : {
+
+    },
+    "Change Fake Password" : {
+
+    },
+    "Checking Authentication..." : {
+
+    },
+    "Choose New Authentication" : {
+
+    },
+    "Close" : {
+
+    },
+    "Complete App Reset" : {
+
+    },
+    "Confirm it's you before the browser can pull files out of the vault." : {
+
+    },
+    "Confirm Passcode" : {
+
+    },
+    "Confirm Password" : {
+
+    },
+    "Content Protected" : {
+
+    },
+    "Continue" : {
+
+    },
+    "Continue with %@" : {
+
+    },
+    "Copy server URL" : {
+
+    },
+    "Copy URL" : {
+
+    },
+    "Create" : {
+
+    },
+    "Create a %lld-digit %@passcode%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Create a %1$lld-digit %2$@passcode%3$@"
+          }
+        }
+      }
+    },
+    "Create a decoy password that shows an empty vault when used" : {
+
+    },
+    "Create a fake password that shows an empty vault when used" : {
+
+    },
+    "Create a secure passcode to protect your vault" : {
+
+    },
+    "Create a secure password to protect your vault" : {
+
+    },
+    "Create a strong password to protect your vault" : {
+
+    },
+    "Create Folder" : {
+
+    },
+    "Created: %@" : {
+
+    },
+    "Current Method" : {
+
+    },
+    "Current Password" : {
+
+    },
+    "Current Setting: %@" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete (%lld)" : {
+
+    },
+    "Delete All" : {
+
+    },
+    "Delete All Files" : {
+
+    },
+    "Delete Items" : {
+
+    },
+    "Deleted files are moved to trash instead of being permanently deleted." : {
+
+    },
+    "Disable Trash" : {
+
+    },
+    "Disk" : {
+
+    },
+    "Done" : {
+
+    },
+    "Downloads stay off until you allow them. Each file gets a single-use link, and the window closes when it expires or you leave the app." : {
+
+    },
+    "Downloads:" : {
+
+    },
+    "Empty Trash" : {
+
+    },
+    "Empty Trash & Disable" : {
+
+    },
+    "Enable Biometric Authentication" : {
+
+    },
+    "Enable Trash" : {
+
+    },
+    "Enhanced Protection" : {
+
+    },
+    "Enter a name for the new folder" : {
+
+    },
+    "Enter a new name" : {
+
+    },
+    "Enter a new name for the file" : {
+
+    },
+    "Enter a new name for the folder" : {
+
+    },
+    "Enter Passcode" : {
+
+    },
+    "Enter Password" : {
+
+    },
+    "Enter your %lld-digit passcode" : {
+
+    },
+    "Enter your current %@ to continue" : {
+
+    },
+    "Error loading image" : {
+
+    },
+    "Error loading video" : {
+
+    },
+    "Failed to generate QR code" : {
+
+    },
+    "Failed to load audio" : {
+
+    },
+    "Failed to Load File" : {
+
+    },
+    "Failed to load PDF" : {
+
+    },
+    "Fake Password" : {
+
+    },
+    "Fake Password Removed" : {
+
+    },
+    "Favorite" : {
+
+    },
+    "File Name" : {
+
+    },
+    "Files" : {
+
+    },
+    "Files of this type will appear here when you add them to your vault" : {
+
+    },
+    "Flip to Lock" : {
+
+    },
+    "Folder" : {
+
+    },
+    "Folder Name" : {
+
+    },
+    "Folders" : {
+
+    },
+    "Follow these steps to upload files from any device:" : {
+
+    },
+    "Forward 15 seconds" : {
+
+    },
+    "Gallery" : {
+
+    },
+    "Getting Started" : {
+
+    },
+    "Hide confirmation password" : {
+
+    },
+    "Hide password" : {
+
+    },
+    "Home" : {
+
+    },
+    "How to Upload Files:" : {
+
+    },
+    "If you forget this passcode, Keepshire cannot recover your files." : {
+
+    },
+    "If you forget this password, Keepshire cannot recover your files." : {
+
+    },
+    "If you forget your passcode or password, Keepshire cannot recover your files." : {
+
+    },
+    "Instructions" : {
+
+    },
+    "Keepshire could not open its database." : {
+
+    },
+    "Loading %@..." : {
+
+    },
+    "Loading audio..." : {
+
+    },
+    "Lock Behavior" : {
+
+    },
+    "Minimum 6 characters" : {
+
+    },
+    "Modified: %@" : {
+
+    },
+    "Move" : {
+
+    },
+    "Move Here" : {
+
+    },
+    "Move to Folder" : {
+
+    },
+    "MP4, MOV, M4V" : {
+
+    },
+    "Name" : {
+
+    },
+    "No %@" : {
+
+    },
+    "No %@ match '%@'" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No %1$@ match '%2$@'"
+          }
+        }
+      }
+    },
+    "No Results" : {
+
+    },
+    "Not favorited" : {
+
+    },
+    "Not selected" : {
+
+    },
+    "Not Set" : {
+
+    },
+    "OK" : {
+
+    },
+    "Open with QuickLook" : {
+
+    },
+    "Opens Settings" : {
+
+    },
+    "Pairing Code:" : {
+
+    },
+    "Passcode" : {
+
+    },
+    "Password" : {
+
+    },
+    "Password Strength:" : {
+
+    },
+    "Pause" : {
+
+    },
+    "Permanently Delete" : {
+
+    },
+    "Permanently delete %lld selected items" : {
+
+    },
+    "Permanently delete items you no longer need" : {
+
+    },
+    "Play" : {
+
+    },
+    "Playback position" : {
+
+    },
+    "Playback speed" : {
+
+    },
+    "Please don't close the app" : {
+
+    },
+    "Preview Not Available" : {
+
+    },
+    "Privacy Policy" : {
+
+    },
+    "Processing:" : {
+
+    },
+    "QR Code" : {
+
+    },
+    "Re-encrypting your files with the new authentication method" : {
+
+    },
+    "Re-enter your %lld-digit %@passcode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Re-enter your %1$lld-digit %2$@passcode"
+          }
+        }
+      }
+    },
+    "Remove Fake Password" : {
+
+    },
+    "Remove from favorites" : {
+
+    },
+    "Rename" : {
+
+    },
+    "Rename File" : {
+
+    },
+    "Rename Folder" : {
+
+    },
+    "Reset" : {
+
+    },
+    "Restore" : {
+
+    },
+    "Restore (%lld)" : {
+
+    },
+    "Restore %lld item(s) to their original location?" : {
+
+    },
+    "Restore %lld selected items" : {
+
+    },
+    "Restore Items" : {
+
+    },
+    "Rewind 15 seconds" : {
+
+    },
+    "Root" : {
+
+    },
+    "Scan QR Code" : {
+
+    },
+    "Scan this code with your phone's camera to quickly access the upload page" : {
+
+    },
+    "Screen Recording Protection" : {
+
+    },
+    "Screenshot Protection" : {
+
+    },
+    "Search %@" : {
+
+    },
+    "Search files" : {
+
+    },
+    "Search this folder" : {
+
+    },
+    "Security" : {
+
+    },
+    "Security Notice" : {
+
+    },
+    "Security Setup" : {
+
+    },
+    "Select" : {
+
+    },
+    "Select All" : {
+
+    },
+    "Select how you'd like to secure your vault" : {
+
+    },
+    "Select Items" : {
+
+    },
+    "Select items and restore to their original location" : {
+
+    },
+    "Select your new authentication method" : {
+
+    },
+    "Selected" : {
+
+    },
+    "Server disabled" : {
+
+    },
+    "Server Disabled" : {
+
+    },
+    "Server Running" : {
+
+    },
+    "Server Stopped" : {
+
+    },
+    "Server URL" : {
+
+    },
+    "Server URL:" : {
+
+    },
+    "Set" : {
+
+    },
+    "Set Fake Password" : {
+
+    },
+    "Set New Authentication" : {
+
+    },
+    "Set New Fake Password" : {
+
+    },
+    "Set Passcode" : {
+
+    },
+    "Set Password" : {
+
+    },
+    "Set Your Passcode" : {
+
+    },
+    "Set Your Password" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Shake to Lock" : {
+
+    },
+    "Share" : {
+
+    },
+    "Share file" : {
+
+    },
+    "Share this HTTPS address with devices on the same Wi-Fi. The browser will warn that the certificate is not from a public authority — that is expected." : {
+
+    },
+    "Show confirmation password" : {
+
+    },
+    "Show password" : {
+
+    },
+    "Sort" : {
+
+    },
+    "Sort by" : {
+
+    },
+    "Start Server" : {
+
+    },
+    "Stop Downloads" : {
+
+    },
+    "Stop Server" : {
+
+    },
+    "Support" : {
+
+    },
+    "Supported File Types" : {
+
+    },
+    "Supported formats:" : {
+
+    },
+    "The app has been reset. Please restart the app." : {
+
+    },
+    "The browser asks for this code the first time it connects. It changes every time you start the server." : {
+
+    },
+    "There are %lld item(s) in trash. Disabling trash will permanently delete all items. This action cannot be undone." : {
+
+    },
+    "This file type cannot be previewed" : {
+
+    },
+    "This may take a few moments" : {
+
+    },
+    "This will completely reset the app to first-launch state. All data including keychain, files, and settings will be deleted." : {
+
+    },
+    "This will delete all files and folders in your vault but keep your passcode and settings." : {
+
+    },
+    "Total Files" : {
+
+    },
+    "Total Size" : {
+
+    },
+    "Trash" : {
+
+    },
+    "Trash is Empty" : {
+
+    },
+    "Troubleshooting" : {
+
+    },
+    "Try Again" : {
+
+    },
+    "Unfavorite" : {
+
+    },
+    "Unsupported Video Format" : {
+
+    },
+    "Updating Encryption" : {
+
+    },
+    "Updating Vault" : {
+
+    },
+    "Upload files from any device on your network" : {
+
+    },
+    "Use %@" : {
+
+    },
+    "Vault actions" : {
+
+    },
+    "Vault passcode or password" : {
+
+    },
+    "Verify Current Authentication" : {
+
+    },
+    "Version" : {
+
+    },
+    "View Trash" : {
+
+    },
+    "Web server is not available in this mode" : {
+
+    },
+    "Web Upload" : {
+
+    },
+    "When you delete files with trash enabled, they'll appear here as a gallery. You can restore them or permanently delete them." : {
+
+    },
+    "You are changing to the same authentication type" : {
+
+    },
+    "Your authentication method has changed. The fake password has been automatically removed for security. You can set a new fake password matching the new authentication format if needed." : {
+
+    },
+    "Your files are being updated for security" : {
+
+    },
+    "Your vault contents are hidden for security" : {
+
+    },
+    "Your vault is protected by advanced security measures." : {
+
+    }
+  },
+  "version" : "1.0"
+}

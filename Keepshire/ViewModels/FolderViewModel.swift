@@ -12,6 +12,7 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     // MARK: - Published State
     @Published private(set) var folders: [Folder] = []
     @Published private(set) var files: [VaultItem] = []
+    @Published var searchText = ""
 
     // Sorting
     @Published var sortOption: FolderSortOption = .userDefault
@@ -139,10 +140,29 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
 
     // MARK: - Derived Collections
     var sortedFolders: [Folder] {
-        sort(folders: folders)
+        sort(folders: filteredFolders)
     }
     var sortedFiles: [VaultItem] {
-        sort(files: files)
+        sort(files: filteredFiles)
+    }
+    var isShowingNoSearchResults: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && sortedFolders.isEmpty
+            && sortedFiles.isEmpty
+    }
+
+    private var filteredFolders: [Folder] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return folders }
+        return folders.filter { $0.displayName.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var filteredFiles: [VaultItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return files }
+        return files.filter {
+            ($0.fileName ?? "").localizedCaseInsensitiveContains(query)
+        }
     }
 
     // MARK: - Public API
@@ -175,8 +195,8 @@ final class FolderViewModel: ObservableObject, SelectionManageable, ImportManage
     }
 
     func selectAll() {
-        selectedFolders = Set(folders)
-        selectedFiles = Set(files)
+        selectedFolders = Set(sortedFolders)
+        selectedFiles = Set(sortedFiles)
     }
 
     func moveSelectedItems(to destination: Folder?) {

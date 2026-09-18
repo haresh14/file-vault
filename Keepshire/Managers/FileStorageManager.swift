@@ -29,6 +29,8 @@ class FileStorageManager: FileStorageManaging {
     private let metadataSealer: VaultMetadataSealer
     private var saveObservers: [NSObjectProtocol] = []
     private let photoImportService = PhotoImportService()
+    private let sharedInboxURL: URL?
+    private let thumbnailCache = NSCache<NSUUID, NSData>()
     
     // Encryption key derived from user's passcode
     private var encryptionKey: SymmetricKey?
@@ -57,12 +59,16 @@ class FileStorageManager: FileStorageManaging {
         fileManager: FileManager = .default,
         documentsDirectory: URL,
         coreDataManager: CoreDataManager,
-        keyDerivationStore: VaultKeyDerivationStoring = InMemoryVaultKeyDerivationStore()
+        keyDerivationStore: VaultKeyDerivationStoring = InMemoryVaultKeyDerivationStore(),
+        sharedInboxURL: URL? = nil
     ) {
         self.fileManager = fileManager
         self.documentsDirectory = documentsDirectory
         self.coreDataManager = coreDataManager
         self.keyDerivationStore = keyDerivationStore
+        self.sharedInboxURL = sharedInboxURL ?? FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.com.haresh.keepshire")?
+            .appendingPathComponent("Inbox", isDirectory: true)
         
         // Create vault directory
         vaultDirectory = documentsDirectory.appendingPathComponent("Vault", isDirectory: true)
@@ -159,6 +165,8 @@ class FileStorageManager: FileStorageManaging {
     // MARK: - Encryption Key Management
     
     func setupEncryptionKey(from password: String) {
+        // Cached plaintext thumbnails must never survive a credential/key transition.
+        clearThumbnailCache()
         if let record = keyDerivationStore.loadRecord() {
             encryptionKey = try? cryptoService.key(from: password, record: record)
         } else if vaultContainsCiphertext() {
@@ -183,6 +191,51 @@ class FileStorageManager: FileStorageManaging {
         migrateOnDiskNamesToUUID()
         encryptPlaintextThumbnails()
         removeOrphanedFiles()
+    }
+
+    @discardableResult
+    func importPendingSharedFiles() -> Int {
+        guard encryptionKey != nil, let sharedInboxURL else { return 0 }
+        let sessions = (try? fileManager.contentsOfDirectory(
+            at: sharedInboxURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        var imported = 0
+
+        for session in sessions {
+            let files = (try? fileManager.contentsOfDirectory(
+                at: session,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )) ?? []
+            var sessionSucceeded = true
+            for file in files {
+                do {
+                    _ = try saveFile(
+                        fromFileURL: file,
+                        fileName: file.lastPathComponent,
+                        fileType: determineFileType(from: file.lastPathComponent),
+                        targetFolder: nil
+                    )
+                    imported += 1
+                } catch FileStorageError.duplicateFile {
+                    continue
+                } catch {
+                    sessionSucceeded = false
+                    VaultLog.error("Could not import a pending shared file")
+                }
+            }
+            if sessionSucceeded {
+                try? fileManager.removeItem(at: session)
+            }
+        }
+
+        if imported > 0 {
+            NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
+            NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
+        }
+        return imported
     }
     
     /// Re-encrypt all vault files with a new encryption key
@@ -897,13 +950,32 @@ class FileStorageManager: FileStorageManaging {
     }
     
     func loadThumbnail(for vaultItem: VaultItem) -> Data? {
+        if let id = vaultItem.id,
+           let cached = thumbnailCache.object(forKey: id as NSUUID) {
+            return cached as Data
+        }
         if migrateItemOnDisk(vaultItem) {
             coreDataManager.persistChanges()
         }
         upgradeThumbnailIfPlaintext(vaultItem)
         guard let name = vaultItem.storedThumbnailName ?? vaultItem.thumbnailFileName else { return nil }
         guard let key = encryptionKey else { return nil }
-        return try? encryptedThumbnailStore.read(fileName: name, key: key)
+        guard let data = try? encryptedThumbnailStore.read(fileName: name, key: key) else {
+            return nil
+        }
+        if let id = vaultItem.id {
+            thumbnailCache.setObject(data as NSData, forKey: id as NSUUID)
+        }
+        return data
+    }
+
+    func clearThumbnailCache() {
+        thumbnailCache.removeAllObjects()
+    }
+
+    func isThumbnailCached(for vaultItem: VaultItem) -> Bool {
+        guard let id = vaultItem.id else { return false }
+        return thumbnailCache.object(forKey: id as NSUUID) != nil
     }
     
     func loadImage(for vaultItem: VaultItem) async throws -> Data {

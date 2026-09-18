@@ -73,6 +73,29 @@ struct ReliabilityTests {
         #expect(VaultBlobFormat.hardCap == 2 * 1024 * 1024 * 1024)
     }
 
+    @Test func pendingShareImportsAfterKeySetupAndDeletesInboxSession() throws {
+        let storage = try IsolatedTestDependencies()
+        let inbox = storage.rootURL.appendingPathComponent("SharedInbox", isDirectory: true)
+        let session = inbox.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let sharedFile = session.appendingPathComponent("shared.txt")
+        try Data("from share sheet".utf8).write(to: sharedFile)
+
+        let manager = FileStorageManager(
+            documentsDirectory: storage.rootURL.appendingPathComponent("ShareImportVault"),
+            coreDataManager: storage.coreDataManager,
+            keyDerivationStore: KeychainVaultKeyDerivationStore(keychain: storage.keychainManager),
+            sharedInboxURL: inbox
+        )
+        manager.setupEncryptionKey(from: "share-inbox-key")
+
+        #expect(manager.importPendingSharedFiles() == 1)
+        #expect(!FileManager.default.fileExists(atPath: session.path))
+        let item = storage.coreDataManager.fetchAllVaultItems().first
+        #expect(item?.fileName == "shared.txt")
+        #expect(try manager.loadFile(vaultItem: item!) == Data("from share sheet".utf8))
+    }
+
     @Test func migrateAbortsAndKeepsOldKeyWhenABlobIsCorrupt() async throws {
         let storage = try IsolatedTestDependencies()
         let manager = storage.fileStorageManager

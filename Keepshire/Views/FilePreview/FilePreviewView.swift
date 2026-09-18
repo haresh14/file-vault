@@ -90,6 +90,7 @@ struct FilePreviewView: View {
                             Image(systemName: isFavorite ? "heart.fill" : "heart")
                                 .foregroundColor(isFavorite ? .red : .white)
                         }
+                        .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
                         
                         // Share button
                         Button(action: {
@@ -98,6 +99,7 @@ struct FilePreviewView: View {
                             Image(systemName: "square.and.arrow.up")
                                 .foregroundColor(.white)
                         }
+                        .accessibilityLabel("Share file")
                     }
                 }
             }

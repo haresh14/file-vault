@@ -79,9 +79,12 @@ These steps require your Apple ID and cannot be finished from this repo. They ar
 2. Click **+** → **App IDs** → **App**.
 3. Description: `Keepshire`.
 4. Bundle ID: **Explicit** `com.haresh.keepshire`.
-5. Capabilities: leave the extras off (no Push, no Associated Domains, no App Groups, no iCloud).
+5. Enable **App Groups**. Leave Push, Associated Domains, and iCloud off.
 6. Register.
-7. In Xcode: Keepshire target → **Signing & Capabilities** → Team = your personal team → **Automatically manage signing**. The first device build may ask you to allow certificates.
+7. Return to Identifiers and create another explicit App ID: `com.haresh.keepshire.share`, description `Keepshire Share`. Enable **App Groups**.
+8. Identifiers → **App Groups** → **+**. Register `group.com.haresh.keepshire`.
+9. Open both App IDs, configure App Groups, and select `group.com.haresh.keepshire`.
+10. In Xcode, select both the **Keepshire** and **KeepshireShare** targets → **Signing & Capabilities** → Team = your team → **Automatically manage signing**. Confirm the App Groups capability lists `group.com.haresh.keepshire`. The first device build may ask you to allow certificates.
 
 **3. Create the app record (listing)**
 

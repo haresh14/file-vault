@@ -184,6 +184,7 @@ struct TrashView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 }
+                .accessibilityLabel("Restore \(viewModel.selectedItems.count) selected items")
                 
                 Divider()
                     .frame(height: 40)
@@ -202,6 +203,7 @@ struct TrashView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 }
+                .accessibilityLabel("Permanently delete \(viewModel.selectedItems.count) selected items")
             }
             .padding(.horizontal)
             .background(Color(.systemGray6))

@@ -31,7 +31,9 @@ struct FolderContentView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(Color(.systemGray6))
-            if loginStateManager.shouldShowEmptyVault || (viewModel.folders.isEmpty && viewModel.files.isEmpty) {
+            if loginStateManager.shouldShowEmptyVault
+                || (viewModel.folders.isEmpty && viewModel.files.isEmpty)
+                || viewModel.isShowingNoSearchResults {
                 FolderContentEmptyState(configuration: emptyStateConfiguration)
             } else {
                 contentList
@@ -39,6 +41,7 @@ struct FolderContentView: View {
         }
         .navigationTitle(folder?.displayName ?? "Folders")
         .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $viewModel.searchText, prompt: "Search this folder")
         .toolbar { toolbar }
         .modifier(FolderContentAlertsModifier(
             viewModel: viewModel,
@@ -139,6 +142,14 @@ struct FolderContentView: View {
     private var emptyStateConfiguration: EmptyStateConfiguration {
         if loginStateManager.shouldShowEmptyVault {
             return .noContent
+        }
+        if viewModel.isShowingNoSearchResults {
+            return EmptyStateConfiguration(
+                iconName: "magnifyingglass",
+                title: "No Results",
+                subtitle: "No files or folders match “\(viewModel.searchText)”.",
+                animation: .none
+            )
         }
         return .emptyFolder(
             canCreateFolders: loginStateManager.canCreateFolders,

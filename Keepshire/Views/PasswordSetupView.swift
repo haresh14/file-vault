@@ -81,6 +81,14 @@ struct PasswordSetupView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+
+            if !isFakePasswordSetup {
+                Text("If you forget this password, Keepshire cannot recover your files.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("password.noRecoveryWarning")
+            }
         }
     }
     
@@ -114,6 +122,7 @@ struct PasswordSetupView: View {
                     Image(systemName: showPassword ? "eye.slash" : "eye")
                         .foregroundColor(.secondary)
                 }
+                .accessibilityLabel(showPassword ? "Hide password" : "Show password")
             }
             
             Text("Minimum 6 characters")
@@ -141,6 +150,7 @@ struct PasswordSetupView: View {
                 Image(systemName: showConfirmPassword ? "eye.slash" : "eye")
                     .foregroundColor(.secondary)
             }
+            .accessibilityLabel(showConfirmPassword ? "Hide confirmation password" : "Show confirmation password")
         }
     }
     

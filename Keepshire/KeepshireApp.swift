@@ -14,6 +14,7 @@ struct KeepshireApp: App {
     
     init() {
         configureUITestingStateIfNeeded()
+        _ = DiagnosticsManager.shared
         // Handle background URLSession events
         setupBackgroundURLSessionHandling()
     }

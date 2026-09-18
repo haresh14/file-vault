@@ -40,9 +40,12 @@ protocol FileStorageManaging {
     func deleteFile(vaultItem: VaultItem) throws
     func permanentlyDeleteFile(vaultItem: VaultItem) throws
     func loadThumbnail(for vaultItem: VaultItem) -> Data?
+    func clearThumbnailCache()
     func loadImage(for vaultItem: VaultItem) async throws -> Data
     func determineFileType(from fileName: String) -> String
     func setupEncryptionKey(from password: String)
+    @discardableResult
+    func importPendingSharedFiles() -> Int
     func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws
     func toggleFavorite(for vaultItem: VaultItem)
     func fetchFavoriteItems() -> [VaultItem]

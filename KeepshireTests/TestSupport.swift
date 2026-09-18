@@ -116,6 +116,7 @@ final class FakeFileStorageManager: FileStorageManaging {
 
     private(set) var saves: [Save] = []
     private(set) var encryptionPasswords: [String] = []
+    private(set) var pendingShareImportCalls = 0
     var duplicateFileNames: Set<String> = []
     private let coreDataManager: CoreDataManager
 
@@ -137,11 +138,17 @@ final class FakeFileStorageManager: FileStorageManaging {
     func deleteFile(vaultItem: VaultItem) throws {}
     func permanentlyDeleteFile(vaultItem: VaultItem) throws {}
     func loadThumbnail(for vaultItem: VaultItem) -> Data? { nil }
+    func clearThumbnailCache() {}
     func loadImage(for vaultItem: VaultItem) async throws -> Data { Data() }
     func determineFileType(from fileName: String) -> String {
         fileName.hasSuffix(".pdf") ? "application/pdf" : "application/octet-stream"
     }
     func setupEncryptionKey(from password: String) { encryptionPasswords.append(password) }
+    @discardableResult
+    func importPendingSharedFiles() -> Int {
+        pendingShareImportCalls += 1
+        return 0
+    }
     func migrateFilesToNewEncryptionKey(
         oldPassword: String,
         newPassword: String,
