@@ -3,12 +3,27 @@ import SwiftUI
 struct FolderBreadcrumbView: View {
     let folder: Folder?
     @Binding var navigationPath: NavigationPath
+    let onNavigateToFolder: ((Folder?) -> Void)?
+
+    init(
+        folder: Folder?,
+        navigationPath: Binding<NavigationPath>,
+        onNavigateToFolder: ((Folder?) -> Void)? = nil
+    ) {
+        self.folder = folder
+        _navigationPath = navigationPath
+        self.onNavigateToFolder = onNavigateToFolder
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 Button {
-                    navigationPath.removeLast(navigationPath.count)
+                    if let onNavigateToFolder {
+                        onNavigateToFolder(nil)
+                    } else {
+                        navigationPath.removeLast(navigationPath.count)
+                    }
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "house.fill").font(.caption)
@@ -24,7 +39,11 @@ struct FolderBreadcrumbView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Button {
-                                navigationPath.removeLast(breadcrumbs.count - (index + 1))
+                                if let onNavigateToFolder {
+                                    onNavigateToFolder(breadcrumb)
+                                } else {
+                                    navigationPath.removeLast(breadcrumbs.count - (index + 1))
+                                }
                             } label: {
                                 Text(breadcrumb.displayName)
                                     .font(.caption)
@@ -59,7 +78,6 @@ struct FolderContentList: View {
     let selectedFolders: Set<Folder>
     let selectedFiles: Set<VaultItem>
     let isSelectionMode: Bool
-    @Binding var navigationPath: NavigationPath
     let tapFolder: (Folder) -> Void
     let renameFolder: (Folder) -> Void
     let selectFolder: (Folder) -> Void
@@ -90,7 +108,6 @@ struct FolderContentList: View {
                             onMove: { moveFolder(folder) },
                             onDelete: { deleteFolder(folder) }
                         )
-                        .background(NavigationLink(value: folder) { EmptyView() }.opacity(0))
                         .swipeActions(
                             edge: .trailing,
                             allowsFullSwipe: !UserDefaults.standard.bool(forKey: "trashEnabled")
@@ -133,9 +150,6 @@ struct FolderContentList: View {
                 }
             }
         }
-        .navigationDestination(for: Folder.self) { folder in
-            FolderContentView(folder: folder, navigationPath: $navigationPath)
-        }
     }
 }
 
@@ -156,8 +170,10 @@ struct FolderContentToolbar: ToolbarContent {
     let selectItems: () -> Void
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            if isSelectionMode {
+        // Declared conditionally rather than always-present-but-empty: an empty leading
+        // item still claims the slot that holds the back button and the large title.
+        if isSelectionMode {
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button("Select All", action: selectAll)
             }
         }

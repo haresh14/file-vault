@@ -33,8 +33,12 @@ struct OTPStylePasscodeView: View {
                             currentIndex = index
                         }
                     )
+                    .accessibilityHidden(true)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(digitCount)-digit passcode")
+            .accessibilityValue("\(passcode.count) of \(digitCount) digits entered")
             
             // Custom number pad
             CustomNumberPadView(
@@ -93,6 +97,8 @@ struct DigitDisplay: View {
     let digit: String
     let isActive: Bool
     let onTap: () -> Void
+    @ScaledMetric(relativeTo: .body) private var fieldWidth: CGFloat = 50
+    @ScaledMetric(relativeTo: .body) private var fieldHeight: CGFloat = 60
     
     var body: some View {
         Button(action: onTap) {
@@ -103,7 +109,10 @@ struct DigitDisplay: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(isActive ? Color.blue : Color.clear, lineWidth: 2)
                     )
-                    .frame(width: 50, height: 60)
+                    .frame(
+                        width: min(fieldWidth, 66),
+                        height: min(fieldHeight, 78)
+                    )
                 
                 // Visual indicator - smaller dots
                 Text(digit.isEmpty ? "" : "●")

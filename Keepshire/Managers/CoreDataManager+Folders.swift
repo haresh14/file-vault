@@ -12,8 +12,13 @@ extension CoreDataManager {
         folder.createdAt = Date()
         folder.updatedAt = Date()
         folder.parent = parent
-        save()
-        return folder
+        do {
+            try save()
+            return folder
+        } catch {
+            context.rollback()
+            return nil
+        }
     }
 
     func fetchFolders(in parent: Folder?) -> [Folder] {
@@ -39,7 +44,7 @@ extension CoreDataManager {
 
     func deleteFolder(_ folder: Folder) {
         context.delete(folder)
-        save()
+        persistChanges()
     }
 
     func deleteFolderCompletely(_ folder: Folder) {
@@ -50,7 +55,7 @@ extension CoreDataManager {
             cleanupFolderFileStorage(folder)
             context.delete(folder)
         }
-        save()
+        persistChanges()
     }
 
     func moveFolder(_ folder: Folder, to parent: Folder?) {
@@ -60,13 +65,13 @@ extension CoreDataManager {
         }
         folder.parent = parent
         folder.updatedAt = Date()
-        save()
+        persistChanges()
     }
 
     func updateFolder(_ folder: Folder, name: String) {
         folder.name = name
         folder.updatedAt = Date()
-        save()
+        persistChanges()
     }
 
     private func fetchFolders(predicate: NSPredicate?) -> [Folder] {

@@ -3,6 +3,28 @@ import Foundation
 import SwiftUI
 
 struct SettingsView: View {
+    private enum Destination: String, CaseIterable, Identifiable {
+        case authentication = "Authentication"
+        case security = "Security"
+        case data = "Data & Storage"
+        case trash = "Trash"
+        case web = "Web & Background"
+        case about = "About"
+
+        var id: Self { self }
+
+        var systemImage: String {
+            switch self {
+            case .authentication: return "key"
+            case .security: return "lock.shield"
+            case .data: return "internaldrive"
+            case .trash: return "trash"
+            case .web: return "network"
+            case .about: return "info.circle"
+            }
+        }
+    }
+
     private enum Constants {
         static let trashEnabledKey = "trashEnabled"
         static let refreshDelay: TimeInterval = 0.2
@@ -25,51 +47,17 @@ struct SettingsView: View {
     @State private var showResetAlert = false
     @State private var showResetConfirmation = false
     @State private var showDeleteFilesAlert = false
+    @State private var selectedDestination: Destination? = .authentication
     @StateObject private var securityManager = SecurityManager.shared
     @StateObject private var loginStateManager = LoginStateManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var currentAuthType: AuthenticationType {
         KeychainManager.shared.getAuthenticationType()
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                if loginStateManager.canAccessFullSettings {
-                    authenticationSection
-                    securitySection
-                    SettingsTrashDataSections(
-                        trashEnabled: $trashEnabled,
-                        trashItemCount: trashItemCount,
-                        fileCount: storageInfo.fileCount,
-                        formattedUsedSpace: formatFileSize(storageInfo.usedSpace),
-                        updateTrashEnabled: updateTrashEnabled
-                    )
-                    SettingsWebBackgroundSection(
-                        lockTimeoutDisplayName: lockTimeoutDisplayName,
-                        lockBehaviorDescription: lockBehaviorDescription
-                    )
-                    #if DEBUG
-                    SettingsDebugSection(
-                        completeReset: { showResetAlert = true },
-                        simulateFirstLaunch: performFirstLaunchCleanup,
-                        deleteAllFiles: { showDeleteFilesAlert = true }
-                    )
-                    #endif
-                }
-                Section("About") {
-                    LabeledContent("Version", value: AppMetadata.versionDisplay)
-                    if let privacyPolicyURL = AppMetadata.privacyPolicyURL {
-                        Link("Privacy Policy", destination: privacyPolicyURL)
-                    }
-                    if let supportURL = AppMetadata.supportURL {
-                        Link("Support", destination: supportURL)
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-        }
+        settingsLayout
         .modifier(SettingsPresentationModifier(
             showBiometricAlert: $showBiometricAlert,
             showResetConfirmation: $showResetConfirmation,
@@ -87,9 +75,11 @@ struct SettingsView: View {
         ))
         .sheet(isPresented: $showChangeAuthSheet) {
             ChangeAuthenticationView(currentAuthType: currentAuthType, onAuthChanged: authenticationChanged)
+                .presentationSizing(.form)
         }
         .sheet(isPresented: $showFakePasswordSheet) {
             fakePasswordSetup
+                .presentationSizing(.form)
         }
         .onAppear {
             loadStorageInfo()
@@ -99,6 +89,130 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .refreshVaultItems)) { _ in
             loadStorageInfo()
             loadTrashCount()
+        }
+    }
+
+    @ViewBuilder
+    private var settingsLayout: some View {
+        if horizontalSizeClass == .regular {
+            NavigationSplitView {
+                List(availableDestinations, selection: $selectedDestination) { destination in
+                    Label(destination.rawValue, systemImage: destination.systemImage)
+                        .tag(destination)
+                }
+                .navigationTitle("Settings")
+                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            } detail: {
+                NavigationStack {
+                    settingsDetail
+                }
+            }
+        } else {
+            NavigationStack {
+                completeSettingsForm
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+    }
+
+    private var availableDestinations: [Destination] {
+        guard loginStateManager.canAccessFullSettings else { return [.about] }
+        var destinations: [Destination] = [.authentication, .security, .data]
+        if trashEnabled {
+            destinations.append(.trash)
+        }
+        destinations.append(contentsOf: [.web, .about])
+        return destinations
+    }
+
+    @ViewBuilder
+    private var settingsDetail: some View {
+        switch availableDestinations.contains(selectedDestination ?? .about)
+            ? (selectedDestination ?? .about)
+            : (availableDestinations.first ?? .about) {
+        case .authentication:
+            Form {
+                authenticationSection
+            }
+            .navigationTitle(Destination.authentication.rawValue)
+        case .security:
+            Form {
+                securitySection
+            }
+            .navigationTitle(Destination.security.rawValue)
+        case .data:
+            Form {
+                dataSections(openTrash: { selectedDestination = .trash })
+                debugSection
+            }
+            .navigationTitle(Destination.data.rawValue)
+        case .trash:
+            TrashView()
+                .navigationTitle(Destination.trash.rawValue)
+        case .web:
+            Form {
+                SettingsWebBackgroundSection(
+                    lockTimeoutDisplayName: lockTimeoutDisplayName,
+                    lockBehaviorDescription: lockBehaviorDescription
+                )
+            }
+            .navigationTitle(Destination.web.rawValue)
+        case .about:
+            Form {
+                aboutSection
+            }
+            .navigationTitle(Destination.about.rawValue)
+        }
+    }
+
+    private var completeSettingsForm: some View {
+        Form {
+            if loginStateManager.canAccessFullSettings {
+                authenticationSection
+                securitySection
+                dataSections()
+                SettingsWebBackgroundSection(
+                    lockTimeoutDisplayName: lockTimeoutDisplayName,
+                    lockBehaviorDescription: lockBehaviorDescription
+                )
+                debugSection
+            }
+            aboutSection
+        }
+    }
+
+    private func dataSections(openTrash: (() -> Void)? = nil) -> some View {
+        SettingsTrashDataSections(
+            trashEnabled: $trashEnabled,
+            trashItemCount: trashItemCount,
+            fileCount: storageInfo.fileCount,
+            formattedUsedSpace: formatFileSize(storageInfo.usedSpace),
+            updateTrashEnabled: updateTrashEnabled,
+            openTrash: openTrash
+        )
+    }
+
+    @ViewBuilder
+    private var debugSection: some View {
+        #if DEBUG
+        SettingsDebugSection(
+            completeReset: { showResetAlert = true },
+            simulateFirstLaunch: performFirstLaunchCleanup,
+            deleteAllFiles: { showDeleteFilesAlert = true }
+        )
+        #endif
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            LabeledContent("Version", value: AppMetadata.versionDisplay)
+            if let privacyPolicyURL = AppMetadata.privacyPolicyURL {
+                Link("Privacy Policy", destination: privacyPolicyURL)
+            }
+            if let supportURL = AppMetadata.supportURL {
+                Link("Support", destination: supportURL)
+            }
         }
     }
 
@@ -226,7 +340,7 @@ struct SettingsView: View {
     private func performDeleteAllFiles() {
         FileStorageManager.shared.deleteAllVaultContent()
         CoreDataManager.shared.fetchAllFolders().forEach(CoreDataManager.shared.deleteFolder)
-        CoreDataManager.shared.save()
+        CoreDataManager.shared.persistChanges()
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
             NotificationCenter.default.post(
@@ -267,7 +381,7 @@ struct SettingsView: View {
                     VaultLog.debug("Error permanently deleting trashed file: \(error)")
                 }
             }
-            CoreDataManager.shared.save()
+            CoreDataManager.shared.persistChanges()
             UserDefaults.standard.set(false, forKey: Constants.trashEnabledKey)
             trashEnabled = false
             loadTrashCount()

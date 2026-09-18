@@ -12,7 +12,7 @@ extension CoreDataManager {
                 VaultLog.debug("ERROR: Failed to delete \(entityName): \(error)")
             }
         }
-        save()
+        persistChanges()
         context.reset()
         VaultLog.debug("DEBUG: Core Data cleared and context reset")
     }

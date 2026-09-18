@@ -6,7 +6,7 @@ final class PhotoImportService {
     func importAsset(
         _ asset: PHAsset,
         imageHandler: @escaping (Data, String, String) -> Void,
-        videoHandler: @escaping (Data, String, String) -> Void,
+        videoHandler: @escaping (URL, String, String) -> Void,
         completion: @escaping (Result<VaultItem, Error>) -> Void
     ) {
         if asset.mediaType == .image {
@@ -46,14 +46,9 @@ final class PhotoImportService {
                     completion(.failure(FileStorageError.importFailed))
                     return
                 }
-                do {
-                    let data = try Data(contentsOf: urlAsset.url)
-                    let fileName = asset.value(forKey: "filename") as? String
-                        ?? "VID_\(Date().timeIntervalSince1970).mov"
-                    videoHandler(data, fileName, "video/quicktime")
-                } catch {
-                    completion(.failure(error))
-                }
+                let fileName = asset.value(forKey: "filename") as? String
+                    ?? "VID_\(Date().timeIntervalSince1970).mov"
+                videoHandler(urlAsset.url, fileName, "video/quicktime")
             }
         } else {
             completion(.failure(FileStorageError.importFailed))

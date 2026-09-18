@@ -13,8 +13,9 @@ final class KeepshireUITests: XCTestCase {
         XCTAssertTrue(app.buttons["auth.choice.passcode4"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["auth.choice.passcode6"].exists)
         XCTAssertTrue(app.buttons["auth.choice.password"].exists)
+        XCTAssertEqual(app.buttons["auth.choice.passcode6"].value as? String, "Selected")
+        XCTAssertTrue(app.staticTexts["auth.noRecoveryWarning"].exists)
 
-        app.buttons["auth.choice.passcode6"].tap()
         app.buttons["auth.continue"]
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .tap()

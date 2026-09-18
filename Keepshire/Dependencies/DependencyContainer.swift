@@ -13,7 +13,8 @@ import Combine
 /// Protocol definitions for manager dependencies
 protocol CoreDataManaging {
     var context: NSManagedObjectContext { get }
-    func save()
+    var persistentStoreLoadError: Error? { get }
+    func save() throws
     func clearAllCoreData()
     func createFolder(name: String, parent: Folder?) -> Folder?
     func updateFolder(_ folder: Folder, name: String)
@@ -34,19 +35,24 @@ protocol CoreDataManaging {
 
 protocol FileStorageManaging {
     func saveFile(data: Data, fileName: String, fileType: String, targetFolder: Folder?) throws -> VaultItem
+    func saveFile(fromFileURL url: URL, fileName: String, fileType: String, targetFolder: Folder?) throws -> VaultItem
     func loadFile(vaultItem: VaultItem) throws -> Data
     func deleteFile(vaultItem: VaultItem) throws
     func permanentlyDeleteFile(vaultItem: VaultItem) throws
     func loadThumbnail(for vaultItem: VaultItem) -> Data?
+    func clearThumbnailCache()
     func loadImage(for vaultItem: VaultItem) async throws -> Data
     func determineFileType(from fileName: String) -> String
     func setupEncryptionKey(from password: String)
+    @discardableResult
+    func importPendingSharedFiles() -> Int
     func migrateFilesToNewEncryptionKey(oldPassword: String, newPassword: String, progress: @escaping (Int, Int) -> Void) async throws
     func toggleFavorite(for vaultItem: VaultItem)
     func fetchFavoriteItems() -> [VaultItem]
     func renameFile(vaultItem: VaultItem, newFileName: String) throws
     func prepareForSharing(vaultItem: VaultItem) throws -> URL
     func cleanupTemporaryFile(at url: URL)
+    func sweepTemporaryShareFiles()
     func clearAllStoredFiles()
     func getStorageInfo() -> (fileCount: Int, usedSpace: Int64)
 }

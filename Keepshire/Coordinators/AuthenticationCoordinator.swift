@@ -75,10 +75,16 @@ final class AuthenticationCoordinator: ObservableObject {
             isCheckingBiometric = false
             shouldShowPasscode = false
             loginStateManager.resetLoginState()
+            fileStorageManager.sweepTemporaryShareFiles()
+            fileStorageManager.clearThumbnailCache()
 
             if isPasswordSet && !isAuthenticated {
                 checkBiometricAuthentication()
             }
+        } else if isAuthenticated {
+            // Returning inside the auto-lock window skips unlock, so this is the only
+            // chance to pick up anything the Share Extension staged while we were away.
+            importSharedFilesIfUnlocked()
         }
     }
 
@@ -107,6 +113,7 @@ final class AuthenticationCoordinator: ObservableObject {
         isAuthenticated = true
         shouldShowPasscode = false
         biometricManager.resetFailureCount()
+        fileStorageManager.sweepTemporaryShareFiles()
         setupEncryptionKey()
     }
 
@@ -116,6 +123,8 @@ final class AuthenticationCoordinator: ObservableObject {
         isAuthenticated = false
         loginStateManager.resetLoginState()
         keychainManager.setLastBackgroundTime()
+        fileStorageManager.sweepTemporaryShareFiles()
+        fileStorageManager.clearThumbnailCache()
 
         DispatchQueue.main.async {
             let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
@@ -162,6 +171,12 @@ final class AuthenticationCoordinator: ObservableObject {
     private func setupEncryptionKey() {
         if let password = try? keychainManager.getPassword() {
             fileStorageManager.setupEncryptionKey(from: password)
+            importSharedFilesIfUnlocked()
         }
+    }
+
+    private func importSharedFilesIfUnlocked() {
+        guard !loginStateManager.isFakeLogin else { return }
+        fileStorageManager.importPendingSharedFiles()
     }
 }

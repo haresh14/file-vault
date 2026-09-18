@@ -40,18 +40,23 @@ struct WebUploadTabView: View {
                     Spacer(minLength: 20)
                 }
                 .padding()
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("Web Upload")
             .navigationBarTitleDisplayMode(.inline)
         }
         .sheet(isPresented: $showQRCode) {
             WebUploadQRCodeView(url: webServer.serverURL)
+                .presentationSizing(.form)
         }
         .sheet(isPresented: $showInstructions) {
             InstructionsView()
+                .presentationSizing(.form)
         }
         .sheet(isPresented: $showExportUnlock) {
             WebExportUnlockSheet { webServer.beginExportSession() }
+                .presentationSizing(.form)
         }
     }
 

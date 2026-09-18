@@ -118,6 +118,7 @@ struct SettingsTrashDataSections: View {
     let fileCount: Int
     let formattedUsedSpace: String
     let updateTrashEnabled: (Bool) -> Void
+    var openTrash: (() -> Void)? = nil
 
     var body: some View {
         Group {
@@ -126,16 +127,29 @@ struct SettingsTrashDataSections: View {
                     .accessibilityIdentifier("settings.trash")
                     .onChange(of: trashEnabled) { _, value in updateTrashEnabled(value) }
                 if trashEnabled {
-                    NavigationLink(destination: TrashView()) {
-                        HStack {
-                            Text("View Trash")
-                            Spacer()
-                            if trashItemCount > 0 {
-                                Text("\(trashItemCount)").foregroundColor(.secondary)
+                    if let openTrash {
+                        Button(action: openTrash) {
+                            HStack {
+                                Text("View Trash")
+                                Spacer()
+                                if trashItemCount > 0 {
+                                    Text("\(trashItemCount)").foregroundColor(.secondary)
+                                }
                             }
                         }
+                        .foregroundColor(.primary)
+                    } else {
+                        NavigationLink(destination: TrashView()) {
+                            HStack {
+                                Text("View Trash")
+                                Spacer()
+                                if trashItemCount > 0 {
+                                    Text("\(trashItemCount)").foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .foregroundColor(.primary)
                     }
-                    .foregroundColor(.primary)
                     Text("Deleted files are moved to trash instead of being permanently deleted.")
                         .font(.caption2)
                         .foregroundColor(.secondary)

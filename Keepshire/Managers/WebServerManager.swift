@@ -878,7 +878,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
         // Notify UI to refresh with more comprehensive notifications
         DispatchQueue.main.async {
             // Save Core Data context to ensure changes are persisted
-            CoreDataManager.shared.save()
+            CoreDataManager.shared.persistChanges()
             
             // Post multiple notifications to ensure all UI components refresh
             NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
@@ -998,7 +998,7 @@ class WebServerManager: ObservableObject, WebServerManaging {
                 
                 // Notify UI to refresh
                 DispatchQueue.main.async {
-                    CoreDataManager.shared.save()
+                    CoreDataManager.shared.persistChanges()
                     NotificationCenter.default.post(name: .refreshVaultItems, object: nil)
                     NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: CoreDataManager.shared.context)
                     NotificationCenter.default.post(name: .vaultDataChanged, object: nil)

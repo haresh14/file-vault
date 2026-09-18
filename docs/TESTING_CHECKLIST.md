@@ -53,14 +53,18 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 
 ## Unlock
 
-1. [ ] Wrong credential → error, fields clear
-2. [ ] Correct credential → tabs
-3. [ ] Fake password (if set) → empty UI, no add, no web server, Settings About only
+1. [ ] Fresh install selects 6-digit passcode by default and shows the no-recovery warning
+2. [ ] 4-digit remains selectable and is described as weaker
+3. [ ] Setup warns before saving: forgotten passcode/password means files cannot be recovered
+4. [ ] Wrong credential → error, fields clear
+5. [ ] Correct credential → tabs
+6. [ ] Fake password (if set) → empty UI, no add, no web server, Settings About only
 
 ## Change authentication
 
 - [ ] Change method in Settings re-encrypts files
-- [ ] Old credential cannot decrypt
+- [ ] If re-encrypt cannot finish, the old credential still opens files
+- [ ] Old credential cannot decrypt after a successful change
 - [ ] Fake password is cleared
 
 ## Vault encryption
@@ -75,13 +79,20 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Vault that had plaintext thumbs: first unlock still shows thumbnails (files are rewritten under AES-GCM)
 - [ ] After unlock, Gallery search still matches the original filename
 - [ ] Lock the device, inspect `Keepshire.sqlite` (or a Core Data dump): `fileName` / folder `name` are empty; `sealedMetadata` is present
-- [ ] `Documents/Vault`, `Documents/Thumbnails`, and `Keepshire.sqlite` have “Do not back up” set
+- [ ] Share a file, cancel the sheet, lock the app: no decrypted file remains under `tmp/keepshire-share/`
+- [ ] Import a video from Photos; the app stays running (does not jetsam on a large clip under 2 GB)
+- [ ] Files larger than 2 GB fail import with an error
 
 ## Files and folders
 
 - [ ] Import up to 50 photos/videos; document picker
 - [ ] Nested folders: create, rename, move, delete
-- [ ] Gallery and category search; folder tab has no search
+- [ ] Gallery and category search; folder search matches files and immediate child folders
+- [ ] On a physical device, the Folder search field is visible on the tab's first appearance and collapses once the list is scrolled, matching Gallery and the system apps
+- [ ] Folder search still works from the empty and no-results states
+- [ ] Folder tab shows its title on first load, and pushing into a nested folder does not flash "Folders" before the folder name
+- [ ] VoiceOver announces passcode progress without speaking digits
+- [ ] Largest Dynamic Type keeps the number pad and Continue controls usable
 - [ ] Sort, multi-select, favorite, share, rename, move
 - [ ] Trash restore / empty / disable with contents
 - [ ] Trash off: delete a file and confirm its `Documents/Vault/` blob and `Documents/Thumbnails/` thumb are gone
@@ -92,6 +103,35 @@ Simulator: Features → Face ID → Enrolled / Matching Face / Non-matching Face
 - [ ] Photo pinch, pan, double-tap zoom, swipe between items
 - [ ] Video play/pause, scrubber, ±15s, speed, pinch/double-tap zoom
 - [ ] Audio; PDF; other documents via QuickLook
+
+## Share Extension
+
+- [ ] Share an image, video, PDF, and generic file to Keepshire
+- [ ] Before unlock, files remain only in the App Group inbox
+- [ ] Fake-vault unlock does not import or remove pending files
+- [ ] Real-vault unlock encrypts pending files into the root folder and removes the inbox session
+- [ ] Sharing and returning to an already-unlocked vault (inside the auto-lock window) still imports
+- [ ] Force-quit during staging/import; retry does not lose a pending file
+
+## iPad and localization
+
+- [ ] Regular-width iPad Folder tab shows the nested folder outline, folder content, and selected-file preview; sidebar and breadcrumbs stay synchronized
+- [ ] Gallery and Trash show grid + preview detail; Categories show category + files + preview columns
+- [ ] Settings sidebar opens Authentication, Security, Data/Trash, Web/Background, and About without exposing full settings in the fake vault
+- [ ] Media and document previews have an explicit close control and file information remains usable with pointer/keyboard input
+- [ ] Web Upload and shared sheets use readable form widths rather than stretching edge to edge
+- [ ] Rotate iPad through all supported orientations and resize through Stage Manager/Split View; compact width falls back to the phone stack without stale selection
+- [ ] iPhone navigation, tab identifiers, search, selection, and full-screen previews are unchanged
+- [ ] Only one scene/window is offered
+- [ ] Pseudolanguage and right-to-left launch: labels fit, navigation direction mirrors, keypad stays ordered 1–9
+
+## Gallery performance and diagnostics
+
+- [ ] Gallery shows every photo and video after unlock, and excludes documents and audio
+- [ ] Gallery search and every sort option cover the whole vault, not just what is on screen
+- [ ] Locking clears decrypted thumbnail memory; thumbnails reload after unlock
+- [ ] Changing the passcode does not show a thumbnail decrypted under the old key
+- [ ] MetricKit diagnostic delivery records only its delivery date; no vault analytics or file metadata are logged
 
 ## Web upload
 

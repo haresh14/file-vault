@@ -156,9 +156,10 @@ final class VaultMainViewModel: ObservableObject, SelectionManageable, ImportMan
             vaultItems = []
             return
         }
-        
+
         let allItems = coreDataManager.fetchVaultItemsFromAllFolders()
-        // Filter to only show photos and videos in the Gallery
+        // fileType lives in sealed metadata, so media filtering has to happen after
+        // the fetch reveals it. A store-level predicate on fileType matches nothing.
         vaultItems = allItems.filter { $0.isImage || $0.isVideo }
     }
     

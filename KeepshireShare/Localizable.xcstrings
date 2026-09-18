@@ -1,0 +1,33 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld files ready" : {
+      "comment" : "Title shown after the extension stages several shared files"
+    },
+    "1 file ready" : {
+      "comment" : "Title shown after the extension stages a single shared file"
+    },
+    "Adding to Keepshire" : {
+
+    },
+    "Couldn’t add these files" : {
+
+    },
+    "Done" : {
+
+    },
+    "Keepshire cannot reach its shared storage. This build is missing the App Groups capability." : {
+
+    },
+    "No supported files were shared." : {
+
+    },
+    "Open and unlock Keepshire to import them into your vault." : {
+
+    },
+    "Preparing your files…" : {
+
+    }
+  },
+  "version" : "1.0"
+}

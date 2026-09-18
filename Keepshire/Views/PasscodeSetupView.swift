@@ -101,6 +101,14 @@ struct PasscodeSetupView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+
+            if !isFakePasswordSetup {
+                Text("If you forget this passcode, Keepshire cannot recover your files.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("passcode.noRecoveryWarning")
+            }
         }
     }
     

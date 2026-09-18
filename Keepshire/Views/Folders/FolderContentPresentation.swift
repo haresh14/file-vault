@@ -30,6 +30,7 @@ struct FolderContentSheetsModifier: ViewModifier {
                 )
                 .presentationDetents([.fraction(0.5)])
                 .presentationDragIndicator(.visible)
+                .presentationSizing(.form)
             }
             .sheet(isPresented: $viewModel.showAddActionSheet) {
                 UniversalAddContentView.forFolder(
@@ -39,6 +40,7 @@ struct FolderContentSheetsModifier: ViewModifier {
                 )
                 .presentationDetents([.fraction(0.4)])
                 .presentationDragIndicator(.visible)
+                .presentationSizing(.form)
             }
             .sheet(isPresented: $viewModel.showMoveSheet) {
                 FolderPickerView(
@@ -47,6 +49,7 @@ struct FolderContentSheetsModifier: ViewModifier {
                     currentFolder: folder,
                     onMove: move
                 )
+                .presentationSizing(.form)
             }
             .fullScreenCover(isPresented: mediaViewerPresented) {
                 UnifiedMediaViewerView(

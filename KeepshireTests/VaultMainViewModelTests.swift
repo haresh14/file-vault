@@ -74,7 +74,7 @@ struct VaultMainViewModelTests {
         #expect(viewModel.filteredItems.isEmpty, "Filtered items should be empty initially")
     }
 
-    @Test func testOrderingSearchSelectionAndMediaIndexParity() {
+    @Test func testOrderingSearchSelectionAndMediaIndexParity() throws {
         let coreData = TestCoreDataStore.reset()
         let storage = FakeFileStorageManager(coreDataManager: coreData)
         let login = FakeLoginStateManager()
@@ -83,7 +83,7 @@ struct VaultMainViewModelTests {
         let second = coreData.createVaultItem(fileType: "video/quicktime", fileName: "Alpha.mov", folder: nil)!
         second.createdAt = Date(timeIntervalSince1970: 2)
         _ = coreData.createVaultItem(fileType: "application/pdf", fileName: "Ignored.pdf", folder: nil)
-        coreData.save()
+        try coreData.save()
 
         let viewModel = VaultMainViewModel(
             coreDataManager: coreData,
@@ -101,6 +101,37 @@ struct VaultMainViewModelTests {
         viewModel.searchText = ""
         viewModel.showMediaViewerForItem(first)
         #expect(viewModel.mediaViewerIndex == 1)
+    }
+
+    /// fileType is nil in the store once metadata is sealed, so the gallery has to
+    /// filter media after the fetch reveals it. Every other gallery test uses a fake
+    /// storage manager and never seals, which hides that difference.
+    @Test func gallerySelectsMediaWhenMetadataIsSealed() throws {
+        let dependencies = try IsolatedTestDependencies()
+        let storage = dependencies.fileStorageManager
+        storage.setupEncryptionKey(from: "gallery-sealed")
+
+        let photo = try storage.saveFile(
+            data: Data("photo".utf8),
+            fileName: "Photo.jpg",
+            fileType: "image/jpeg",
+            targetFolder: nil
+        )
+        _ = try storage.saveFile(
+            data: Data("document".utf8),
+            fileName: "Invoice.pdf",
+            fileType: "application/pdf",
+            targetFolder: nil
+        )
+
+        let viewModel = VaultMainViewModel(
+            coreDataManager: dependencies.coreDataManager,
+            fileStorageManager: storage,
+            loginStateManager: FakeLoginStateManager()
+        )
+
+        #expect(photo.sealedMetadata != nil)
+        #expect(viewModel.vaultItems.map(\.fileName) == ["Photo.jpg"])
     }
 
     @Test func testFakeVaultFilteringAndInjectedImport() async {

@@ -9,7 +9,7 @@ import SwiftUI
 
 struct AuthTypeSelectionView: View {
     let onAuthTypeSelected: (AuthenticationType) -> Void
-    @State private var selectedType: AuthenticationType = .passcode4
+    @State private var selectedType: AuthenticationType = .passcode6
     @State private var navigationPath = NavigationPath()
     
     var body: some View {
@@ -61,6 +61,12 @@ struct AuthTypeSelectionView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+
+            Text("If you forget your passcode or password, Keepshire cannot recover your files.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("auth.noRecoveryWarning")
         }
     }
     
@@ -167,7 +173,7 @@ struct AuthTypeCard: View {
     private var descriptionText: String {
         switch type {
         case .passcode4:
-            return "Quick and simple 4-digit PIN"
+            return "Quick but weaker 4-digit PIN"
         case .passcode6:
             return "More secure 6-digit PIN"
         case .password:

@@ -35,7 +35,7 @@
 
 Keepshire is a **local, encrypted file vault** for iOS. Users store photos, videos, audio, documents, and other files on-device. Access is gated by a passcode or password, optionally Face ID / Touch ID. Files are encrypted at rest with a key derived from the vault credential.
 
-There is **no cloud sync, no App Groups, no widgets, no Share Extension, and no App Intents**. The only network feature is an optional **LAN HTTPS server** for browser upload/download on the same Wi‑Fi.
+There is **no cloud sync, widgets, or App Intents**. The Share Extension uses an App Group inbox to stage files; the main app encrypts them only after a real-vault unlock. The only network feature is an optional **LAN HTTPS server** for browser upload/download on the same Wi‑Fi.
 
 Architecture: SwiftUI app (`KeepshireApp` → `ContentView` → `AuthenticationCoordinator` → `MainTabView`), MVVM view models, protocol-based `DependencyContainer`, Core Data for metadata, encrypted files on disk.
 
@@ -73,7 +73,7 @@ These values live in App Store Connect, not in the binary (except the home-scree
 | Policy / support URLs | `https://keepshire.haresh.dev/privacy`, `https://keepshire.haresh.dev/support` | Settings → About |
 | Launch screen | Explicit empty `UILaunchScreen` dictionary | Required when linking with iOS 27 SDK |
 | Signing | Automatic | Team `AYL8H487NP` |
-| Entitlements file | **None** | No App Groups, iCloud, associated domains, or push entitlement |
+| Entitlements | App Group only | `group.com.haresh.keepshire`; no iCloud, associated domains, or push entitlement |
 
 No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 
@@ -105,7 +105,7 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 
 | Path / store | Protection | Encrypted by app? |
 |--------------|------------|-------------------|
-| `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes. Filenames on disk are the item UUID, not the display name. |
+| `Documents/Vault/` | `FileProtectionType.complete` | Yes — AES-GCM. Files under 16 MB are a single combined sealed box. Larger files use a `KSHC` chunked layout (1 MB plaintext chunks). Filenames on disk are the item UUID, not the display name. Imports above 2 GB are rejected. |
 | `Documents/Thumbnails/` | `FileProtectionType.complete` | Yes — AES-GCM combined sealed boxes named `{uuid}.thumb` (200×200 JPEG @ 0.7 before encryption) |
 | `Documents/Keepshire.sqlite` (+ WAL/SHM) | `completeUntilFirstUserAuthentication` | Display names, MIME types, and sizes are AES-GCM sealed JSON on each row (`sealedMetadata`). Search uses the decrypted copies in RAM after unlock. The store, `Documents/Vault/`, and `Documents/Thumbnails/` are excluded from iCloud/computer backup. |
 | Keychain items `com.haresh.keepshire` | `WhenUnlockedThisDeviceOnly` | System Keychain (credential + PBKDF2 salt/parameters) |
@@ -114,8 +114,10 @@ No Bonjour services are advertised, so `NSBonjourServices` is not declared.
 **Encryption details**
 
 - Key = PBKDF2-HMAC-SHA256 of the real credential (210,000 iterations, 16-byte random salt, 32-byte key). Salt and parameters live in Keychain account `vaultKeyDerivation` (`WhenUnlockedThisDeviceOnly`).
-- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files, thumbnails, and Core Data `sealedMetadata` JSON.
-- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Failed files are skipped. Item and folder metadata blobs are re-sealed with the new key.
+- Cipher: `AES.GCM.seal` / `AES.GCM.open` (combined nonce + ciphertext + tag) for vault files, thumbnails, and Core Data `sealedMetadata` JSON. Vault blobs at or above 16 MB are stored as versioned `KSHC` chunked sealed boxes so import does not hold the whole file in RAM.
+- Changing authentication generates a new salt and **re-encrypts every vault file** (`migrateFilesToNewEncryptionKey`) with a progress UI (`MigrationProgressView`). Re-encrypted copies are staged as `.migrating` files and committed only after every blob succeeds; a failure leaves the previous key and original ciphertext in place. Item and folder metadata blobs are re-sealed with the new key after that commit.
+- Core Data `save()` throws instead of crashing the process. A store that fails to load shows an error overlay on launch.
+- Share and preview decrypt into `tmp/keepshire-share/<session>/`. Those directories are removed when the share sheet finishes, when the vault locks, and on the next unlock.
 - If ciphertext exists but no derivation record is in Keychain, unlock derives a SHA-256 key long enough to open those files, then re-encrypts them with PBKDF2 and stores a salt.
 - Duplicate display names in a folder get a suffix (`name (n).ext`). Each item has its own UUID blob on disk. Display name, MIME type, and size live in sealed JSON; gallery search filters decrypted `fileName` values in memory.
 - Permanent delete removes the item's ciphertext and thumbnail from disk. Unlock also deletes vault files and thumbnails that no item claims; the sweep is skipped when the vault has no items.
@@ -165,8 +167,8 @@ Every item below is a **must-keep** behavior unless product explicitly drops it.
 
 | ID | Feature | User-visible behavior | Implementation | Apple APIs |
 |----|---------|----------------------|----------------|------------|
-| A1 | Choose auth type | First launch: 4-digit passcode, 6-digit passcode, or alphanumeric password | `AuthTypeSelectionView`, stored in UserDefaults `authenticationType` | SwiftUI |
-| A2 | 4-digit passcode setup | Numeric only, exact length 4, confirm step, OTP-style fields + custom number pad | `PasscodeSetupView`, `OTPStylePasscodeView`, `CustomNumberPadView` | SwiftUI |
+| A1 | Choose auth type | First launch: 6-digit passcode is selected by default; 4-digit passcode and alphanumeric password remain available. Setup warns that forgotten credentials cannot be recovered. | `AuthTypeSelectionView`, stored in UserDefaults `authenticationType` | SwiftUI |
+| A2 | 4-digit passcode setup | Numeric only, exact length 4, confirm step, OTP-style fields + custom number pad. Explicitly described as weaker than 6-digit. | `PasscodeSetupView`, `OTPStylePasscodeView`, `CustomNumberPadView` | SwiftUI |
 | A3 | 6-digit passcode setup | Same as A2, length 6 | same | SwiftUI |
 | A4 | Password setup | Minimum **6** characters, confirmation, strength UI | `PasswordSetupView` | SwiftUI |
 | A5 | Store credential | Saved in Keychain, this-device-only, not iCloud Keychain sync | `KeychainManager.savePassword`, service `com.haresh.keepshire`, account `userPassword` | Security.framework |
@@ -258,7 +260,7 @@ MIME detection: `FileStorageManager.determineFileType(from:)` by extension; UTI 
 | O3 | Favorite | Toggle `isFavorite`; heart in viewer and lists | Core Data |
 | O4 | Share / export | Decrypt to temp file → share sheet | `UIActivityViewController`, `ShareManager`, `prepareForSharing` |
 | O5 | Delete | Trash if enabled; else permanent delete of the Core Data row, the UUID blob, and the thumbnail | Core Data + FileStorage |
-| O6 | Search | **Gallery** and **Category files** use SwiftUI `.searchable` and filter `fileName` immediately (no debounce). Folder browser has **no** search field. | SwiftUI searchable |
+| O6 | Search | **Gallery**, **Category files**, and the **Folder browser** use SwiftUI `.searchable`. Folder search matches decrypted file names and immediate child-folder names. | SwiftUI searchable |
 | O7 | Sort files | User Default, Name, Size, Date, Kind, Favorites | `SortOption` / `FolderSortOption` |
 | O8 | Multi-select | Long-press or “Select”; Select All; Favorite, Share, Move, Delete | Selection toolbars / floating bar |
 | O9 | Context menu (file) | Select, Favorite/Unfavorite, Rename, Move, Share, Delete | SwiftUI contextMenu |
@@ -386,10 +388,13 @@ Fake login: **About only**.
 | X2 | Sheets | SwiftUI `.sheet` / `.fullScreenCover` for pickers, add content, web upload, trash, and auth change |
 | X3 | Dark mode | System SwiftUI colors (`Color(.systemGray6)`, etc.); no custom theme engine |
 | X4 | Orientations | iPhone: portrait + landscape; iPad: all four |
-| X5 | Localization | **English hardcoded strings only** — no `Localizable.strings` |
-| X6 | Accessibility | Standard SwiftUI controls; no dedicated VoiceOver audit artifacts |
-| X7 | Dynamic Type | Relies on SwiftUI text styles in places; not systematically audited |
-| X8 | iPad | Same targets/layouts; no split-view, multiple windows, or document browser scene. Multiple scenes are disabled |
+| X5 | Localization | English source strings use string catalogs in the app and Share Extension; layouts use leading/trailing semantics and the numeric keypad intentionally stays left-to-right. |
+| X6 | Accessibility | Auth choices, secret passcode entry count, number pad, vault/folder rows, preview actions, trash actions, web upload, and player controls have VoiceOver labels. Number-pad keys and passcode fields scale with Dynamic Type and retain 44-point targets. |
+| X7 | Dynamic Type | SwiftUI text styles plus scaled passcode fields and keypad controls; auth setup remains usable at accessibility sizes. |
+| X8 | iPad | Regular-width iPad uses native adaptive tabs and split layouts: a nested Folder outline, category/sidebar navigation, Gallery and Trash grid/detail previews, sectioned Settings, and embedded file/media previews. Compact iPad windows retain the iPhone stacks. Web Upload uses a centered readable column. Multiple scenes remain disabled. |
+| X9 | Share Extension import | The extension copies supported files to `group.com.haresh.keepshire/Inbox/<session>/` without vault or Keychain access. The app drains the inbox on a real unlock, and also on foreground when the vault is still unlocked inside the auto-lock window; fake-vault unlocks never drain it. |
+| X10 | Gallery thumbnail cache | Gallery fetches all non-trashed items and selects photos/videos in memory, because `fileType` lives in sealed metadata and cannot be filtered by a store predicate. Thumbnails decrypt lazily per visible cell; the decrypted data is memory-cached and purged whenever the vault locks or the key changes. |
+| X11 | Diagnostics | MetricKit crash/hang delivery only. The app stores the last delivery date and does not record vault analytics, file names, paths, or content. |
 
 ---
 
@@ -452,7 +457,7 @@ These are confirmed absences. Do not treat them as regressions unless product ad
 
 - Camera capture, scanning, or microphone recording
 - iCloud Drive / CloudKit / iCloud Keychain sync of vault files
-- Share Extension, Action Extension, Widgets, Live Activities, App Intents / Siri
+- Action Extension, Widgets, Live Activities, App Intents / Siri
 - Multiple windows / document-based `DocumentGroup`
 - Optic ID (visionOS) — Face ID / Touch ID only
 - PIN from system `LAPolicy.deviceOwnerAuthentication` as the primary unlock UI
@@ -468,7 +473,7 @@ These are confirmed absences. Do not treat them as regressions unless product ad
 
 | Target | Coverage (current files) |
 |--------|---------------------------|
-| KeepshireTests | Keychain (including derivation record), Core Data, storage/crypto/thumbnails/trash, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
+| KeepshireTests | Keychain (including derivation record), Core Data save-without-crash, storage/crypto/thumbnails/trash, chunked vault blobs, tmp share sweep, fail-closed passcode migration, VaultCryptoService PBKDF2, Security, Biometric, authentication coordination, shared imports, Folder and VaultMain view models, WebServer HTML/HTTP helpers, DI, EmptyState, video lifecycle |
 | KeepshireUITests | First-launch authentication, tab/navigation, fake-vault restrictions, add controls, and launch smoke tests |
 
 Upgrade work should run unit tests on the new SDK simulator and a smoke pass of UI tests. Tests are not a substitute for the checklist below.
@@ -500,7 +505,7 @@ Use this for iOS 27, 28, 29, or any Xcode bump. Check every box against a **devi
 - [ ] Document picker: PDF, text, Office-like, zip, audio
 - [ ] Duplicate and rename-collision behavior unchanged
 - [ ] Nested folders: create, rename, move (no cycle), delete + trash rules, swipe-to-delete
-- [ ] Gallery search (filename, live filter); Category search; folders have no search
+- [ ] Gallery, Category, and Folder search (file and immediate child-folder names)
 - [ ] Sort, multi-select, share, favorite (Gallery, Folders, Categories)
 - [ ] Categories counts and filters
 - [ ] Trash restore / empty / disable-with-contents alert

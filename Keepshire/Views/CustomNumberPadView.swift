@@ -11,6 +11,7 @@ struct CustomNumberPadView: View {
     let onNumberTapped: (String) -> Void
     let onBackspaceTapped: () -> Void
     let onHelpTapped: (() -> Void)?
+    @ScaledMetric(relativeTo: .body) private var rowSpacing: CGFloat = 12
     
     init(onNumberTapped: @escaping (String) -> Void, onBackspaceTapped: @escaping () -> Void, onHelpTapped: (() -> Void)? = nil) {
         self.onNumberTapped = onNumberTapped
@@ -26,9 +27,9 @@ struct CustomNumberPadView: View {
     ]
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: rowSpacing) {
             ForEach(numbers, id: \.self) { row in
-                HStack(spacing: 16) {
+                HStack(spacing: rowSpacing) {
                     ForEach(row, id: \.self) { item in
                         NumberPadButton(
                             text: item,
@@ -47,19 +48,26 @@ struct CustomNumberPadView: View {
             }
         }
         .padding()
+        // Numeric order must stay 1–9 in every locale.
+        .environment(\.layoutDirection, .leftToRight)
     }
 }
 
 struct NumberPadButton: View {
     let text: String
     let action: () -> Void
+    @ScaledMetric(relativeTo: .title2) private var keySize: CGFloat = 72
+
+    private var scaledKeySize: CGFloat {
+        min(keySize, 96)
+    }
     
     var body: some View {
         Button(action: action) {
             ZStack {
                 Circle()
                     .fill(Color(.systemGray5))
-                    .frame(width: 80, height: 80)
+                    .frame(width: scaledKeySize, height: scaledKeySize)
                 
                 if text == "⌫" {
                     Image(systemName: "delete.left")
@@ -78,6 +86,7 @@ struct NumberPadButton: View {
             }
         }
         .buttonStyle(NumberPadButtonStyle())
+        .frame(minWidth: 44, minHeight: 44)
         .accessibilityIdentifier(text == "⌫" ? "keypad.delete" : text == "?" ? "keypad.help" : "keypad.\(text)")
         .accessibilityLabel(text == "⌫" ? "Delete" : text == "?" ? "Help" : text)
     }

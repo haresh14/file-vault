@@ -12,6 +12,7 @@ import AVFoundation
 struct UnifiedMediaViewerView: View {
     let mediaItems: [VaultItem]
     let initialIndex: Int
+    let onDismiss: (() -> Void)?
     
     // The currentIndex needs to be optional for .scrollPosition
     @State private var currentIndex: Int?
@@ -23,9 +24,14 @@ struct UnifiedMediaViewerView: View {
     @StateObject private var gestureHandler = FileInfoGestureHandler()
     @Environment(\.dismiss) private var dismiss
     
-    init(mediaItems: [VaultItem], initialIndex: Int) {
+    init(
+        mediaItems: [VaultItem],
+        initialIndex: Int,
+        onDismiss: (() -> Void)? = nil
+    ) {
         self.mediaItems = mediaItems
         self.initialIndex = initialIndex
+        self.onDismiss = onDismiss
         // We set the initial value in onAppear
         self._currentIndex = State(initialValue: initialIndex)
     }
@@ -59,7 +65,7 @@ struct UnifiedMediaViewerView: View {
                         gestureHandler: gestureHandler,
                         geometry: geometry,
                         onFavoriteToggle: toggleFavorite,
-                        onDismiss: { dismiss() },
+                        onDismiss: close,
                         isScrollDisabled: isScrollDisabled
                     ) {
                         // Main media content
@@ -106,22 +112,24 @@ struct UnifiedMediaViewerView: View {
                             }
                             
                             // Favorite and Share buttons overlay (hidden during zoom and when info panel is shown)
-                            if !isScrollDisabled && !mediaItems.isEmpty && !gestureHandler.showInfoPanel {
+                            if !isScrollDisabled && !mediaItems.isEmpty {
                                 VStack {
                                     HStack {
+                                        Button(action: close) {
+                                            Image(systemName: "xmark")
+                                                .foregroundColor(.white)
+                                                .modifier(MediaViewerControlStyle())
+                                        }
+                                        .accessibilityLabel("Close preview")
+
                                         Spacer()
-                                        HStack(spacing: 20) {
+                                        HStack(spacing: 12) {
                                             // Favorite button
                                             Button(action: toggleFavorite) {
                                                 let isFavorite = currentItem.id.flatMap { favoriteStatus[$0] } ?? currentItem.isFavorite
                                                 Image(systemName: isFavorite ? "heart.fill" : "heart")
                                                     .foregroundColor(isFavorite ? .red : .white)
-                                                    .font(.title2)
-                                                    .background(
-                                                        Circle()
-                                                            .fill(Color.black.opacity(0.5))
-                                                            .frame(width: 44, height: 44)
-                                                    )
+                                                    .modifier(MediaViewerControlStyle())
                                             }
                                             
                                             // Share button
@@ -130,16 +138,11 @@ struct UnifiedMediaViewerView: View {
                                             }) {
                                                 Image(systemName: "square.and.arrow.up")
                                                     .foregroundColor(.white)
-                                                    .font(.title2)
-                                                    .background(
-                                                        Circle()
-                                                            .fill(Color.black.opacity(0.5))
-                                                            .frame(width: 44, height: 44)
-                                                    )
+                                                    .modifier(MediaViewerControlStyle())
                                             }
                                         }
-                                        .padding(.trailing, 20)
                                     }
+                                    .padding(.horizontal, 20)
                                     Spacer()
                                 }
                                 .padding(.top, 50) // Account for safe area
@@ -160,6 +163,25 @@ struct UnifiedMediaViewerView: View {
                 }
             }
         }
+    }
+
+    private func close() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
+    }
+}
+
+/// Sizes the circular overlay controls by their frame rather than their glyph, so
+/// every control occupies the same bounds and lines up with the row's padding.
+private struct MediaViewerControlStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.title2)
+            .frame(width: 44, height: 44)
+            .background(Circle().fill(Color.black.opacity(0.5)))
     }
 }
 

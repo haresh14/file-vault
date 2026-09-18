@@ -37,8 +37,21 @@ final class ThumbnailGenerationService {
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(tempFileName)
         try data.write(to: tempURL)
         defer { try? fileManager.removeItem(at: tempURL) }
+        return try generateVideoThumbnail(
+            fromFileURL: tempURL,
+            storageKey: storageKey,
+            displayFileName: displayFileName,
+            key: key
+        )
+    }
 
-        let asset = AVURLAsset(url: tempURL)
+    func generateVideoThumbnail(
+        fromFileURL fileURL: URL,
+        storageKey: String,
+        displayFileName: String,
+        key: SymmetricKey
+    ) throws -> String? {
+        let asset = AVURLAsset(url: fileURL)
         // Intentionally retained for behavior compatibility; modernization is a later wave.
         guard !asset.tracks(withMediaType: .video).isEmpty else {
             return generateGenericVideoThumbnail(storageKey: storageKey, displayFileName: displayFileName, key: key)

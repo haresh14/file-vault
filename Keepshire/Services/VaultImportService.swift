@@ -71,9 +71,9 @@ final class VaultImportService: VaultImportServicing {
                         recordProcessed()
                         group.leave()
                     }
-                    guard let url, let data = try? Data(contentsOf: url) else { return }
+                    guard let url else { return }
                     self?.save(
-                        data: data,
+                        fromFileURL: url,
                         fileName: "Video.mov",
                         fileType: "video/quicktime",
                         targetFolder: targetFolder
@@ -110,6 +110,22 @@ final class VaultImportService: VaultImportServicing {
             progress(Double(index + 1), total)
         }
         completion()
+    }
+
+    private func save(fromFileURL url: URL, fileName: String, fileType: String, targetFolder: Folder?) {
+        do {
+            _ = try fileStorageManager.saveFile(
+                fromFileURL: url,
+                fileName: fileName,
+                fileType: fileType,
+                targetFolder: targetFolder
+            )
+            VaultLog.debug("Successfully imported file: \(fileName)")
+        } catch FileStorageError.duplicateFile {
+            VaultLog.debug("Skipped duplicate file: \(fileName)")
+        } catch {
+            VaultLog.debug("Error importing file \(fileName): \(error)")
+        }
     }
 
     private func save(data: Data, fileName: String, fileType: String, targetFolder: Folder?) {

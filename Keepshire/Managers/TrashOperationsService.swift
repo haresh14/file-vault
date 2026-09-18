@@ -21,7 +21,7 @@ final class TrashOperationsService {
     func moveToTrash(_ item: VaultItem) {
         item.isTrashed = true
         item.trashedAt = Date()
-        coreDataManager.save()
+        coreDataManager.persistChanges()
     }
 
     func permanentlyDelete(_ item: VaultItem) {

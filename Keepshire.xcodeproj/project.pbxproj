@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0820B4E91BAD26DFF25C1B9D /* KeepshireShare.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 4AEB6B4823EEFEE563146342 /* KeepshireShare.appex */; };
+		6F401FB2EA32A89E5C36A7A2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA8EEC916E949C7E599A95AF /* Foundation.framework */; };
+		820D47712B57487C1655DBE6 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE30A3F6A4731E8C4AB1747A /* ShareViewController.swift */; };
+		CED03D45E0413967818354C0 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4C0809F9D3F88DD39B8 /* Localizable.xcstrings */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		04628D822E1FEC59006A0BF8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,12 +28,39 @@
 			remoteGlobalIDString = 04628D732E1FEC56006A0BF8;
 			remoteInfo = Keepshire;
 		};
+		CCD30552F08F36968FD3BAD8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04628D6C2E1FEC56006A0BF8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7FBAC734C18F1DAA051A304D;
+			remoteInfo = KeepshireShare;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		68D1FC1956905BDD71FD10D8 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0820B4E91BAD26DFF25C1B9D /* KeepshireShare.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		04628D742E1FEC56006A0BF8 /* Keepshire.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepshire.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		04628D812E1FEC59006A0BF8 /* KeepshireTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KeepshireTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		04628D8B2E1FEC59006A0BF8 /* KeepshireUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KeepshireUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		23C5B4C0809F9D3F88DD39B8 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		47203CBB08B8566FFAD09CD0 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4AEB6B4823EEFEE563146342 /* KeepshireShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KeepshireShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CE30A3F6A4731E8C4AB1747A /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		DC2F50D78583DF69688AAFFB /* KeepshireShare.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = KeepshireShare.entitlements; sourceTree = "<group>"; };
+		FA8EEC916E949C7E599A95AF /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -82,6 +116,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E21D78592175C0A050C5364 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F401FB2EA32A89E5C36A7A2 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -92,6 +134,8 @@
 				04628D842E1FEC59006A0BF8 /* KeepshireTests */,
 				04628D8E2E1FEC59006A0BF8 /* KeepshireUITests */,
 				04628D752E1FEC56006A0BF8 /* Products */,
+				D851703776EF1FA22200D2AA /* Frameworks */,
+				12776C8B41A4F099D8AFA84B /* KeepshireShare */,
 			);
 			sourceTree = "<group>";
 		};
@@ -101,8 +145,36 @@
 				04628D742E1FEC56006A0BF8 /* Keepshire.app */,
 				04628D812E1FEC59006A0BF8 /* KeepshireTests.xctest */,
 				04628D8B2E1FEC59006A0BF8 /* KeepshireUITests.xctest */,
+				4AEB6B4823EEFEE563146342 /* KeepshireShare.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		12776C8B41A4F099D8AFA84B /* KeepshireShare */ = {
+			isa = PBXGroup;
+			children = (
+				CE30A3F6A4731E8C4AB1747A /* ShareViewController.swift */,
+				47203CBB08B8566FFAD09CD0 /* Info.plist */,
+				DC2F50D78583DF69688AAFFB /* KeepshireShare.entitlements */,
+				23C5B4C0809F9D3F88DD39B8 /* Localizable.xcstrings */,
+			);
+			path = KeepshireShare;
+			sourceTree = "<group>";
+		};
+		5DF9EA80D5B7449F92C8F9ED /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				FA8EEC916E949C7E599A95AF /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		D851703776EF1FA22200D2AA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5DF9EA80D5B7449F92C8F9ED /* iOS */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -115,17 +187,17 @@
 				04628D702E1FEC56006A0BF8 /* Sources */,
 				04628D712E1FEC56006A0BF8 /* Frameworks */,
 				04628D722E1FEC56006A0BF8 /* Resources */,
+				68D1FC1956905BDD71FD10D8 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5046E6D5E8252415DFEA3732 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				04628D762E1FEC56006A0BF8 /* Keepshire */,
 			);
 			name = Keepshire;
-			packageProductDependencies = (
-			);
 			productName = Keepshire;
 			productReference = 04628D742E1FEC56006A0BF8 /* Keepshire.app */;
 			productType = "com.apple.product-type.application";
@@ -147,8 +219,6 @@
 				04628D842E1FEC59006A0BF8 /* KeepshireTests */,
 			);
 			name = KeepshireTests;
-			packageProductDependencies = (
-			);
 			productName = KeepshireTests;
 			productReference = 04628D812E1FEC59006A0BF8 /* KeepshireTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -170,11 +240,26 @@
 				04628D8E2E1FEC59006A0BF8 /* KeepshireUITests */,
 			);
 			name = KeepshireUITests;
-			packageProductDependencies = (
-			);
 			productName = KeepshireUITests;
 			productReference = 04628D8B2E1FEC59006A0BF8 /* KeepshireUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		7FBAC734C18F1DAA051A304D /* KeepshireShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 593545B5CC332A170F2517FB /* Build configuration list for PBXNativeTarget "KeepshireShare" */;
+			buildPhases = (
+				FDCE79EA6194EC544A69662F /* Sources */,
+				5E21D78592175C0A050C5364 /* Frameworks */,
+				BC5F385B66DD4827ABCFE83E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KeepshireShare;
+			productName = KeepshireShare;
+			productReference = 4AEB6B4823EEFEE563146342 /* KeepshireShare.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -216,6 +301,7 @@
 				04628D732E1FEC56006A0BF8 /* Keepshire */,
 				04628D802E1FEC59006A0BF8 /* KeepshireTests */,
 				04628D8A2E1FEC59006A0BF8 /* KeepshireUITests */,
+				7FBAC734C18F1DAA051A304D /* KeepshireShare */,
 			);
 		};
 /* End PBXProject section */
@@ -239,6 +325,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC5F385B66DD4827ABCFE83E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CED03D45E0413967818354C0 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,6 +360,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FDCE79EA6194EC544A69662F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				820D47712B57487C1655DBE6 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -278,6 +380,12 @@
 			isa = PBXTargetDependency;
 			target = 04628D732E1FEC56006A0BF8 /* Keepshire */;
 			targetProxy = 04628D8C2E1FEC59006A0BF8 /* PBXContainerItemProxy */;
+		};
+		5046E6D5E8252415DFEA3732 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = KeepshireShare;
+			target = 7FBAC734C18F1DAA051A304D /* KeepshireShare */;
+			targetProxy = CCD30552F08F36968FD3BAD8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -410,6 +518,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Keepshire/Keepshire.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -417,6 +526,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Keepshire/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Keepshire: Private Photo Vault";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -438,6 +548,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Keepshire/Keepshire.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -445,6 +556,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Keepshire/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Keepshire: Private Photo Vault";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -533,6 +645,51 @@
 			};
 			name = Release;
 		};
+		A2A90F1548F14B908DF7E29F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = KeepshireShare/KeepshireShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AYL8H487NP;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KeepshireShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haresh.keepshire.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F0599A1C1BD1E97A8B5C6EEB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = KeepshireShare/KeepshireShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AYL8H487NP;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KeepshireShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haresh.keepshire.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -568,6 +725,15 @@
 			buildConfigurations = (
 				04628D9C2E1FEC59006A0BF8 /* Debug */,
 				04628D9D2E1FEC59006A0BF8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		593545B5CC332A170F2517FB /* Build configuration list for PBXNativeTarget "KeepshireShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A90F1548F14B908DF7E29F /* Release */,
+				F0599A1C1BD1E97A8B5C6EEB /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

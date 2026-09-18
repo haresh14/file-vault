@@ -201,7 +201,7 @@ struct FileStorageManagerTests {
             fileName: "legacy.txt",
             key: crypto.legacySHA256Key(from: password)
         )
-        let item = storage.coreDataManager.createVaultItem(
+        let item = try storage.coreDataManager.createVaultItem(
             fileName: "legacy.txt",
             fileType: "text/plain",
             fileSize: Int64(payload.count)
@@ -331,6 +331,23 @@ struct FileStorageManagerTests {
         let onDisk = try Data(contentsOf: thumbURL)
         #expect(UIImage(data: onDisk) == nil)
         #expect(onDisk != jpeg)
+    }
+
+    @Test func testThumbnailCachePopulatesAndClearsOnLock() async throws {
+        let storage = try makeStorage()
+        let manager = storage.fileStorageManager
+        manager.setupEncryptionKey(from: "thumbnail-cache")
+        let item = try manager.saveFile(
+            data: createTestImage().pngData()!,
+            fileName: "cached.png",
+            fileType: "image/png"
+        )
+
+        #expect(!manager.isThumbnailCached(for: item))
+        #expect(manager.loadThumbnail(for: item) != nil)
+        #expect(manager.isThumbnailCached(for: item))
+        manager.clearThumbnailCache()
+        #expect(!manager.isThumbnailCached(for: item))
     }
 
     @Test func testWrongKeyDoesNotRevealThumbnail() async throws {
@@ -515,7 +532,7 @@ struct FileStorageManagerTests {
 
     @Test func testLegacyPlaintextMetadataSealsOnUnlock() async throws {
         let storage = try makeStorage()
-        let item = storage.coreDataManager.createVaultItem(
+        let item = try storage.coreDataManager.createVaultItem(
             fileName: "legacy-meta.txt",
             fileType: "text/plain",
             fileSize: 4
@@ -570,7 +587,7 @@ struct FileStorageManagerTests {
             item.createdAt = Date()
         }
         let sealStart = CFAbsoluteTimeGetCurrent()
-        storage.coreDataManager.save()
+        try storage.coreDataManager.save()
         let sealSeconds = CFAbsoluteTimeGetCurrent() - sealStart
 
         context.reset()
@@ -729,7 +746,7 @@ struct FileStorageManagerTests {
 
         item.isTrashed = false
         item.trashedAt = nil
-        storage.coreDataManager.save()
+        try storage.coreDataManager.save()
         #expect(storage.coreDataManager.fetchVaultItems(in: nil).contains(item))
 
         manager.moveToTrash(vaultItem: item)

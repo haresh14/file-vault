@@ -9,6 +9,7 @@ import SwiftUI
 
 /// Reusable grid component for displaying vault items with search and empty state support
 struct VaultGridView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     // MARK: - Properties
     
     let items: [VaultItem]
@@ -32,9 +33,21 @@ struct VaultGridView: View {
     
     // MARK: - Grid Configuration
     
-    private let columns = [
-        GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
-    ]
+    private var gridSpacing: CGFloat {
+        horizontalSizeClass == .regular ? 8 : 2
+    }
+
+    private var columns: [GridItem] {
+        [
+            GridItem(
+                .adaptive(
+                    minimum: horizontalSizeClass == .regular ? 140 : 100,
+                    maximum: horizontalSizeClass == .regular ? 220 : 150
+                ),
+                spacing: gridSpacing
+            )
+        ]
+    }
     
     // MARK: - Body
     
@@ -44,7 +57,7 @@ struct VaultGridView: View {
                 EmptyStateView(emptyStateConfig)
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 2) {
+                    LazyVGrid(columns: columns, spacing: gridSpacing) {
                         ForEach(items) { item in
                             VaultItemCell(
                                 item: item,
@@ -132,7 +145,7 @@ struct VaultGridView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 2)
+                    .padding(.horizontal, gridSpacing)
                 }
             }
         }

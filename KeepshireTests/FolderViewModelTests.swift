@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct FolderViewModelTests {
-    @Test func sortingSelectionAndMediaIndexMatchDisplayedOrder() {
+    @Test func sortingSelectionAndMediaIndexMatchDisplayedOrder() throws {
         let coreData = TestCoreDataStore.reset()
         let login = FakeLoginStateManager()
         let storage = FakeFileStorageManager(coreDataManager: coreData)
@@ -12,7 +12,7 @@ struct FolderViewModelTests {
         older.createdAt = Date(timeIntervalSince1970: 1)
         let newer = coreData.createVaultItem(fileType: "video/quicktime", fileName: "Alpha.mov", folder: nil)!
         newer.createdAt = Date(timeIntervalSince1970: 2)
-        coreData.save()
+        try coreData.save()
 
         let viewModel = FolderViewModel(
             folder: nil,
@@ -48,6 +48,45 @@ struct FolderViewModelTests {
 
         #expect(viewModel.files.isEmpty)
         #expect(viewModel.sortedFiles.isEmpty)
+    }
+
+    @Test func searchFiltersFolderAndFileNamesAndSelectAllUsesVisibleResults() {
+        let coreData = TestCoreDataStore.reset()
+        let trip = coreData.createFolder(name: "Summer Trip", parent: nil)!
+        _ = coreData.createFolder(name: "Receipts", parent: nil)
+        let beach = coreData.createVaultItem(
+            fileType: "image/jpeg",
+            fileName: "Beach.jpg",
+            folder: nil
+        )!
+        _ = coreData.createVaultItem(
+            fileType: "application/pdf",
+            fileName: "Invoice.pdf",
+            folder: nil
+        )
+        let viewModel = FolderViewModel(
+            folder: nil,
+            coreDataManager: coreData,
+            fileStorageManager: FakeFileStorageManager(coreDataManager: coreData),
+            loginStateManager: FakeLoginStateManager()
+        )
+
+        viewModel.searchText = "trip"
+        #expect(viewModel.sortedFolders == [trip])
+        #expect(viewModel.sortedFiles.isEmpty)
+
+        viewModel.searchText = "beach"
+        #expect(viewModel.sortedFolders.isEmpty)
+        #expect(viewModel.sortedFiles == [beach])
+        viewModel.selectAll()
+        #expect(viewModel.selectedFolders.isEmpty)
+        #expect(viewModel.selectedFiles == Set([beach]))
+
+        viewModel.searchText = "missing"
+        #expect(viewModel.isShowingNoSearchResults)
+        viewModel.searchText = ""
+        #expect(viewModel.sortedFolders.count == 2)
+        #expect(viewModel.sortedFiles.count == 2)
     }
 
     @Test func importsPassCurrentFolderAndExposeProgress() {
